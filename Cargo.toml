@@ -1,0 +1,25 @@
+[package]
+name = "tessera"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "A PKCS#11 token hub for Flatpak: runs the token drivers in one sandbox and shares them with other apps through p11-kit"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/pedrohqb/tessera"
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+cryptoki = "0.12"
+pcsc = "2.9"
+x509-parser = "0.18"
+serde = { version = "1", features = ["derive"] }
+toml = "1"
+libloading = "0.9"
+ashpd = { version = "0.13", default-features = false, features = ["async-io", "background"] }
+anyhow = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

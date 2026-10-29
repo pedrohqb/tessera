@@ -1,0 +1,4 @@
+name = "SafeNet Authentication Client"
+vendor = "Thales"
+description = "SafeNet eToken 5100/5110 and IDPrime"
+module = "/app/extra/drivers/safenet/libeToken.so"

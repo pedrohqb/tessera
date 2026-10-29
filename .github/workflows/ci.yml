@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libpcsclite-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --locked -- -D warnings
+      - run: cargo test --locked
+
+  flatpak:
+    name: Flatpak bundle
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Check the vendor drivers against their pins and fill in sizes
+        run: python3 scripts/pin-drivers.py
+      - name: Build
+        run: |
+          flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --repo=repo build-dir flatpak/io.github.pedrohqb.Tessera.yml
+          flatpak build-bundle repo tessera.flatpak io.github.pedrohqb.Tessera
+      - name: Release tarball (the binary built against the runtime)
+        run: |
+          mkdir -p dist/tessera
+          cp -a build-dir/files/bin/tessera build-dir/files/bin/apply_extra dist/tessera/
+          cp -a build-dir/files/share dist/tessera/
+          mkdir -p dist/tessera/lib/tessera
+          cp -a build-dir/files/lib/tessera/drivers dist/tessera/lib/tessera/
+          tar -C dist -czf tessera-x86_64.tar.gz tessera
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tessera-x86_64
+          path: |
+            tessera.flatpak
+            tessera-x86_64.tar.gz
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" tessera.flatpak tessera-x86_64.tar.gz --title "$GITHUB_REF_NAME" --generate-notes
+    permissions:
+      contents: write

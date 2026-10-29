@@ -1,0 +1,8 @@
+name = "SafeSign IC"
+vendor = "A.E.T. Europe"
+description = "GD Burti and other SafeSign tokens"
+module = "/app/extra/drivers/safesign/libaetpkss.so"
+
+[[tools]]
+name = "Token Administration"
+exec = ["/app/extra/drivers/safesign/tokenadmin"]

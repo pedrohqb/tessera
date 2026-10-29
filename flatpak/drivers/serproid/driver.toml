@@ -1,0 +1,9 @@
+name = "SerproID"
+vendor = "Serpro"
+description = "Cloud certificate; sign in with the SerproID app"
+module = "/app/extra/drivers/serproid/libserproidp11.so"
+create_dirs = ["~/.config/serproid/certificados"]
+
+[[tools]]
+name = "SerproID"
+exec = ["/app/extra/drivers/serproid/serproid"]

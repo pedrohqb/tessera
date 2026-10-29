@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.pedrohqb.Tessera</id>
+  <launchable type="desktop-id">io.github.pedrohqb.Tessera.desktop</launchable>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Tessera</name>
+  <summary>Share smart card and token drivers with your other apps</summary>
+  <summary xml:lang="pt-BR">Compartilhe os drivers de cartões e tokens com seus outros aplicativos</summary>
+  <developer id="io.github.pedrohqb">
+    <name>Pedro Henrique Quitete Barreto</name>
+  </developer>
+  <url type="homepage">https://github.com/pedrohqb/tessera</url>
+  <url type="bugtracker">https://github.com/pedrohqb/tessera/issues</url>
+  <description>
+    <p>Tessera lets sandboxed apps use hardware tokens, smart cards and cloud certificates without installing any driver on the system. It runs the token drivers inside its own sandbox and shares every token with other apps through p11-kit, the standard way for Linux apps to reach PKCS#11 devices.</p>
+    <p>This is meant for immutable systems such as Fedora Silverblue, Kinoite, Bluefin, Aurora and Bazzite, where installing a vendor's driver package on the host is hard or impossible.</p>
+    <ul>
+      <li>Shows the card readers, the inserted tokens and their certificates</li>
+      <li>Drivers included: OpenSC (PIV, YubiKey, CAC, many national ID cards), SafeSign IC, SafeNet Authentication Client and SerproID; more can be added as extensions</li>
+      <li>Vendor drivers are downloaded from the vendors at install time and checked against pinned checksums</li>
+      <li>Opens the vendors' tools, such as SafeSign's Token Administration and the SerproID app</li>
+      <li>Sets up Firefox and Papers to use the tokens, and shows the command that lets them reach Tessera</li>
+      <li>Keeps running in the background, and can start at login</li>
+    </ul>
+    <p>Apps connect to the socket at $XDG_RUNTIME_DIR/p11-kit/pkcs11 by loading p11-kit-client.so. PJeOffice Pro from FlatPark connects there already.</p>
+    <p>The host still needs pcscd and the CCID driver, which most distributions ship.</p>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/pedrohqb/tessera/main/data/screenshots/main.png</image>
+      <caption>Readers, tokens, drivers and apps</caption>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Utility</category>
+    <category>Security</category>
+  </categories>
+  <keywords>
+    <keyword>token</keyword>
+    <keyword>smart card</keyword>
+    <keyword>certificate</keyword>
+    <keyword>PKCS#11</keyword>
+    <keyword>p11-kit</keyword>
+  </keywords>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <releases>
+    <release version="0.1.0" date="2026-10-29">
+      <description>
+        <p>First release: token service, readers, tokens and certificates, drivers, and Firefox and Papers setup.</p>
+      </description>
+    </release>
+  </releases>
+</component>
