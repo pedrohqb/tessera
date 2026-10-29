@@ -38,8 +38,19 @@ jobs:
         run: python3 scripts/pin-drivers.py
       - name: Build
         run: |
+          set +e
           flatpak-builder --user --install-deps-from=flathub --force-clean \
-            --repo=repo build-dir flatpak/io.github.pedrohqb.Tessera.yml
+            --repo=repo build-dir flatpak/io.github.pedrohqb.Tessera.yml > build.log 2>&1
+          status=$?
+          set -e
+          tail -n 25 build.log
+          if [ $status -ne 0 ]; then
+            # Surface the end of the log as an annotation, readable through
+            # the checks API without downloading the full log.
+            msg=$(tail -n 60 build.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=flatpak-builder failed::$msg"
+            exit $status
+          fi
           flatpak build-bundle repo tessera.flatpak io.github.pedrohqb.Tessera
       - name: Release tarball (the binary built against the runtime)
         run: |
