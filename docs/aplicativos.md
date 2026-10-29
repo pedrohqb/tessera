@@ -24,7 +24,9 @@ No Gerenciador de dispositivos, aparece um módulo com os slots do SerproID, do 
 
 ## Chromium, Google Chrome, Microsoft Edge e Brave
 
-`org.chromium.Chromium`, `com.google.Chrome`, `com.microsoft.Edge`, `com.brave.Browser`. Os navegadores baseados no Chromium leem os certificados de cliente e os módulos PKCS#11 do banco NSS do usuário e não têm tela para carregar módulos. O **Configurar** registra o `p11-kit-client.so` nesse banco. O passo 1 é só o override do socket, como nos outros.
+`org.chromium.Chromium`, `com.google.Chrome`, `com.microsoft.Edge`, `com.brave.Browser`. **Basta o passo 1.** Ao iniciar o NSS, o Chromium carrega sozinho o módulo de certificados raiz, `libnssckbi.so` (`LoadNSSModule("Root Certs", "libnssckbi.so")` em `crypto/nss_util.cc`). No runtime do Flatpak, esse arquivo é o p11-kit, que com o `override` chega ao servidor do sistema e, portanto, aos tokens do Tessera. É o mesmo caminho do Papers.
+
+Na primeira versão, o **Configurar** registrava também o `p11-kit-client.so` no banco NSS do navegador. Cada token passou a aparecer duas vezes, e o navegador pedia o PIN do SafeSign uma vez por cópia: duas no Chrome, no Edge e no Brave, três no Chromium (cujo `~/.pki/nssdb` real pode ter ainda outro registro). Agora o **Configurar** só retira esse registro, se existir. O passo 2 aparece como pronto quando não há nada a retirar.
 
 Onde fica o banco ([documentação do Chromium](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md)): desde o Chromium 146, em `$XDG_DATA_HOME/pki/nssdb`, que no Flatpak é `~/.var/app/<navegador>/data/pki/nssdb`. Se existir o banco antigo, `~/.pki/nssdb`, ele vence. O Tessera segue a mesma regra:
 
@@ -37,9 +39,7 @@ Onde fica o banco ([documentação do Chromium](https://chromium.googlesource.co
 
 No teste de 29 de outubro de 2026, o Chrome, o Edge e o Brave usavam o banco novo. A primeira versão do Tessera procurava só o antigo e dizia que não havia banco.
 
-O navegador cria o banco na primeira vez que roda. O Flatpak só mostra ao Tessera as pastas que já existiam quando ele abriu. Por isso, se o banco ainda não existir, o **Configurar** explica: faça o passo 1, abra o navegador uma vez e feche, saia do Tessera e abra de novo, e tente outra vez. Depois de configurar, reinicie o navegador.
-
-> Ainda não testado com token real. Se o navegador também carregar sozinho o módulo de raízes do runtime, como acontece no Papers, cada certificado vai aparecer duas vezes, e a solução será a mesma do Papers.
+O Tessera precisa dessas pastas só para retirar o registro antigo. O Flatpak só mostra a ele as pastas que já existiam quando ele abriu.
 
 ## Papers
 

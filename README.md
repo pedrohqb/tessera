@@ -92,7 +92,7 @@ Tessera writes and updates the `tessera-*.module` files itself, through its `xdg
 
 **Chromium, Google Chrome, Microsoft Edge, Brave** (`org.chromium.Chromium`, `com.google.Chrome`, `com.microsoft.Edge`, `com.brave.Browser`):
 1. The same override.
-2. Open the browser once and close it, then press *Set up* in Tessera: it registers `p11-kit-client.so` in the browser's NSS database. Since Chromium 146 that is `~/.var/app/<id>/data/pki/nssdb`; an older `~/.pki/nssdb`, if there is one, wins (the real one for Chromium, which may use the home folder). If the browser made its database after Tessera started, quit and reopen Tessera first. Restart the browser.
+2. Nothing else: Chromium loads the root-certificates module (`libnssckbi.so`) by itself, and in the Flatpak runtime that is p11-kit, which reaches the host's server. *Set up* only removes the `p11-kit-client.so` an older Tessera registered in the browser's NSS database (since Chromium 146, `~/.var/app/<id>/data/pki/nssdb`; an older `~/.pki/nssdb` wins if it exists), which made every token show twice and the PIN be asked twice.
 
 **Papers** (`org.gnome.Papers`):
 1. ```sh

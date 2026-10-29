@@ -129,9 +129,9 @@ const PT_BR: &[(&str, &str)] = &[
     ("No answer 3 times in a row. Press Restart to try again, or switch it off.",
      "Sem resposta 3 vezes seguidas. Aperte Reiniciar para tentar de novo, ou desligue o driver."),
     ("is set up: restart it to load the module", "configurado: reinicie-o para carregar o módulo"),
-    ("Adds the module to the browser's certificate database; restart the browser afterwards",
-     "Adiciona o módulo ao banco de certificados do navegador; reinicie o navegador depois"),
-    ("has no certificate database yet: do step 1, open the browser once and close it, then quit and reopen Tessera and try again",
-     "ainda não tem banco de certificados: faça o passo 1, abra o navegador uma vez e feche, depois saia do Tessera, abra de novo e tente outra vez"),
+    ("Nothing to add: the browser reaches the tokens through its root-certificates module once step 1 is done. The button removes the module an older Tessera added, which made it ask for the PIN twice",
+     "Nada a acrescentar: depois do passo 1, o navegador chega aos tokens pelo seu módulo de certificados raiz. O botão retira o módulo que uma versão anterior do Tessera acrescentou, que fazia o navegador pedir o PIN duas vezes"),
+    ("is set up: the duplicate module was removed; restart the browser", "está configurado: o módulo duplicado foi retirado; reinicie o navegador"),
+    ("needs nothing more: step 1 is enough", "não precisa de mais nada: o passo 1 basta"),
     ("Could not turn on starting at login", "Não foi possível ativar o início automático"),
 ];

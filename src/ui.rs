@@ -620,7 +620,7 @@ fn app_state(app: &ClientApp) -> (bool, bool) {
             let profiles = paths::firefox_profiles();
             !profiles.is_empty() && profiles.iter().all(|p| nss::has_module(p))
         }
-        Setup::Chromium => apps::chromium_nssdb(app).is_some_and(|db| nss::has_module(&db)),
+        Setup::Chromium => !apps::chromium_nssdb(app).is_some_and(|db| nss::has_module(&db)),
         Setup::None => true,
     };
     (socket, nss)
@@ -663,21 +663,27 @@ fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
             }
             Ok(format!("{} ({})", t("Firefox is set up"), profiles.len()))
         }
-        Setup::Chromium => {
-            let Some(db) = apps::chromium_nssdb(app) else {
-                return Err(format!(
+        // Chromium loads the root-certificates module (libnssckbi.so) by
+        // itself, and in the Flatpak runtime that is p11-kit, which reaches
+        // the system's server once step 1 is done: like Papers, the browser
+        // needs no module of its own. With p11-kit-client.so registered too,
+        // every token showed twice and the PIN was asked once per copy, so
+        // step 2 only removes the module an older Tessera registered.
+        Setup::Chromium => match apps::chromium_nssdb(app) {
+            Some(db) if nss::has_module(&db) => {
+                nss::set_up_poppler_db(&db).map_err(|e| format!("{}: {e:#}", db.display()))?;
+                Ok(format!(
                     "{} {}",
                     app.name,
-                    t("has no certificate database yet: do step 1, open the browser once and close it, then quit and reopen Tessera and try again")
-                ));
-            };
-            nss::add_module(&db).map_err(|e| format!("{}: {e:#}", db.display()))?;
-            Ok(format!(
+                    t("is set up: the duplicate module was removed; restart the browser")
+                ))
+            }
+            _ => Ok(format!(
                 "{} {}",
                 app.name,
-                t("is set up: restart it to load the module")
-            ))
-        }
+                t("needs nothing more: step 1 is enough")
+            )),
+        },
         Setup::None => Ok(String::new()),
     }
 }
@@ -736,7 +742,7 @@ fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> adw::ExpanderRow {
         .subtitle(match app.setup {
             Setup::Firefox => t("Close Firefox first: adds the module to every Firefox profile"),
             Setup::Poppler => t("Makes the certificate database the app reads when signing"),
-            _ => t("Adds the module to the browser's certificate database; restart the browser afterwards"),
+            _ => t("Nothing to add: the browser reaches the tokens through its root-certificates module once step 1 is done. The button removes the module an older Tessera added, which made it ask for the PIN twice"),
         })
         .build();
     let button = gtk::Button::builder()

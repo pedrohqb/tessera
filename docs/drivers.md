@@ -85,7 +85,7 @@ O SerproID é um certificado em nuvem. O driver (`libserproidp11.so`) não fala 
 - **Identificação do aplicativo:** a cada assinatura, o driver lê `/proc/self/exe` e grava o caminho no log. O nome aparece no celular como "Aplicação" ("Tessera", pelo p11-kit). Os testes mostraram que o nome não importa para a aprovação.
 - **Janela de autorização:** logo depois de uma aprovação no celular, novas assinaturas do mesmo aplicativo saem sem perguntar, em cerca de 0,2 s, durante alguns minutos. Isso confundiu vários testes, porque uma assinatura "que funcionou" pode não ter passado pela aprovação.
 - **Assinaturas guardadas:** o mesmo resumo assinado de novo devolve a mesma assinatura, em 0,2 s.
-- **Notificação:** a cada pedido, ele roda `sh -c "notify-send … 'Foi enviado um pedido de PIN para o seu dispositivo.'"`.
+- **Notificação:** a cada pedido, ele roda `sh -c "notify-send … 'Foi enviado um pedido de PIN para o seu dispositivo.'"`, com uma imagem da própria pasta que a área de trabalho fora do sandbox não abre. O Tessera põe à frente no `PATH` dos drivers um `notify-send` seu (em `~/.var/app/io.github.pedrohqb.Tessera/data/tessera/libexec/bin`) que tira o ícone e as imagens e mostra o ícone do Tessera.
 - **Log:** `~/.var/app/io.github.pedrohqb.Tessera/.config/serproid/serproid.log`. O arquivo é acrescentado, não apagado. Linhas como `Tipo de classe nao tratado em C_FindObjectsInit: 0x9` são buscas do NSS por objetos que o driver não tem, e não indicam erro.
 - **`maquinaId`:** um arquivo na mesma pasta identifica a máquina na nuvem. O do Tessera é diferente do do distrobox.
 

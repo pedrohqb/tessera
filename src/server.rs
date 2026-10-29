@@ -124,6 +124,14 @@ fn spawn(driver: &Driver) -> Result<Child> {
     // `p11-kit remote` (see remote.rs).
     match crate::remote::private_dir() {
         Ok(dir) => {
+            // Our notify-send first (see remote.rs).
+            let mut path = vec![dir.join("bin")];
+            if let Some(old) = std::env::var_os("PATH") {
+                path.extend(std::env::split_paths(&old));
+            }
+            if let Ok(joined) = std::env::join_paths(path) {
+                cmd.env("PATH", joined);
+            }
             cmd.env("P11_KIT_PRIVATEDIR", dir);
         }
         Err(e) => eprintln!("tessera: using p11-kit remote: {e}"),

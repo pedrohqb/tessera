@@ -181,5 +181,41 @@ pub fn private_dir() -> std::io::Result<PathBuf> {
         fs::write(&script, body)?;
     }
     fs::set_permissions(&script, fs::Permissions::from_mode(0o755))?;
+    let bin = dir.join("bin");
+    fs::create_dir_all(&bin)?;
+    let notify = bin.join("notify-send");
+    if fs::read_to_string(&notify).ok().as_deref() != Some(NOTIFY_SEND) {
+        fs::write(&notify, NOTIFY_SEND)?;
+    }
+    fs::set_permissions(&notify, fs::Permissions::from_mode(0o755))?;
     Ok(dir)
 }
+
+/// Put first in the drivers' PATH (see server.rs). SerproID announces each
+/// request with `notify-send`, naming an image from its own folder, which
+/// the desktop outside the sandbox cannot open: the notification showed a
+/// broken picture. This drops the icon and image hints and shows Tessera's
+/// icon.
+const NOTIFY_SEND: &str = r#"#!/bin/sh
+# Written by Tessera: notify-send for the drivers, with Tessera's icon.
+hint=0 skip=0
+for a do
+    shift
+    if [ $skip = 1 ]; then skip=0; continue; fi
+    if [ $hint = 1 ]; then
+        hint=0
+        case $a in *image-path*|*image_path*|*image-data*|*image_data*|*icon_data*) continue ;; esac
+        set -- "$@" --hint="$a"
+        continue
+    fi
+    case $a in
+        -i|--icon) skip=1; continue ;;
+        -i*|--icon=*) continue ;;
+        -h|--hint) hint=1; continue ;;
+        --hint=*image-path*|--hint=*image_path*|--hint=*image-data*|--hint=*image_data*|--hint=*icon_data*) continue ;;
+    esac
+    set -- "$@" "$a"
+done
+real=$(PATH=${PATH#*:} command -v notify-send) || exit 0
+exec "$real" --icon=io.github.pedrohqb.Tessera "$@"
+"#;
