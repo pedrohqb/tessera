@@ -29,4 +29,5 @@ Testado em 29 de outubro de 2026 num Bluefin, com um token GD Burti (SafeSign, c
 - Papers: assinatura de PDF com os dois, cada certificado listado uma vez.
 - Token Administration do SafeSign e aplicativo do SerproID abertos pelo Tessera.
 
-Chromium, Chrome, Edge, Brave e Okular estão implementados e testados com um token de teste, ainda sem teste com token real.
+- Chromium, Chrome, Edge e Brave: login com certificado com SerproID e SafeSign, com o PIN pedido uma vez.
+- Okular: assinatura de PDF.

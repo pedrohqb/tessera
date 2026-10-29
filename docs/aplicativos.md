@@ -41,6 +41,13 @@ Onde fica o banco ([documentação do Chromium](https://chromium.googlesource.co
 
 No teste de 29 de outubro de 2026, o Chrome, o Edge e o Brave usavam o banco novo. A primeira versão do Tessera procurava só o antigo e dizia que não havia banco.
 
+Se um navegador ainda pedir o PIN duas vezes, veja se o banco dele registra o módulo de raízes à mão. No teste, o `~/.pki/nssdb` real (o do Chromium) tinha um bloco `name=Mozilla Root Certs` com `library=/usr/lib/x86_64-linux-gnu/libnssckbi.so`, comum em instruções de instalação de token. O Chromium já carrega esse módulo sozinho, e com o registro carregava duas vezes. Com o navegador fechado, isto guarda uma cópia e retira o bloco:
+
+```sh
+cd ~/.pki/nssdb && cp pkcs11.txt pkcs11.txt.antes && \
+awk -v RS= -v ORS='\n\n' 'index($0, "libnssckbi.so") == 0' pkcs11.txt.antes > pkcs11.txt
+```
+
 O Tessera precisa dessas pastas só para retirar o registro antigo. O Flatpak só mostra a ele as pastas que já existiam quando ele abriu.
 
 ## Papers
