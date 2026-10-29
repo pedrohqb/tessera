@@ -74,6 +74,7 @@ modules:
       # Its p11-kit module file would go to the runtime's read-only
       # /usr/share; Tessera writes its own p11-kit configuration anyway.
       - --enable-p11_system_config_modules=/app/share/p11-kit/modules
+      - --with-completiondir=/app/share/bash-completion/completions
     cleanup:
       - /bin
       - /include
