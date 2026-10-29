@@ -344,11 +344,16 @@ fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
                 .build();
             b.set_sensitive(d.available());
             let tool = tool.clone();
+            let driver = d.clone();
             let w = Rc::downgrade(win);
             b.connect_clicked(move |_| {
                 let Some((prog, args)) = tool.exec.split_first() else {
                     return;
                 };
+                // The folders the vendor tool needs (SerproID crashes
+                // without ~/.config/serproid/certificados), even when the
+                // driver itself is switched off.
+                drivers::prepare_dirs(std::slice::from_ref(&driver));
                 if let Err(e) = Command::new(prog).args(args).envs(&tool.env).spawn() {
                     if let Some(win) = w.upgrade() {
                         win.toast(&format!("{}: {e}", tool.name));
