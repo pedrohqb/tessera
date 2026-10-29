@@ -89,10 +89,24 @@ fn print_status() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Publish to the host only the drivers that answered; stop the ones that
+/// hang. Shared by `serve` and the window.
+pub fn check_drivers(
+    srv: &mut server::Server,
+    ds: &[drivers::Driver],
+    snap: &status::Snapshot,
+) -> Result<usize, String> {
+    for id in &snap.timed_out {
+        srv.stop_driver(id, "no answer; stopped (switch it off if you don't use it)");
+    }
+    apps::write_host_modules(ds, &snap.ok).map_err(|e| format!("{e:#}"))
+}
+
 fn serve() -> ExitCode {
     let ds = drivers::discover();
+    let disabled = settings::Settings::load().disabled_drivers;
     let mut srv = server::Server::new();
-    if let Err(e) = srv.start(&ds) {
+    if let Err(e) = srv.start(&ds, &disabled) {
         if e.to_string() == "conflict" {
             eprintln!(
                 "tessera: another Tessera already serves in {}",
@@ -103,20 +117,32 @@ fn serve() -> ExitCode {
         eprintln!("tessera: cannot start the token service: {e:#}");
         return ExitCode::FAILURE;
     }
-    let running = srv.running();
-    match apps::write_host_modules(&ds, &running) {
-        Ok(n) => eprintln!(
-            "tessera: serving {n} driver(s) in {}; host modules in {}",
-            paths::socket_dir().display(),
-            paths::host_modules_dir().display()
-        ),
-        Err(e) => eprintln!("tessera: cannot write the host modules: {e:#}"),
-    }
+    // Nothing is published until each driver has answered once.
+    let _ = apps::write_host_modules(&ds, &[]);
+    eprintln!("tessera: serving in {}", paths::socket_dir().display());
+    let mut last = usize::MAX;
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(2));
-        if let server::State::Failed(msg) = srv.poll() {
-            eprintln!("tessera: {msg}");
+        let running: Vec<(String, String)> = ds
+            .iter()
+            .filter(|d| srv.running().contains(&d.id))
+            .map(|d| (d.id.clone(), d.name.clone()))
+            .collect();
+        let snap = status::snapshot(&running);
+        for e in &snap.errors {
+            eprintln!("tessera: {e}");
         }
+        match check_drivers(&mut srv, &ds, &snap) {
+            Ok(n) if n != last => {
+                eprintln!(
+                    "tessera: {n} driver(s) published in {}",
+                    paths::host_modules_dir().display()
+                );
+                last = n;
+            }
+            Ok(_) => {}
+            Err(e) => eprintln!("tessera: cannot write the host modules: {e}"),
+        }
+        std::thread::sleep(std::time::Duration::from_secs(10));
     }
 }
 

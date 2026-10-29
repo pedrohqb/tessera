@@ -30,13 +30,14 @@ struct Hub {
 impl Hub {
     fn start_server(&self) {
         let ds = drivers::discover();
-        let result = self.server.borrow_mut().start(&ds);
+        let disabled = self.settings.borrow().disabled_drivers.clone();
+        let result = self.server.borrow_mut().start(&ds, &disabled);
         if let Err(e) = result {
             self.server.borrow_mut().set_failure(format!("{e:#}"));
         }
-        let running = self.server.borrow().running();
-        *self.host.borrow_mut() =
-            apps::write_host_modules(&ds, &running).map_err(|e| format!("{e:#}"));
+        // Nothing is published to the host until each driver has answered
+        // once (see refresh): a driver that hangs would hang every app.
+        *self.host.borrow_mut() = apps::write_host_modules(&ds, &[]).map_err(|e| format!("{e:#}"));
         *self.drivers.borrow_mut() = ds;
     }
 
@@ -291,17 +292,24 @@ fn refresh(hub: &Rc<Hub>, win: &Rc<Win>) {
         return;
     }
     let win = win.clone();
+    let hub = hub.clone();
     let running = hub.running();
     glib::spawn_future_local(async move {
         let snap = gio::spawn_blocking(move || status::snapshot(&running)).await;
         win.busy.set(false);
         if let Ok(snap) = snap {
+            let host = {
+                let ds = hub.drivers.borrow();
+                crate::check_drivers(&mut hub.server.borrow_mut(), &ds, &snap)
+            };
+            *hub.host.borrow_mut() = host;
+            update_service(&hub, &win);
             apply_snapshot(&win, snap);
         }
     });
 }
 
-fn fill_drivers(hub: &Hub, win: &Rc<Win>) {
+fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     win.drivers.clear();
     let ds = hub.drivers.borrow();
     if ds.is_empty() {
@@ -349,6 +357,33 @@ fn fill_drivers(hub: &Hub, win: &Rc<Win>) {
             });
             row.add_suffix(&b);
         }
+        // On/off: a switched-off driver gets no server and is not published.
+        let enabled = !hub.settings.borrow().disabled_drivers.contains(&d.id);
+        let switch = gtk::Switch::builder()
+            .active(enabled)
+            .valign(gtk::Align::Center)
+            .tooltip_text(t("Use this driver"))
+            .build();
+        switch.set_sensitive(d.available());
+        {
+            let (hub, w, id) = (hub.clone(), Rc::downgrade(win), d.id.clone());
+            switch.connect_active_notify(move |sw| {
+                {
+                    let mut st = hub.settings.borrow_mut();
+                    st.disabled_drivers.retain(|x| x != &id);
+                    if !sw.is_active() {
+                        st.disabled_drivers.push(id.clone());
+                    }
+                    st.save();
+                }
+                hub.start_server();
+                if let Some(win) = w.upgrade() {
+                    win.last.borrow_mut().clear();
+                    refresh(&hub, &win);
+                }
+            });
+        }
+        row.add_suffix(&switch);
         win.drivers.add(&row);
     }
 }

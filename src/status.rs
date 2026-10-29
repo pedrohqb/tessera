@@ -58,7 +58,17 @@ pub struct Snapshot {
     pub tokens: Vec<Token>,
     /// Drivers whose server could not be read: "driver: error".
     pub errors: Vec<String>,
+    /// Ids of the drivers that answered.
+    pub ok: Vec<String>,
+    /// Ids of the drivers that did not answer in time.
+    pub timed_out: Vec<String>,
 }
+
+enum ReadError {
+    Timeout,
+    Failed(String),
+}
+use ReadError::{Failed, Timeout};
 
 pub fn readers() -> Readers {
     let ctx = match pcsc::Context::establish(pcsc::Scope::User) {
@@ -181,8 +191,8 @@ pub fn list_tokens_in_process() -> Result<String, String> {
 
 /// Read one driver's server in a child process (p11-kit-client takes its
 /// address from the environment, so each server gets its own process).
-fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, String> {
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, ReadError> {
+    let exe = std::env::current_exe().map_err(|e| Failed(e.to_string()))?;
     let socket = paths::driver_socket(id);
     let mut child = Command::new(exe)
         .arg("list-tokens")
@@ -193,27 +203,31 @@ fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| Failed(e.to_string()))?;
     // A driver that hangs (waiting for a reader, say) must not hang the
     // window: give up after a while.
     let deadline = Instant::now() + LIST_TIMEOUT;
     loop {
-        match child.try_wait().map_err(|e| e.to_string())? {
+        match child.try_wait().map_err(|e| Failed(e.to_string()))? {
             Some(_) => break,
             None if Instant::now() >= deadline => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(format!("no answer in {} s", LIST_TIMEOUT.as_secs()));
+                return Err(Timeout);
             }
             None => std::thread::sleep(Duration::from_millis(50)),
         }
     }
-    let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    let out = child
+        .wait_with_output()
+        .map_err(|e| Failed(e.to_string()))?;
     if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        return Err(Failed(
+            String::from_utf8_lossy(&out.stderr).trim().to_string(),
+        ));
     }
     let list: TokenList =
-        toml::from_str(&String::from_utf8_lossy(&out.stdout)).map_err(|e| e.to_string())?;
+        toml::from_str(&String::from_utf8_lossy(&out.stdout)).map_err(|e| Failed(e.to_string()))?;
     Ok(list
         .tokens
         .into_iter()
@@ -224,20 +238,45 @@ fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, String> {
         .collect())
 }
 
-/// Readers and tokens. `drivers` are (id, name) of the running servers.
-/// Must run off the main thread: a slow token can take a second or two.
+/// Readers and tokens. `drivers` are (id, name) of the running servers,
+/// read in parallel. Must run off the main thread.
 pub fn snapshot(drivers: &[(String, String)]) -> Snapshot {
-    let mut tokens = Vec::new();
-    let mut errors = Vec::new();
-    for (id, name) in drivers {
-        match tokens_of(id, name) {
-            Ok(t) => tokens.extend(t),
-            Err(e) => errors.push(format!("{name}: {e}")),
+    let handles: Vec<_> = drivers
+        .iter()
+        .cloned()
+        .map(|(id, name)| {
+            std::thread::spawn(move || {
+                let r = tokens_of(&id, &name);
+                (id, name, r)
+            })
+        })
+        .collect();
+    let readers = readers();
+    let mut snap = Snapshot {
+        readers,
+        tokens: Vec::new(),
+        errors: Vec::new(),
+        ok: Vec::new(),
+        timed_out: Vec::new(),
+    };
+    for h in handles {
+        let Ok((id, name, r)) = h.join() else {
+            continue;
+        };
+        match r {
+            Ok(t) => {
+                snap.tokens.extend(t);
+                snap.ok.push(id);
+            }
+            Err(Timeout) => {
+                snap.errors.push(format!(
+                    "{name}: no answer in {} s; stopped",
+                    LIST_TIMEOUT.as_secs()
+                ));
+                snap.timed_out.push(id);
+            }
+            Err(Failed(e)) => snap.errors.push(format!("{name}: {e}")),
         }
     }
-    Snapshot {
-        readers: readers(),
-        tokens,
-        errors,
-    }
+    snap
 }

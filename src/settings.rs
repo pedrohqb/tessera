@@ -9,6 +9,9 @@ use crate::paths;
 pub struct Settings {
     #[serde(default)]
     pub autostart: bool,
+    /// Drivers the user switched off.
+    #[serde(default)]
+    pub disabled_drivers: Vec<String>,
 }
 
 impl Settings {

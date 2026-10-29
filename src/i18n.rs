@@ -95,6 +95,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("Start the token service first", "Inicie o serviço de tokens antes"),
     ("Not set up", "Não configurado"),
     ("driver(s)", "driver(s)"),
+    ("Use this driver", "Usar este driver"),
     ("System connection (the system's p11-kit server)", "Conexão com o sistema (servidor p11-kit do sistema)"),
     ("module file(s) in", "arquivo(s) de módulo em"),
     ("run once in a terminal:", "rode uma vez no terminal:"),
