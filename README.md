@@ -98,7 +98,14 @@ TESSERA_DRIVERS_PATH=/path/to/drivers cargo run
 
 For development, these environment variables override the defaults: `TESSERA_DRIVERS_PATH` (driver directories, separated by `:`), `TESSERA_SOCKET`, `TESSERA_P11KIT` (the `p11-kit` command) and `TESSERA_CLIENT_MODULE`.
 
-Every push builds a test bundle (`tessera.flatpak`) in GitHub Actions. Tagging `vX.Y.Z` publishes it, together with `tessera-x86_64.tar.gz`: the whole `/app` tree built against the GNOME runtime (Tessera, its data, the bundled libpcsclite and OpenSC), for packaging as extra-data.
+Every push builds a test build in GitHub Actions: `tessera-repo.tar.gz`, a small Flatpak repository. A single-file `.flatpak` bundle can't carry the drivers' extra-data, which is why it isn't used. To install the test build:
+
+```sh
+tar -xzf tessera-repo.tar.gz
+./install-test-repo.sh        # adds it as the local remote "tessera-test" and installs Tessera
+```
+
+Tagging `vX.Y.Z` publishes it, together with `tessera-x86_64.tar.gz`: the whole `/app` tree built against the GNOME runtime (Tessera, its data, the bundled libpcsclite and OpenSC), for packaging as extra-data.
 
 ## Status
 
