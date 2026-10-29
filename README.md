@@ -104,7 +104,7 @@ tessera status              print drivers, readers and tokens
 tessera nss-setup DIR       register p11-kit-client.so in the NSS database DIR
 ```
 
-For development, these environment variables override the defaults: `TESSERA_DRIVERS_PATH` (driver directories, separated by `:`), `TESSERA_SOCKET_DIR`, `TESSERA_HOST_MODULES`, `TESSERA_P11KIT` (the `p11-kit` command) and `TESSERA_CLIENT_MODULE`.
+For development, these environment variables override the defaults: `TESSERA_DRIVERS_PATH` (driver directories, separated by `:`), `TESSERA_SOCKET_DIR`, `TESSERA_HOST_MODULES`, `TESSERA_P11KIT_SERVER` (p11-kit's `p11-kit-server` helper) and `TESSERA_CLIENT_MODULE`.
 
 ## Building
 

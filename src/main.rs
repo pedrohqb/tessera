@@ -7,6 +7,8 @@
 //!   tessera status              print readers, tokens and drivers
 //!   tessera nss-setup DIR       register p11-kit-client.so in the NSS
 //!                               database DIR (a Firefox profile, say)
+//!   tessera probe-module MOD    load a driver directly and report each step
+//!   tessera remote ...          (internal) serve one connection for p11-kit server
 //!   tessera list-tokens         (internal) list tokens at P11_KIT_SERVER_ADDRESS
 //!   tessera nss-add-module DIR  (internal) the NSS work of nss-setup
 
@@ -15,6 +17,7 @@ mod drivers;
 mod i18n;
 mod nss;
 mod paths;
+mod remote;
 mod server;
 mod settings;
 mod status;
@@ -164,6 +167,7 @@ fn main() -> ExitCode {
             return print_status();
         }
         Some("serve") => return serve(),
+        Some("remote") => return ExitCode::from(remote::run(&args[2..]) as u8),
         Some("probe-module") => {
             let Some(module) = args.get(2) else {
                 eprintln!("usage: tessera probe-module MODULE");

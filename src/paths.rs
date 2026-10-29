@@ -109,11 +109,23 @@ pub fn driver_dirs() -> Vec<PathBuf> {
     ]
 }
 
-/// The `p11-kit` command. The runtime ships it in /usr/bin.
-pub fn p11kit_command() -> PathBuf {
-    env::var_os("TESSERA_P11KIT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("p11-kit"))
+/// p11-kit's server helper (what `p11-kit server` runs). It is started
+/// directly so that P11_KIT_PRIVATEDIR only redirects the per-connection
+/// `p11-kit-remote` to Tessera (see remote.rs).
+pub fn p11kit_server_command() -> PathBuf {
+    if let Some(p) = env::var_os("TESSERA_P11KIT_SERVER") {
+        return PathBuf::from(p);
+    }
+    for c in [
+        "/usr/libexec/p11-kit/p11-kit-server",
+        "/usr/lib/x86_64-linux-gnu/p11-kit/p11-kit-server",
+        "/usr/lib/p11-kit/p11-kit-server",
+    ] {
+        if std::path::Path::new(c).exists() {
+            return PathBuf::from(c);
+        }
+    }
+    PathBuf::from("/usr/libexec/p11-kit/p11-kit-server")
 }
 
 /// Papers reads its signing certificates through poppler, which looks first

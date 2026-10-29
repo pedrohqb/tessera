@@ -98,7 +98,7 @@ fn spawn(driver: &Driver) -> Result<Child> {
         let _ = fs::remove_file(&socket);
     }
     let log = File::create(log_path(&driver.id))?;
-    let mut cmd = Command::new(paths::p11kit_command());
+    let mut cmd = Command::new(paths::p11kit_server_command());
     // If Tessera dies without stopping the server (killed, crashed), the
     // kernel stops the server too, so no orphan keeps the socket busy.
     // SAFETY: prctl is async-signal-safe and touches no Rust state.
@@ -110,8 +110,7 @@ fn spawn(driver: &Driver) -> Result<Child> {
             Ok(())
         });
     }
-    cmd.arg("server")
-        .arg("--foreground")
+    cmd.arg("--foreground")
         .arg("--name")
         .arg(&socket)
         .arg("--provider")
@@ -121,6 +120,14 @@ fn spawn(driver: &Driver) -> Result<Child> {
         .stdout(Stdio::null())
         .stderr(log);
     cmd.envs(&driver.env);
+    // Each connection is served by `tessera remote` instead of
+    // `p11-kit remote` (see remote.rs).
+    match crate::remote::private_dir() {
+        Ok(dir) => {
+            cmd.env("P11_KIT_PRIVATEDIR", dir);
+        }
+        Err(e) => eprintln!("tessera: using p11-kit remote: {e}"),
+    }
     if !driver.library_path.is_empty() {
         let mut parts: Vec<PathBuf> = driver.library_path.clone();
         if let Some(old) = std::env::var_os("LD_LIBRARY_PATH") {
