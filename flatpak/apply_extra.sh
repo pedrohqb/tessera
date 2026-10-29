@@ -50,16 +50,30 @@ if [ -f safesign.deb ]; then
             log "libaetpkss.so not found in the SafeSign package"
         fi
         rm -rf "$d/etc"
-        ta=$(find "$d" -type f -name tokenadmin | head -n1)
+        # GDBM for libaetpkss.so (the AUR package depends on gdbm).
+        for g in gdbm.deb gdbm-compat.deb; do
+            [ -f "$g" ] && unpack_deb "$g" "$d/gdbm" || log "could not unpack $g"
+        done
+        # Token Administration: the vendor's RHEL 10 build, which needs no
+        # wxWidgets (the AUR package does the same).
+        if [ -f safesign.rpm ] && mkdir -p "$d/rpm" &&
+            bsdtar --no-same-owner -xf safesign.rpm -C "$d/rpm"; then
+            ta=$(find "$d/rpm" -type f -name tokenadmin | head -n1)
+        else
+            log "could not unpack the SafeSign rpm"
+            ta=$(find "$d/usr" -type f -name tokenadmin | head -n1)
+        fi
         if [ -n "$ta" ]; then
             write_launcher "$d/tokenadmin" "/app/extra/$ta" \
-                "/app/extra/$d/usr/lib" "/app/extra/$d/usr/lib/x86_64-linux-gnu"
+                "/app/extra/$d/usr/lib" \
+                "/app/extra/$d/gdbm/usr/lib/x86_64-linux-gnu"
         fi
     else
         log "could not unpack SafeSign"
     fi
     rm -f safesign.deb
 fi
+rm -f safesign.rpm gdbm.deb gdbm-compat.deb
 
 # --- SafeNet Authentication Client (Thales): SafeNet 5100 eToken ----------
 # The zip carries packages for several distributions; like distrobox-adv-br,
@@ -95,6 +109,12 @@ if [ -f serproid.deb ]; then
     rm -rf "$d"
     if unpack_deb serproid.deb "$d"; then
         rm -rf "$d/etc"
+        # The app's launcher script and configuration use absolute paths
+        # (cd /usr/share/serproid-desktop; ./jre/bin/java ...). Point the text
+        # files at our copy; binaries are left alone.
+        grep -rlI '/usr/share/serproid-desktop' "$d/usr" 2>/dev/null | while read -r f; do
+            sed -i "s|/usr/share/serproid-desktop|/app/extra/$d/usr/share/serproid-desktop|g" "$f"
+        done
         lib=$(find "$d" -name 'libserproidp11.so' \( -type f -o -type l \) | head -n1)
         if [ -n "$lib" ]; then
             ln -sf "/app/extra/$lib" "$d/libserproidp11.so"

@@ -1,4 +1,4 @@
-//! Registering p11-kit-proxy.so in an NSS database (a Firefox profile, or
+//! Registering p11-kit-client.so in an NSS database (a Firefox profile, or
 //! the small database Tessera makes for Papers).
 //!
 //! NSS is loaded at run time from the runtime's libnss3.so, so Tessera needs
@@ -21,12 +21,12 @@ pub enum Outcome {
     AlreadyPresent,
 }
 
-/// Is the proxy module already listed in this database's pkcs11.txt?
+/// Is the client module already listed in this database's pkcs11.txt?
 pub fn has_module(dir: &Path) -> bool {
     fs::read_to_string(dir.join("pkcs11.txt"))
         .map(|t| {
             t.lines()
-                .any(|l| l.trim() == format!("library={}", paths::PROXY_MODULE))
+                .any(|l| l.trim() == format!("library={}", paths::CLIENT_MODULE))
         })
         .unwrap_or(false)
 }
@@ -74,7 +74,7 @@ pub fn add_module_in_process(dir: &Path) -> Result<Outcome> {
             bail!("NSS_Initialize failed (NSS error {})", err());
         }
         let name = CString::new(paths::NSS_MODULE_NAME)?;
-        let module = CString::new(paths::PROXY_MODULE)?;
+        let module = CString::new(paths::CLIENT_MODULE)?;
         let rv = add(name.as_ptr(), module.as_ptr(), 0, 0);
         let code = err();
         shutdown();

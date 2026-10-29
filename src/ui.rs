@@ -22,6 +22,8 @@ struct Hub {
     server: RefCell<Server>,
     drivers: RefCell<Vec<Driver>>,
     settings: RefCell<Settings>,
+    /// Host module files written (count), or why not.
+    host: RefCell<Result<usize, String>>,
     _hold: RefCell<Option<gio::ApplicationHoldGuard>>,
 }
 
@@ -29,10 +31,24 @@ impl Hub {
     fn start_server(&self) {
         let ds = drivers::discover();
         let result = self.server.borrow_mut().start(&ds);
-        *self.drivers.borrow_mut() = ds;
         if let Err(e) = result {
             self.server.borrow_mut().set_failure(format!("{e:#}"));
         }
+        let running = self.server.borrow().running();
+        *self.host.borrow_mut() =
+            apps::write_host_modules(&ds, &running).map_err(|e| format!("{e:#}"));
+        *self.drivers.borrow_mut() = ds;
+    }
+
+    /// (id, name) of the drivers whose server runs.
+    fn running(&self) -> Vec<(String, String)> {
+        let running = self.server.borrow().running();
+        self.drivers
+            .borrow()
+            .iter()
+            .filter(|d| running.contains(&d.id))
+            .map(|d| (d.id.clone(), d.name.clone()))
+            .collect()
     }
 }
 
@@ -71,6 +87,7 @@ struct Win {
     toasts: adw::ToastOverlay,
     service_row: adw::ActionRow,
     service_button: gtk::Button,
+    host_row: adw::ActionRow,
     pcsc_row: adw::ActionRow,
     readers: Section,
     tokens: Section,
@@ -122,9 +139,10 @@ fn copy_button(win: &Rc<Win>, text: String) -> gtk::Button {
 
 fn update_service(hub: &Hub, win: &Win) {
     let state = hub.server.borrow_mut().poll();
-    let socket = paths::socket_path();
+    let dir = paths::socket_dir();
+    let n = hub.server.borrow().running().len();
     let (subtitle, button, warn) = match &state {
-        State::Running => (format!("{} · {}", t("Running"), socket.display()), t("Restart"), false),
+        State::Running => (format!("{} · {n} {} · {}", t("Running"), t("driver(s)"), dir.display()), t("Restart"), false),
         State::Stopped => (t("Stopped").to_string(), t("Start"), false),
         State::Conflict => (t("Another program already answers on this socket (is Tessera already running, for example as `tessera serve`?).").to_string(), t("Start"), true),
         State::Failed(msg) => (format!("{}: {msg}", t("The server exited")), t("Start"), true),
@@ -135,6 +153,25 @@ fn update_service(hub: &Hub, win: &Win) {
         win.service_row.add_css_class("error");
     } else {
         win.service_row.remove_css_class("error");
+    }
+    match &*hub.host.borrow() {
+        Ok(n) => {
+            win.host_row.set_subtitle(&format!(
+                "{n} {} {} · {} {}",
+                t("module file(s) in"),
+                paths::host_modules_dir().display(),
+                t("run once in a terminal:"),
+                apps::HOST_SERVER_COMMAND
+            ));
+            win.host_row.remove_css_class("error");
+        }
+        Err(e) => {
+            win.host_row.set_subtitle(&format!(
+                "{}: {e}",
+                t("Could not write the host module files")
+            ));
+            win.host_row.add_css_class("error");
+        }
     }
 }
 
@@ -180,13 +217,17 @@ fn apply_snapshot(win: &Win, snap: Snapshot) {
     }
 
     win.tokens.clear();
+    for e in &snap.errors {
+        let row = status_page_row(t("A driver could not be read"), e);
+        row.add_css_class("error");
+        win.tokens.add(&row);
+    }
     match snap.tokens {
-        Err(e) => win.tokens.add(&status_page_row(t("No token found"), &e)),
-        Ok(tokens) if tokens.is_empty() => win.tokens.add(&status_page_row(
+        tokens if tokens.is_empty() => win.tokens.add(&status_page_row(
             t("No token found"),
             t("Insert a token, or install the driver for it below."),
         )),
-        Ok(tokens) => {
+        tokens => {
             for tok in tokens {
                 let n = tok.certificates.len();
                 let count = format!(
@@ -204,7 +245,13 @@ fn apply_snapshot(win: &Win, snap: Snapshot) {
                     } else {
                         &tok.label
                     })
-                    .subtitle(format!("{} {} · {count}", tok.manufacturer, tok.model).trim())
+                    .subtitle(
+                        format!(
+                            "{} {} · {} · {count}",
+                            tok.manufacturer, tok.model, tok.driver
+                        )
+                        .trim(),
+                    )
                     .build();
                 row.add_prefix(&gtk::Image::from_icon_name("auth-smartcard-symbolic"));
                 if n == 0 {
@@ -244,8 +291,9 @@ fn refresh(hub: &Rc<Hub>, win: &Rc<Win>) {
         return;
     }
     let win = win.clone();
+    let running = hub.running();
     glib::spawn_future_local(async move {
-        let snap = gio::spawn_blocking(status::snapshot).await;
+        let snap = gio::spawn_blocking(move || status::snapshot(&running)).await;
         win.busy.set(false);
         if let Ok(snap) = snap {
             apply_snapshot(&win, snap);
@@ -337,10 +385,6 @@ fn set_up_app(
         win.toast(t("Start the token service first"));
         return;
     }
-    if let Err(e) = apps::write_module_file(app_id) {
-        win.toast(&format!("{}: {e:#}", t("Could not set up")));
-        return;
-    }
     status.set_subtitle(&format!("{app_id} · {}", t("Configured")));
     match nss_target {
         NssTarget::Papers => {
@@ -388,11 +432,12 @@ fn client_row(
     icon: &str,
     nss_target: NssTarget,
 ) -> adw::ExpanderRow {
-    let state = if apps::module_file_present(app.id) {
-        t("Configured")
-    } else {
-        t("Not set up")
-    };
+    let state =
+        if matches!(nss_target, NssTarget::Papers) && nss::has_module(&paths::papers_nss_dir()) {
+            t("Configured")
+        } else {
+            t("Not set up")
+        };
     let row = adw::ExpanderRow::builder()
         .use_markup(false)
         .title(app.name)
@@ -403,7 +448,9 @@ fn client_row(
     let cmd = apps::override_command(app.id);
     let step1 = adw::ActionRow::builder()
         .use_markup(false)
-        .title(t("1. Let the app reach Tessera (run once in a terminal)"))
+        .title(t(
+            "1. Let the app reach the system's p11-kit server (run once in a terminal)",
+        ))
         .subtitle(&cmd)
         .subtitle_selectable(true)
         .build();
@@ -437,7 +484,7 @@ fn client_row(
         let manual = adw::ActionRow::builder()
             .use_markup(false)
             .title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"))
-            .subtitle(paths::PROXY_MODULE)
+            .subtitle(paths::CLIENT_MODULE)
             .subtitle_selectable(true)
             .build();
         row.add_row(&manual);
@@ -465,13 +512,12 @@ fn apps_group(hub: &Rc<Hub>, win: &Rc<Win>) -> adw::PreferencesGroup {
         NssTarget::Papers,
     ));
 
-    // PJeOffice Pro (FlatPark) loads p11-kit-client.so through its own bridge,
-    // at the p11-kit default socket; it needs its package to point at
-    // Tessera's socket instead.
+    // PJeOffice Pro (FlatPark) already has access to the host's p11-kit
+    // server socket and loads p11-kit-client.so through its own bridge.
     let pje = plain_row(
         apps::PJEOFFICE.name,
-        t("Waiting for its FlatPark package to support Tessera"),
-        "dialog-information-symbolic",
+        t("Works once the system connection is on (no setup needed)"),
+        "emblem-ok-symbolic",
     );
     group.add(&pje);
     group
@@ -508,6 +554,13 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         .build();
     service_row.add_suffix(&service_button);
     service.add(&service_row);
+    let host_row = plain_row(
+        t("System connection (the system's p11-kit server)"),
+        "",
+        "network-wired-symbolic",
+    );
+    host_row.set_subtitle_selectable(true);
+    service.add(&host_row);
     let pcsc_row = plain_row(t("Smart card service (pcscd)"), "", "computer-symbolic");
     service.add(&pcsc_row);
     page.add(&service);
@@ -522,6 +575,7 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         toasts: adw::ToastOverlay::new(),
         service_row,
         service_button,
+        host_row,
         pcsc_row,
         readers: Section::new(t("Readers"), None),
         tokens: Section::new(t("Tokens"), None),
@@ -529,6 +583,8 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         last: RefCell::new(String::new()),
         busy: Cell::new(false),
     });
+    win.host_row
+        .add_suffix(&copy_button(&win, apps::HOST_SERVER_COMMAND.to_string()));
     page.add(&win.readers.group);
     page.add(&win.tokens.group);
     page.add(&win.drivers.group);
@@ -683,6 +739,7 @@ pub fn run() -> ExitCode {
                 server: RefCell::new(Server::new()),
                 drivers: RefCell::new(vec![]),
                 settings: RefCell::new(Settings::load()),
+                host: RefCell::new(Ok(0)),
                 _hold: RefCell::new(Some(app.hold())),
             });
             h.start_server();

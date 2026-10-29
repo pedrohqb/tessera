@@ -17,14 +17,14 @@
     <p>This is meant for immutable systems such as Fedora Silverblue, Kinoite, Bluefin, Aurora and Bazzite, where installing a vendor's driver package on the host is hard or impossible.</p>
     <ul>
       <li>Shows the card readers, the inserted tokens and their certificates</li>
-      <li>Drivers included: OpenSC (PIV, YubiKey, CAC, many national ID cards), SafeSign IC, SafeNet Authentication Client and SerproID; more can be added as extensions</li>
+      <li>Drivers included: SafeSign IC, SafeNet Authentication Client and SerproID; more can be added as extensions</li>
       <li>Vendor drivers are downloaded from the vendors at install time and checked against pinned checksums</li>
       <li>Opens the vendors' tools, such as SafeSign's Token Administration and the SerproID app</li>
       <li>Sets up Firefox and Papers to use the tokens, and shows the command that lets them reach Tessera</li>
       <li>Keeps running in the background, and can start at login</li>
     </ul>
-    <p>Tessera serves the tokens on $XDG_RUNTIME_DIR/tessera/pkcs11. A client app needs access to that socket (flatpak override --user --filesystem=xdg-run/tessera) and a line in its p11-kit configuration, which Tessera writes for Firefox and Papers.</p>
-    <p>The host still needs pcscd and the CCID driver, which most distributions ship.</p>
+    <p>Each driver runs in its own p11-kit server inside Tessera. Tessera adds them to the host's p11-kit configuration, and the host's p11-kit server (p11-kit-server.socket, enabled once) serves them to other apps. Sandboxed apps need --filesystem=xdg-run/p11-kit/pkcs11; PJeOffice Pro from FlatPark has it already.</p>
+    <p>The host needs pcscd with the CCID driver and p11-kit-server, which most distributions ship.</p>
   </description>
   <screenshots>
     <screenshot type="default">

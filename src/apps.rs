@@ -1,18 +1,22 @@
-//! Pointing client apps at Tessera.
+//! The host side and the client apps.
 //!
-//! Each Flatpak app has its own p11-kit configuration in
-//! ~/.var/app/<id>/config/pkcs11. A module file there with
+//! Host: one file per driver in ~/.config/pkcs11/modules,
 //!
-//!     remote: unix:path=/run/user/<uid>/tessera/pkcs11
+//!     remote: unix:path=/run/user/<uid>/tessera/<driver>
 //!
-//! makes p11-kit (its proxy module, and anything that loads modules through
-//! p11-kit, such as GnuTLS) serve Tessera's tokens inside that app. The app
-//! also needs access to the socket: `flatpak override --user
-//! --filesystem=xdg-run/tessera <id>`.
+//! makes the host's p11-kit (its proxy, and its server behind
+//! `p11-kit-server.socket`) serve Tessera's tokens next to the host's own
+//! modules. Native apps that use p11-kit-proxy.so see them directly.
+//!
+//! Sandboxed apps: `flatpak override --user
+//! --filesystem=xdg-run/p11-kit/pkcs11 <app>` puts the host's server socket
+//! where p11-kit-client.so looks for it, in place of Flatpak's trust-store
+//! server (the host server serves the host's trust store too).
 
 use anyhow::{Context, Result};
 use std::fs;
 
+use crate::drivers::Driver;
 use crate::paths;
 
 pub struct ClientApp {
@@ -33,30 +37,48 @@ pub const PJEOFFICE: ClientApp = ClientApp {
     name: "PJeOffice Pro",
 };
 
-fn module_contents() -> String {
+/// The one-time host command that starts the host's p11-kit server.
+pub const HOST_SERVER_COMMAND: &str = "systemctl --user enable --now p11-kit-server.socket";
+
+/// The command that lets a sandboxed app reach the host's p11-kit server.
+pub fn override_command(app_id: &str) -> String {
+    format!("flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 {app_id}")
+}
+
+fn host_module_name(id: &str) -> String {
+    format!("tessera-{id}.module")
+}
+
+fn host_module_contents(d: &Driver) -> String {
     format!(
-        "# Written by Tessera ({}): the tokens it serves.\nremote: {}\n",
+        "# Written by Tessera ({}): {}, served from its sandbox.\nremote: unix:path={}\n",
         paths::APP_ID,
-        paths::server_address()
+        d.name,
+        paths::driver_socket(&d.id).display()
     )
 }
 
-/// The command that lets an app reach Tessera's socket.
-pub fn override_command(app_id: &str) -> String {
-    format!("flatpak override --user --filesystem=xdg-run/tessera {app_id}")
-}
-
-pub fn module_file_present(app_id: &str) -> bool {
-    fs::read_to_string(paths::app_module_file(app_id))
-        .map(|t| t == module_contents())
-        .unwrap_or(false)
-}
-
-/// Write the module file into the app's p11-kit configuration.
-pub fn write_module_file(app_id: &str) -> Result<()> {
-    let file = paths::app_module_file(app_id);
-    if let Some(dir) = file.parent() {
-        fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+/// Write one host module file per running driver and remove Tessera's stale
+/// ones. Returns how many are in place.
+pub fn write_host_modules(drivers: &[Driver], running: &[String]) -> Result<usize> {
+    let dir = paths::host_modules_dir();
+    fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+    let wanted: Vec<&Driver> = drivers.iter().filter(|d| running.contains(&d.id)).collect();
+    for entry in fs::read_dir(&dir)?.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with("tessera-")
+            && name.ends_with(".module")
+            && !wanted.iter().any(|d| host_module_name(&d.id) == name)
+        {
+            let _ = fs::remove_file(entry.path());
+        }
     }
-    fs::write(&file, module_contents()).with_context(|| format!("writing {}", file.display()))
+    for d in &wanted {
+        let path = dir.join(host_module_name(&d.id));
+        let body = host_module_contents(d);
+        if fs::read_to_string(&path).ok().as_deref() != Some(body.as_str()) {
+            fs::write(&path, body).with_context(|| format!("writing {}", path.display()))?;
+        }
+    }
+    Ok(wanted.len())
 }

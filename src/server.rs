@@ -1,15 +1,17 @@
-//! Supervision of the `p11-kit server` process.
+//! Supervision of the driver servers: one `p11-kit server --provider
+//! <module>` per available driver, on $XDG_RUNTIME_DIR/tessera/<driver>.
 //!
-//! The server loads the drivers (inside Tessera's sandbox, where they and
-//! their vendor tools live) and serves every token on
-//! $XDG_RUNTIME_DIR/p11-kit/pkcs11. Client apps load the runtime's
-//! p11-kit-client.so, which talks to that socket.
+//! One server per driver needs no p11-kit configuration (which Flatpak
+//! disables inside sandboxes), and a driver that fails to load or crashes
+//! affects only its own server. For each connection, p11-kit server starts
+//! `p11-kit remote`, which loads the driver with LD_LIBRARY_PATH set from the
+//! driver's `library_path`.
 
 use anyhow::{bail, Context, Result};
 use std::fs::{self, File};
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -27,31 +29,84 @@ extern "C" {
 pub enum State {
     Stopped,
     Running,
-    /// Something else (usually the host's p11-kit-server.socket) answers on
-    /// the socket.
+    /// Something else answers on one of the sockets (another Tessera).
     Conflict,
     Failed(String),
 }
 
-#[derive(Default)]
-pub struct Server {
+struct Instance {
+    id: String,
+    name: String,
     child: Option<Child>,
     failure: Option<String>,
 }
 
-fn log_path() -> PathBuf {
-    paths::p11kit_config_home().join("server.log")
+#[derive(Default)]
+pub struct Server {
+    instances: Vec<Instance>,
+    failure: Option<String>,
 }
 
-fn log_tail() -> String {
-    let text = fs::read_to_string(log_path()).unwrap_or_default();
+fn log_path(id: &str) -> PathBuf {
+    paths::log_dir().join(format!("{id}.log"))
+}
+
+fn log_tail(id: &str) -> String {
+    let text = fs::read_to_string(log_path(id)).unwrap_or_default();
     let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
-    lines[lines.len().saturating_sub(5)..].join("\n")
+    lines[lines.len().saturating_sub(3)..].join("\n")
 }
 
-/// Is anyone accepting connections on the socket?
-pub fn socket_answers() -> bool {
-    UnixStream::connect(paths::socket_path()).is_ok()
+pub fn socket_answers(socket: &Path) -> bool {
+    UnixStream::connect(socket).is_ok()
+}
+
+fn spawn(driver: &Driver) -> Result<Child> {
+    let socket = paths::driver_socket(&driver.id);
+    if socket.exists() {
+        if socket_answers(&socket) {
+            bail!("conflict");
+        }
+        // A stale socket left by a server that died.
+        let _ = fs::remove_file(&socket);
+    }
+    let log = File::create(log_path(&driver.id))?;
+    let mut cmd = Command::new(paths::p11kit_command());
+    // If Tessera dies without stopping the server (killed, crashed), the
+    // kernel stops the server too, so no orphan keeps the socket busy.
+    // SAFETY: prctl is async-signal-safe and touches no Rust state.
+    unsafe {
+        cmd.pre_exec(|| {
+            if prctl(PR_SET_PDEATHSIG, SIGTERM, 0, 0, 0) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    cmd.arg("server")
+        .arg("--foreground")
+        .arg("--name")
+        .arg(&socket)
+        .arg("--provider")
+        .arg(&driver.module)
+        .arg("pkcs11:")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(log);
+    if !driver.library_path.is_empty() {
+        let mut parts: Vec<PathBuf> = driver.library_path.clone();
+        if let Some(old) = std::env::var_os("LD_LIBRARY_PATH") {
+            parts.extend(std::env::split_paths(&old));
+        }
+        cmd.env("LD_LIBRARY_PATH", std::env::join_paths(parts)?);
+    }
+    let child = cmd.spawn().context("starting p11-kit server")?;
+
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < deadline && !socket.exists() {
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    Ok(child)
 }
 
 impl Server {
@@ -62,102 +117,99 @@ impl Server {
     pub fn start(&mut self, drivers: &[Driver]) -> Result<()> {
         self.stop();
         self.failure = None;
-        let socket = paths::socket_path();
-        if socket.exists() {
-            if socket_answers() {
-                bail!("conflict");
-            }
-            // A stale socket left by a server that died.
-            let _ = fs::remove_file(&socket);
-        }
-        if let Some(parent) = socket.parent() {
-            fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
-        }
+        let dir = paths::socket_dir();
+        fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
+        fs::create_dir_all(paths::log_dir())?;
         drivers::prepare_dirs(drivers);
-        let config_home = drivers::write_p11kit_config(drivers)?;
-        let log = File::create(log_path())?;
-        let mut cmd = Command::new(paths::p11kit_command());
-        // If Tessera dies without stopping the server (killed, crashed), the
-        // kernel stops the server too, so no orphan keeps the socket busy.
-        // SAFETY: prctl is async-signal-safe and touches no Rust state.
-        unsafe {
-            cmd.pre_exec(|| {
-                if prctl(PR_SET_PDEATHSIG, SIGTERM, 0, 0, 0) != 0 {
-                    return Err(std::io::Error::last_os_error());
+        let mut conflict = false;
+        for d in drivers.iter().filter(|d| d.available()) {
+            let (child, failure) = match spawn(d) {
+                Ok(c) => (Some(c), None),
+                Err(e) => {
+                    let msg = format!("{e:#}");
+                    conflict |= msg == "conflict";
+                    (None, Some(msg))
                 }
-                Ok(())
+            };
+            self.instances.push(Instance {
+                id: d.id.clone(),
+                name: d.name.clone(),
+                child,
+                failure,
             });
         }
-        let child = cmd
-            .arg("server")
-            .arg("--foreground")
-            .arg("--name")
-            .arg(&socket)
-            .arg("pkcs11:")
-            .env("XDG_CONFIG_HOME", &config_home)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(log)
-            .spawn()
-            .context("starting p11-kit server")?;
-        self.child = Some(child);
-
-        let deadline = Instant::now() + Duration::from_secs(3);
-        while Instant::now() < deadline {
-            if socket.exists() {
-                return Ok(());
-            }
-            if let State::Failed(msg) = self.poll() {
-                bail!(msg);
-            }
-            std::thread::sleep(Duration::from_millis(50));
+        if conflict {
+            bail!("conflict");
         }
         Ok(())
     }
 
     pub fn stop(&mut self) {
-        if let Some(mut child) = self.child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-            let _ = fs::remove_file(paths::socket_path());
+        for inst in self.instances.drain(..) {
+            if let Some(mut child) = inst.child {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = fs::remove_file(paths::driver_socket(&inst.id));
+            }
         }
     }
 
+    /// The overall state: Running when every driver's server runs.
     pub fn poll(&mut self) -> State {
-        if let Some(child) = self.child.as_mut() {
-            match child.try_wait() {
-                Ok(None) => return State::Running,
-                Ok(Some(status)) => {
-                    self.child = None;
-                    let tail = log_tail();
-                    let msg = if tail.is_empty() {
-                        format!("{status}")
-                    } else {
-                        tail
-                    };
-                    self.failure = Some(msg);
+        let mut failures = Vec::new();
+        for inst in self.instances.iter_mut() {
+            if let Some(child) = inst.child.as_mut() {
+                match child.try_wait() {
+                    Ok(None) => continue,
+                    Ok(Some(status)) => {
+                        inst.child = None;
+                        let tail = log_tail(&inst.id);
+                        inst.failure = Some(if tail.is_empty() {
+                            status.to_string()
+                        } else {
+                            tail
+                        });
+                    }
+                    Err(e) => {
+                        inst.child = None;
+                        inst.failure = Some(e.to_string());
+                    }
                 }
-                Err(e) => {
-                    self.child = None;
-                    self.failure = Some(e.to_string());
+            }
+            if let Some(f) = &inst.failure {
+                if f == "conflict" {
+                    return State::Conflict;
                 }
+                failures.push(format!("{}: {f}", inst.name));
             }
         }
         if let Some(f) = &self.failure {
-            if f == "conflict" {
-                return State::Conflict;
-            }
             return State::Failed(f.clone());
         }
-        if socket_answers() {
-            return State::Conflict;
+        if !failures.is_empty() {
+            return State::Failed(failures.join("\n"));
         }
-        State::Stopped
+        if self.instances.iter().any(|i| i.child.is_some()) {
+            State::Running
+        } else {
+            State::Stopped
+        }
+    }
+
+    /// Ids of the drivers whose server is running.
+    pub fn running(&self) -> Vec<String> {
+        self.instances
+            .iter()
+            .filter(|i| i.child.is_some())
+            .map(|i| i.id.clone())
+            .collect()
     }
 
     /// Record a start error so `poll` reports it.
     pub fn set_failure(&mut self, msg: String) {
-        self.failure = Some(msg);
+        if msg != "conflict" {
+            self.failure = Some(msg);
+        }
     }
 }
 

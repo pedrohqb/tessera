@@ -1,4 +1,0 @@
-name = "OpenSC"
-vendor = "OpenSC project"
-description = "PIV, YubiKey, CAC and many national ID cards"
-module = "/app/lib/opensc-pkcs11.so"

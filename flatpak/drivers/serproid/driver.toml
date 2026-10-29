@@ -2,6 +2,7 @@ name = "SerproID"
 vendor = "Serpro"
 description = "Cloud certificate; sign in with the SerproID app"
 module = "/app/extra/drivers/serproid/libserproidp11.so"
+library_path = ["/app/extra/drivers/serproid/usr/lib"]
 create_dirs = ["~/.config/serproid/certificados"]
 
 [[tools]]

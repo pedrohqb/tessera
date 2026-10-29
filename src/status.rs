@@ -1,8 +1,15 @@
 //! What the user sees: card readers (through pcscd) and tokens with their
-//! certificates (through our own socket, the same path client apps use).
+//! certificates, read through each driver's server socket by a child process
+//! (`tessera list-tokens <socket>`), the way client apps read them.
 
 use cryptoki::context::{CInitializeArgs, CInitializeFlags, Pkcs11};
 use cryptoki::object::{Attribute, AttributeType, ObjectClass};
+use serde::{Deserialize, Serialize};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+/// How long one driver may take to list its tokens.
+const LIST_TIMEOUT: Duration = Duration::from_secs(10);
 
 use crate::paths;
 
@@ -19,7 +26,7 @@ pub enum Readers {
     NoService(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Certificate {
     pub subject: String,
     pub issuer: String,
@@ -28,8 +35,11 @@ pub struct Certificate {
     pub expired: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Token {
+    /// Name of the driver that serves it.
+    #[serde(default)]
+    pub driver: String,
     pub label: String,
     pub manufacturer: String,
     pub model: String,
@@ -37,10 +47,17 @@ pub struct Token {
     pub certificates: Vec<Certificate>,
 }
 
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct TokenList {
+    tokens: Vec<Token>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Snapshot {
     pub readers: Readers,
-    pub tokens: Result<Vec<Token>, String>,
+    pub tokens: Vec<Token>,
+    /// Drivers whose server could not be read: "driver: error".
+    pub errors: Vec<String>,
 }
 
 pub fn readers() -> Readers {
@@ -108,12 +125,9 @@ fn parse_cert(label: String, der: &[u8]) -> Option<Certificate> {
     })
 }
 
-/// List tokens and their public certificates through p11-kit-client. Must
-/// run off the main thread: a slow token can take a second or two.
-pub fn tokens() -> Result<Vec<Token>, String> {
-    if !paths::socket_path().exists() {
-        return Ok(vec![]);
-    }
+/// Runs in the child process: list tokens and their public certificates
+/// through p11-kit-client.so, at P11_KIT_SERVER_ADDRESS.
+pub fn list_tokens_in_process() -> Result<String, String> {
     let ctx = Pkcs11::new(client_module()).map_err(|e| e.to_string())?;
     ctx.initialize(CInitializeArgs::new(CInitializeFlags::OS_LOCKING_OK))
         .map_err(|e| e.to_string())?;
@@ -127,6 +141,7 @@ pub fn tokens() -> Result<Vec<Token>, String> {
             continue;
         }
         let mut token = Token {
+            driver: String::new(),
             label: info.label().trim().to_string(),
             manufacturer: info.manufacturer_id().trim().to_string(),
             model: info.model().trim().to_string(),
@@ -161,12 +176,68 @@ pub fn tokens() -> Result<Vec<Token>, String> {
         }
         out.push(token);
     }
-    Ok(out)
+    toml::to_string(&TokenList { tokens: out }).map_err(|e| e.to_string())
 }
 
-pub fn snapshot() -> Snapshot {
+/// Read one driver's server in a child process (p11-kit-client takes its
+/// address from the environment, so each server gets its own process).
+fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let socket = paths::driver_socket(id);
+    let mut child = Command::new(exe)
+        .arg("list-tokens")
+        .env(
+            "P11_KIT_SERVER_ADDRESS",
+            format!("unix:path={}", socket.display()),
+        )
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    // A driver that hangs (waiting for a reader, say) must not hang the
+    // window: give up after a while.
+    let deadline = Instant::now() + LIST_TIMEOUT;
+    loop {
+        match child.try_wait().map_err(|e| e.to_string())? {
+            Some(_) => break,
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("no answer in {} s", LIST_TIMEOUT.as_secs()));
+            }
+            None => std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
+    let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    let list: TokenList =
+        toml::from_str(&String::from_utf8_lossy(&out.stdout)).map_err(|e| e.to_string())?;
+    Ok(list
+        .tokens
+        .into_iter()
+        .map(|mut t| {
+            t.driver = name.to_string();
+            t
+        })
+        .collect())
+}
+
+/// Readers and tokens. `drivers` are (id, name) of the running servers.
+/// Must run off the main thread: a slow token can take a second or two.
+pub fn snapshot(drivers: &[(String, String)]) -> Snapshot {
+    let mut tokens = Vec::new();
+    let mut errors = Vec::new();
+    for (id, name) in drivers {
+        match tokens_of(id, name) {
+            Ok(t) => tokens.extend(t),
+            Err(e) => errors.push(format!("{name}: {e}")),
+        }
+    }
     Snapshot {
         readers: readers(),
-        tokens: tokens(),
+        tokens,
+        errors,
     }
 }

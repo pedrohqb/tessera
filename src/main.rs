@@ -5,9 +5,10 @@
 //!   tessera --background        start the token service without a window
 //!   tessera serve               run only the token service, in the foreground
 //!   tessera status              print readers, tokens and drivers
-//!   tessera setup-app ID [DIR]  point a Flatpak app at Tessera (and register
-//!                               the module in the NSS database DIR)
-//!   tessera nss-add-module DIR  (internal) register p11-kit-client.so in DIR
+//!   tessera nss-setup DIR       register p11-kit-client.so in the NSS
+//!                               database DIR (a Firefox profile, say)
+//!   tessera list-tokens         (internal) list tokens at P11_KIT_SERVER_ADDRESS
+//!   tessera nss-add-module DIR  (internal) the NSS work of nss-setup
 
 mod apps;
 mod drivers;
@@ -22,70 +23,68 @@ mod ui;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+/// (id, name) of the drivers whose server answers.
+fn answering_drivers(ds: &[drivers::Driver]) -> Vec<(String, String)> {
+    ds.iter()
+        .filter(|d| server::socket_answers(&paths::driver_socket(&d.id)))
+        .map(|d| (d.id.clone(), d.name.clone()))
+        .collect()
+}
+
 fn print_status() -> ExitCode {
-    println!("Socket: {}", paths::socket_path().display());
-    println!(
-        "Service: {}",
-        if server::socket_answers() {
-            "answering"
-        } else {
-            "not running"
-        }
-    );
-    println!("\nDrivers:");
     let ds = drivers::discover();
+    let answering = answering_drivers(&ds);
+    println!("Sockets: {}", paths::socket_dir().display());
+    println!("Host modules: {}", paths::host_modules_dir().display());
+    println!("\nDrivers:");
     if ds.is_empty() {
         println!("  (none)");
     }
     for d in &ds {
-        println!(
-            "  {} [{}] {}{}",
-            d.name,
-            d.id,
-            d.module.display(),
-            if d.available() { "" } else { "  (missing)" }
-        );
+        let state = if !d.available() {
+            "files missing"
+        } else if answering.iter().any(|(id, _)| id == &d.id) {
+            "serving"
+        } else {
+            "not running"
+        };
+        println!("  {} [{}] {} ({state})", d.name, d.id, d.module.display());
     }
-    let snap = status::snapshot();
+    let snap = status::snapshot(&answering);
     println!("\nReaders:");
     match &snap.readers {
         status::Readers::Ok(rs) if rs.is_empty() => println!("  (none)"),
         status::Readers::Ok(rs) => {
             for r in rs {
-                println!(
-                    "  {}{}",
-                    r.name,
-                    if r.card_present {
-                        "  [card present]"
-                    } else {
-                        ""
-                    }
-                );
+                let present = if r.card_present {
+                    "  [card present]"
+                } else {
+                    ""
+                };
+                println!("  {}{present}", r.name);
             }
         }
         status::Readers::NoService(e) => println!("  pcscd not reachable: {e}"),
     }
     println!("\nTokens:");
-    match &snap.tokens {
-        Ok(ts) if ts.is_empty() => println!("  (none)"),
-        Ok(ts) => {
-            for t in ts {
-                println!(
-                    "  {} ({} {}, serial {})",
-                    t.label, t.manufacturer, t.model, t.serial
-                );
-                for c in &t.certificates {
-                    println!(
-                        "    - {} | issuer: {} | valid until {}{}",
-                        c.subject,
-                        c.issuer,
-                        c.not_after,
-                        if c.expired { " (expired)" } else { "" }
-                    );
-                }
-            }
+    if snap.tokens.is_empty() {
+        println!("  (none)");
+    }
+    for t in &snap.tokens {
+        println!(
+            "  {} ({} {}, serial {}) via {}",
+            t.label, t.manufacturer, t.model, t.serial, t.driver
+        );
+        for c in &t.certificates {
+            let expired = if c.expired { " (expired)" } else { "" };
+            println!(
+                "    - {} | issuer: {} | valid until {}{expired}",
+                c.subject, c.issuer, c.not_after
+            );
         }
-        Err(e) => println!("  error: {e}"),
+    }
+    for e in &snap.errors {
+        println!("  error: {e}");
     }
     ExitCode::SUCCESS
 }
@@ -96,27 +95,27 @@ fn serve() -> ExitCode {
     if let Err(e) = srv.start(&ds) {
         if e.to_string() == "conflict" {
             eprintln!(
-                "tessera: another p11-kit server already answers on {}",
-                paths::socket_path().display()
+                "tessera: another Tessera already serves in {}",
+                paths::socket_dir().display()
             );
             return ExitCode::FAILURE;
         }
         eprintln!("tessera: cannot start the token service: {e:#}");
         return ExitCode::FAILURE;
     }
-    eprintln!(
-        "tessera: serving {} driver(s) on {}",
-        ds.iter().filter(|d| d.available()).count(),
-        paths::socket_path().display()
-    );
+    let running = srv.running();
+    match apps::write_host_modules(&ds, &running) {
+        Ok(n) => eprintln!(
+            "tessera: serving {n} driver(s) in {}; host modules in {}",
+            paths::socket_dir().display(),
+            paths::host_modules_dir().display()
+        ),
+        Err(e) => eprintln!("tessera: cannot write the host modules: {e:#}"),
+    }
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        match srv.poll() {
-            server::State::Running => {}
-            other => {
-                eprintln!("tessera: service stopped: {other:?}");
-                return ExitCode::FAILURE;
-            }
+        std::thread::sleep(std::time::Duration::from_secs(2));
+        if let server::State::Failed(msg) = srv.poll() {
+            eprintln!("tessera: {msg}");
         }
     }
 }
@@ -126,10 +125,6 @@ extern "C" {
 }
 
 fn main() -> ExitCode {
-    // Tessera looks at its own server through p11-kit-client.so. Inside a
-    // Flatpak sandbox the client's default address is Flatpak's trust-store
-    // server, so point it at our socket (before any thread starts).
-    std::env::set_var("P11_KIT_SERVER_ADDRESS", paths::server_address());
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("status") => {
@@ -143,27 +138,33 @@ fn main() -> ExitCode {
             return print_status();
         }
         Some("serve") => return serve(),
-        Some("setup-app") => {
-            // tessera setup-app APP_ID [NSS_DIR]: what the window's "Set up"
-            // does, for scripts and testing.
-            let Some(app_id) = args.get(2) else {
-                eprintln!("usage: tessera setup-app APP_ID [NSS_DIR]");
+        Some("list-tokens") => {
+            return match status::list_tokens_in_process() {
+                Ok(text) => {
+                    print!("{text}");
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
+        Some("nss-setup") => {
+            let Some(dir) = args.get(2) else {
+                eprintln!("usage: tessera nss-setup DIR");
                 return ExitCode::FAILURE;
             };
-            if let Err(e) = apps::write_module_file(app_id) {
-                eprintln!("tessera: {e:#}");
-                return ExitCode::FAILURE;
-            }
-            println!("{}", paths::app_module_file(app_id).display());
-            if let Some(dir) = args.get(3) {
-                if let Err(e) = nss::add_module(&PathBuf::from(dir)) {
-                    eprintln!("tessera: {e:#}");
-                    return ExitCode::FAILURE;
+            return match nss::add_module(&PathBuf::from(dir)) {
+                Ok(_) => {
+                    println!("{dir}: {} registered", paths::CLIENT_MODULE);
+                    ExitCode::SUCCESS
                 }
-                println!("{dir}: {} registered", paths::PROXY_MODULE);
-            }
-            println!("Now run: {}", apps::override_command(app_id));
-            return ExitCode::SUCCESS;
+                Err(e) => {
+                    eprintln!("tessera: {e:#}");
+                    ExitCode::FAILURE
+                }
+            };
         }
         Some("nss-add-module") => {
             let Some(dir) = args.get(2) else {

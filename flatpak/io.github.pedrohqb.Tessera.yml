@@ -16,15 +16,14 @@ finish-args:
   - --socket=pcsc
   # Cloud certificates (SerproID) and revocation checks by vendor tools.
   - --share=network
-  # The socket client apps connect to: $XDG_RUNTIME_DIR/tessera/pkcs11.
-  # (Not the p11-kit default, xdg-run/p11-kit: inside every sandbox Flatpak
-  # puts its own trust-store server there.)
+  # The drivers' servers: $XDG_RUNTIME_DIR/tessera/<driver>.
   - --filesystem=xdg-run/tessera:create
-  # "Set up" for client apps: the p11-kit module file that points them at
-  # the socket, and for Papers the small NSS database poppler finds first
-  # (see paths.rs). Nothing else of these apps is visible.
-  - --filesystem=~/.var/app/org.mozilla.firefox/config/pkcs11:create
-  - --filesystem=~/.var/app/org.gnome.Papers/config/pkcs11:create
+  # The host's p11-kit module directory, where Tessera writes one
+  # "remote:" file per driver so the host's p11-kit server (and native
+  # apps) serve them. Only files named tessera-*.module are touched.
+  - --filesystem=xdg-config/pkcs11:create
+  # The small NSS database Tessera sets up for Papers, which poppler finds
+  # first (see paths.rs). Nothing else of Papers is visible.
   - --filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create
   # SerproID keeps its certificate list in ~/.config/serproid; keep it inside
   # Tessera's own data instead of the host home.
@@ -66,36 +65,6 @@ modules:
         tag: 2.5.3
         commit: 58de510789550941e6548399e024083f54b8d4f5
 
-  # OpenSC: open-source driver for PIV, YubiKey, CAC and many national eIDs.
-  - name: opensc
-    buildsystem: autotools
-    config-opts:
-      - --disable-doc
-      - --disable-man
-      - --disable-tests
-      - --disable-notify
-      - --disable-strict
-      - --sysconfdir=/app/etc
-      # pcsc-lite installs its headers in include/PCSC.
-      - PCSC_CFLAGS=-I/app/include/PCSC
-      # Its p11-kit module file would go to the runtime's read-only
-      # /usr/share; Tessera writes its own p11-kit configuration anyway.
-      - --enable-p11_system_config_modules=/app/share/p11-kit/modules
-      - --with-completiondir=/app/share/bash-completion/completions
-    cleanup:
-      - /bin
-      - /include
-      - /share/bash-completion
-      - /share/p11-kit
-      - /share/doc
-      - '*.a'
-      - '*.la'
-    sources:
-      - type: git
-        url: https://github.com/OpenSC/OpenSC.git
-        tag: 0.27.1
-        commit: 19868984dc4dc697af6a86d65ab32a1f19a43ea4
-
   - name: tessera
     buildsystem: simple
     build-options:
@@ -114,7 +83,7 @@ modules:
       - install -Dm644 data/io.github.pedrohqb.Tessera.metainfo.xml /app/share/metainfo/io.github.pedrohqb.Tessera.metainfo.xml
       - install -Dm644 data/icons/io.github.pedrohqb.Tessera.svg /app/share/icons/hicolor/scalable/apps/io.github.pedrohqb.Tessera.svg
       - install -Dm644 data/icons/io.github.pedrohqb.Tessera-symbolic.svg /app/share/icons/hicolor/symbolic/apps/io.github.pedrohqb.Tessera-symbolic.svg
-      - for d in safesign safenet serproid opensc; do install -Dm644 flatpak/drivers/$d/driver.toml /app/lib/tessera/drivers/$d/driver.toml; done
+      - for d in safesign safenet serproid; do install -Dm644 flatpak/drivers/$d/driver.toml /app/lib/tessera/drivers/$d/driver.toml; done
       - mkdir -p /app/lib/tessera/extensions
     sources:
       - type: dir
@@ -134,6 +103,29 @@ modules:
         url: https://assets.ctfassets.net/zuadwp3l2xby/6vGICRnQgQ8TkcHTgcouIr/5acf96dcbc0364aa9228606d3969ef97/SafeSignICStandardLinux4.5.0.0-AET.000ub2404x86_64.deb
         sha256: 7742e21e3141e51e307d7613b4046886bc7c4aa203835dcf5c43cd348f2a1b91
         size: 0
+      # SafeSign's Token Administration from the vendor's RHEL 10 package
+      # (no wxWidgets needed), as the AUR package does; the PKCS#11 libraries
+      # come from the Ubuntu package above.
+      - type: extra-data
+        filename: safesign.rpm
+        only-arches: [x86_64]
+        url: https://assets.ctfassets.net/zuadwp3l2xby/3b4YS8ts1cuD4BnUoQGZXl/93f644f03cc226b2adab290be11c6cd5/SafeSignICStandardLinux4.5.0.0-AET.000redhat10x86_64.rpm
+        sha256: 2f5ea4622fda213c9bfc8bf4da51dac09983a349326f9275309565dbdb123378
+        size: 0
+      # GDBM, which libaetpkss.so needs and the runtime lacks (the AUR
+      # package depends on gdbm), from Ubuntu 24.04.
+      - type: extra-data
+        filename: gdbm.deb
+        only-arches: [x86_64]
+        url: https://archive.ubuntu.com/ubuntu/pool/main/g/gdbm/libgdbm6t64_1.23-5.1build1_amd64.deb
+        sha256: 18d6d74a5c038b458d95ba0c0909e0f086cd50bb9a0fee32697902724fc5645e
+        size: 34440
+      - type: extra-data
+        filename: gdbm-compat.deb
+        only-arches: [x86_64]
+        url: https://archive.ubuntu.com/ubuntu/pool/main/g/gdbm/libgdbm-compat4t64_1.23-5.1build1_amd64.deb
+        sha256: fb8564afd7b7d74d55207070ba50339478e22d29a39ec740dc482f069ac7ee65
+        size: 6710
       - type: extra-data
         filename: safenet.zip
         only-arches: [x86_64]

@@ -5,28 +5,31 @@
 //! directory inside and outside every sandbox, which is what lets other apps
 //! reach our socket.
 //!
-//! The socket is not the p11-kit default ($XDG_RUNTIME_DIR/p11-kit/pkcs11):
-//! inside every sandbox Flatpak replaces that directory with its own p11-kit
-//! server for the host's trust store, so it cannot be mounted there. Client
-//! apps reach Tessera instead through a `remote:` line in their own p11-kit
-//! configuration (see apps.rs).
+//! How apps reach the tokens: Tessera runs one `p11-kit server` per driver,
+//! on $XDG_RUNTIME_DIR/tessera/<driver>. On the host, a module file per
+//! driver in ~/.config/pkcs11/modules (`remote: unix:path=...`) makes the
+//! host's own p11-kit server (`p11-kit-server.socket`, on
+//! $XDG_RUNTIME_DIR/p11-kit/pkcs11) serve them together with the host's
+//! modules. Sandboxed apps reach that socket with
+//! `--filesystem=xdg-run/p11-kit/pkcs11` and the runtime's p11-kit-client.so,
+//! as FlatPark's PJeOffice Pro already does.
+//!
+//! Why not inside the sandbox? Flatpak writes `user-config: none` into every
+//! sandbox's /etc/pkcs11/pkcs11.conf and replaces $XDG_RUNTIME_DIR/p11-kit
+//! with its own trust-store server, so neither a configured multi-module
+//! server nor a custom client configuration is possible there.
 
 use std::env;
 use std::path::PathBuf;
 
 pub const APP_ID: &str = "io.github.pedrohqb.Tessera";
 
-/// The PKCS#11 module Tessera itself uses to look at its own server (with
-/// P11_KIT_SERVER_ADDRESS pointing at our socket). It ships in the
-/// freedesktop runtime, and so in the GNOME and KDE ones built on it.
+/// The PKCS#11 module apps load to reach the host's p11-kit server (and that
+/// Tessera loads to look at its own servers). It ships in the freedesktop
+/// runtime, and so in the GNOME and KDE ones built on it.
 pub const CLIENT_MODULE: &str = "/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so";
 
-/// The PKCS#11 module client apps load: p11-kit's proxy, which serves every
-/// module in the app's p11-kit configuration, including the `remote:` entry
-/// Tessera writes there. Same path in every freedesktop-based runtime.
-pub const PROXY_MODULE: &str = "/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so";
-
-/// Name under which Tessera registers the proxy module in NSS databases.
+/// Name under which Tessera registers the client module in NSS databases.
 pub const NSS_MODULE_NAME: &str = "Tessera (p11-kit)";
 
 fn xdg(var: &str, fallback: &str) -> PathBuf {
@@ -55,36 +58,34 @@ extern "C" {
     fn libc_getuid() -> u32;
 }
 
-/// Tessera's socket: $XDG_RUNTIME_DIR/tessera/pkcs11, the same path on the
-/// host and in every sandbox granted `xdg-run/tessera`.
-pub fn socket_path() -> PathBuf {
-    if let Some(p) = env::var_os("TESSERA_SOCKET") {
+/// Where Tessera's servers listen: $XDG_RUNTIME_DIR/tessera, the same path
+/// on the host and in Tessera's sandbox.
+pub fn socket_dir() -> PathBuf {
+    if let Some(p) = env::var_os("TESSERA_SOCKET_DIR") {
         return PathBuf::from(p);
     }
-    runtime_dir().join("tessera").join("pkcs11")
+    runtime_dir().join("tessera")
 }
 
-/// The p11-kit address of our socket, as clients write it.
-pub fn server_address() -> String {
-    format!("unix:path={}", socket_path().display())
+/// The socket of one driver's server.
+pub fn driver_socket(id: &str) -> PathBuf {
+    socket_dir().join(id)
 }
 
-/// The p11-kit module file Tessera writes into a client app's configuration
-/// ($XDG_CONFIG_HOME of a Flatpak app is ~/.var/app/<id>/config).
-pub fn app_module_file(app_id: &str) -> PathBuf {
-    home()
-        .join(".var/app")
-        .join(app_id)
-        .join("config/pkcs11/modules/tessera.module")
+/// The host's p11-kit module directory (~/.config/pkcs11/modules on the
+/// host; Tessera's own $XDG_CONFIG_HOME is inside its sandbox data).
+pub fn host_modules_dir() -> PathBuf {
+    if let Some(p) = env::var_os("TESSERA_HOST_MODULES") {
+        return PathBuf::from(p);
+    }
+    home().join(".config/pkcs11/modules")
 }
 
-/// A private p11-kit configuration, given to the server process only as its
-/// XDG_CONFIG_HOME. It never touches the user's own ~/.config/pkcs11, even when
-/// Tessera runs outside Flatpak during development.
-pub fn p11kit_config_home() -> PathBuf {
+/// Logs of the driver servers.
+pub fn log_dir() -> PathBuf {
     xdg("XDG_DATA_HOME", ".local/share")
         .join("tessera")
-        .join("p11-kit")
+        .join("logs")
 }
 
 /// Where Tessera keeps its own settings.

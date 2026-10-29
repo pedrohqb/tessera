@@ -2,6 +2,10 @@ name = "SafeSign IC"
 vendor = "A.E.T. Europe"
 description = "GD Burti and other SafeSign tokens"
 module = "/app/extra/drivers/safesign/libaetpkss.so"
+library_path = [
+    "/app/extra/drivers/safesign/usr/lib",
+    "/app/extra/drivers/safesign/gdbm/usr/lib/x86_64-linux-gnu",
+]
 
 [[tools]]
 name = "Token Administration"

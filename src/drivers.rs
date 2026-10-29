@@ -10,10 +10,15 @@
 //! description = "GD Burti and other SafeSign tokens"
 //! module = "/app/extra/drivers/safesign/usr/lib/libaetpkss.so"
 //!
+//! library_path = ["/app/extra/drivers/safesign/usr/lib"]   # optional
+//!
 //! [[tools]]
 //! name = "Token Administration"
 //! exec = ["/app/extra/drivers/safesign/tokenadmin"]
 //! ```
+//!
+//! `library_path` is put in LD_LIBRARY_PATH for the process that loads the
+//! module (for libraries the runtime doesn't have).
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -45,6 +50,8 @@ struct DriverFile {
     /// tools expect them and fail if they are missing).
     #[serde(default)]
     create_dirs: Vec<String>,
+    #[serde(default)]
+    library_path: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +63,7 @@ pub struct Driver {
     pub module: PathBuf,
     pub tools: Vec<Tool>,
     pub create_dirs: Vec<String>,
+    pub library_path: Vec<PathBuf>,
 }
 
 impl Driver {
@@ -102,6 +110,7 @@ fn load_one(dir: &Path) -> Result<Driver> {
         module: resolve(dir, &d.module),
         tools,
         create_dirs: d.create_dirs,
+        library_path: d.library_path.iter().map(|p| resolve(dir, p)).collect(),
     })
 }
 
@@ -132,35 +141,6 @@ pub fn discover() -> Vec<Driver> {
     let mut v: Vec<Driver> = found.into_values().collect();
     v.sort_by_key(|d| d.name.to_lowercase());
     v
-}
-
-/// Write the p11-kit configuration the server reads: only Tessera's drivers,
-/// none of the runtime's own modules (the trust store would otherwise be
-/// exported to every client as a token).
-pub fn write_p11kit_config(drivers: &[Driver]) -> Result<PathBuf> {
-    let home = paths::p11kit_config_home();
-    let modules = home.join("pkcs11").join("modules");
-    fs::create_dir_all(&modules).with_context(|| format!("creating {}", modules.display()))?;
-    fs::write(
-        home.join("pkcs11").join("pkcs11.conf"),
-        "# Written by Tessera: load only the modules below.\nuser-config: only\n",
-    )?;
-    for entry in fs::read_dir(&modules)?.flatten() {
-        let p = entry.path();
-        if p.extension().is_some_and(|e| e == "module") {
-            let _ = fs::remove_file(p);
-        }
-    }
-    for d in drivers.iter().filter(|d| d.available()) {
-        let body = format!(
-            "# {} ({})\nmodule: {}\n",
-            d.name,
-            d.vendor,
-            d.module.display()
-        );
-        fs::write(modules.join(format!("{}.module", d.id)), body)?;
-    }
-    Ok(home)
 }
 
 /// Create the directories drivers ask for (e.g. SerproID's certificate
