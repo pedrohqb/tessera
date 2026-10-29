@@ -71,10 +71,14 @@ modules:
       - --sysconfdir=/app/etc
       # pcsc-lite installs its headers in include/PCSC.
       - PCSC_CFLAGS=-I/app/include/PCSC
+      # Its p11-kit module file would go to the runtime's read-only
+      # /usr/share; Tessera writes its own p11-kit configuration anyway.
+      - --enable-p11_system_config_modules=/app/share/p11-kit/modules
     cleanup:
       - /bin
       - /include
       - /share/bash-completion
+      - /share/p11-kit
       - /share/doc
       - '*.a'
       - '*.la'
