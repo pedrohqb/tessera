@@ -60,9 +60,8 @@ jobs:
       - name: Release tarball (everything under /app, built against the runtime)
         run: |
           # The whole /app tree: Tessera, its data and driver descriptions,
-          # plus the libraries it bundles (libpcsclite, OpenSC) and
-          # OpenSC's configuration. Laid out as /app, so a package can unpack
-          # it there.
+          # plus the library it bundles (libpcsclite). Laid out as /app, so a
+          # package can unpack it there.
           mkdir -p dist
           cp -a build-dir/files dist/tessera
           rm -rf dist/tessera/include dist/tessera/lib/pkgconfig dist/tessera/lib/debug

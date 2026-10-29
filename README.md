@@ -16,7 +16,7 @@ Token ─► pcscd (host) ─► Tessera sandbox: one p11-kit server per driver
 Host: p11-kit-server.socket ($XDG_RUNTIME_DIR/p11-kit/pkcs11) ─ host trust store, host modules (OpenSC…)
                                          ▲
                ┌─────────────────────────┼─────────────────────────┐
-         PJeOffice Pro                Firefox                    Papers
+   PJeOffice Pro · Firefox · Chromium · Chrome · Brave · Papers
   (each: --filesystem=xdg-run/p11-kit/pkcs11, loads p11-kit-client.so)
 ```
 
@@ -27,7 +27,11 @@ Host: p11-kit-server.socket ($XDG_RUNTIME_DIR/p11-kit/pkcs11) ─ host trust sto
 
 **Why not inside the sandbox?** Flatpak puts `user-config: none` into every sandbox's `/etc/pkcs11/pkcs11.conf`, and replaces `$XDG_RUNTIME_DIR/p11-kit` with its own trust-store server. So no sandboxed process can load a custom p11-kit configuration or serve on the default socket. One server per driver needs no configuration, and the host's p11-kit does the joining.
 
-The window shows the service, the system connection, the card readers, the tokens with their certificates, and the drivers (with buttons for the vendors' tools). It also helps set up Firefox and Papers. The service keeps running when the window is closed, and it can start at login (menu → *Start automatically at login*).
+The window shows the service, the system connection, the card readers, the tokens with their certificates, and the drivers, each with its state, an on/off switch and buttons for the vendors' tools. It also sets up Firefox, Chromium, Chrome, Brave and Papers. The service keeps running when the window is closed, with an icon in the tray (StatusNotifierItem; on GNOME through the AppIndicator extension, which Bluefin and Aurora ship), and it can start at login (menu → *Start automatically at login*).
+
+Each driver is listed, and published to the host only while it answers. One that stops answering is restarted, and stopped after three times in a row so it cannot hang the apps.
+
+**Full documentation (in Portuguese): [docs/](docs/README.md)**: architecture, every driver and its quirks, each app, troubleshooting tools, and the history of what was found while testing with real tokens.
 
 ## Drivers
 
@@ -86,6 +90,10 @@ Tessera writes and updates the `tessera-*.module` files itself, through its `xdg
    ```
 2. Close Firefox. In Tessera, press *Set up* and choose the profile folder. Or, in Firefox: *Settings → Privacy & Security → Security Devices → Load*, module file `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`.
 
+**Chromium, Google Chrome, Brave** (`org.chromium.Chromium`, `com.google.Chrome`, `com.brave.Browser`):
+1. The same override. Chrome also needs `--persist=.pki`, because its package keeps no `~/.pki` (the window's command includes it).
+2. Open the browser once, then press *Set up* in Tessera: it registers `p11-kit-client.so` in the browser's `~/.pki/nssdb` (the real one for Chromium, which may use the home folder; the one in its data folder for Brave and Chrome). Restart the browser.
+
 **Papers** (`org.gnome.Papers`):
 1. ```sh
    flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.gnome.Papers
@@ -129,15 +137,19 @@ Tagging `vX.Y.Z` publishes it, together with `tessera-x86_64.tar.gz`: the whole 
 
 ## Status
 
-This is an early version. The whole path (client app → host p11-kit server → `remote:` module → Tessera's driver server → driver) is tested with SoftHSM 2. Real tokens (SafeSign, SafeNet) and SerproID's cloud sign-in are being tested on a real system. Reports are welcome.
+First release. Tested on Bluefin with a GD Burti token (SafeSign) and a SerproID cloud certificate: signing in PJeOffice Pro, TLS client-certificate login in Firefox, PDF signing in Papers, and the vendors' tools. Chromium, Chrome and Brave are tested with SoftHSM only; SafeNet has not been tried with a real token. Reports are welcome.
+
+SerproID needed two workarounds that may help anyone packaging it: it uses libgcc_s's unwinder without linking it (preloaded), and it keeps the `CK_MECHANISM` pointer from `C_SignInit` and reads the PSS parameters only in `C_Sign`, after p11-kit has reused that memory (Tessera hands it a copy that stays valid). Details in [docs/drivers.md](docs/drivers.md#serproid).
 
 ---
 
 ## Em português
 
+A documentação completa, em português, está em [docs/](docs/README.md).
+
 O **Tessera** é uma central de tokens para Flatpak. Ele roda os drivers dos tokens (SafeSign/GD Burti, SafeNet e SerproID) dentro do próprio sandbox, sem instalar pacotes de fornecedores no sistema. Foi feito pensando nos sistemas imutáveis (Bluefin, Silverblue, Aurora, Bazzite).
 
-Os tokens chegam aos aplicativos (PJeOffice Pro, Firefox, Papers) pelo servidor p11-kit do próprio sistema. O Tessera grava um arquivo por driver em `~/.config/pkcs11/modules`, e basta ativar uma vez o `systemctl --user enable --now p11-kit-server.socket`. O PJeOffice Pro do FlatPark funciona sem nenhuma configuração. O Firefox e o Papers precisam do `flatpak override` que a janela mostra e do botão "Configurar".
+Os tokens chegam aos aplicativos (PJeOffice Pro, Firefox, Chromium, Chrome, Brave, Papers) pelo servidor p11-kit do próprio sistema. O Tessera grava um arquivo por driver em `~/.config/pkcs11/modules`, e basta ativar uma vez o `systemctl --user enable --now p11-kit-server.socket`. O PJeOffice Pro do FlatPark funciona sem nenhuma configuração. Os outros aplicativos precisam do `flatpak override` que a janela mostra e do botão "Configurar". Com a janela fechada, o Tessera continua servindo os tokens, com um ícone na bandeja.
 
 Os drivers são baixados dos sites oficiais na instalação e conferidos pelo SHA256 fixado. Nenhum script de instalação do fornecedor é executado, seguindo a mesma "limpeza" do [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br).
 

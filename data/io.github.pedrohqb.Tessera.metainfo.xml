@@ -20,8 +20,9 @@
       <li>Drivers included: SafeSign IC, SafeNet Authentication Client and SerproID; more can be added as extensions</li>
       <li>Vendor drivers are downloaded from the vendors at install time and checked against pinned checksums</li>
       <li>Opens the vendors' tools, such as SafeSign's Token Administration and the SerproID app</li>
-      <li>Sets up Firefox and Papers to use the tokens, and shows the command that lets them reach Tessera</li>
-      <li>Keeps running in the background, and can start at login</li>
+      <li>Sets up Firefox, Chromium, Google Chrome, Brave and Papers to use the tokens, and shows the command that lets them reach Tessera</li>
+      <li>Publishes a driver only while it answers, so a driver that hangs cannot hang the apps</li>
+      <li>Keeps running in the background with an icon in the tray, and can start at login</li>
     </ul>
     <p>Each driver runs in its own p11-kit server inside Tessera. Tessera adds them to the host's p11-kit configuration, and the host's p11-kit server (p11-kit-server.socket, enabled once) serves them to other apps. Sandboxed apps need --filesystem=xdg-run/p11-kit/pkcs11; PJeOffice Pro from FlatPark has it already.</p>
     <p>The host needs pcscd with the CCID driver and p11-kit-server, which most distributions ship.</p>
@@ -50,7 +51,7 @@
   <releases>
     <release version="0.1.0" date="2026-10-29">
       <description>
-        <p>First release: token service, readers, tokens and certificates, drivers, and Firefox and Papers setup.</p>
+        <p>First release: one p11-kit server per driver (SafeSign IC, SafeNet Authentication Client, SerproID), published through the host p11-kit server; readers, tokens and certificates; set-up for Firefox, Chromium, Google Chrome, Brave and Papers; tray icon and start at login.</p>
       </description>
     </release>
   </releases>
