@@ -7,88 +7,64 @@
 //! it with each signing request, and its server refuses
 //! `/usr/libexec/p11-kit/p11-kit-remote`; with this, the program is Tessera.
 //!
-//! With TESSERA_SIGN_LENGTH_FIRST=1 (set by a driver's `[env]`), every
-//! C_Sign with an output buffer is preceded by a length query, C_Sign with
-//! no buffer. SerproID signs only when asked in those two steps: a single
-//! C_Sign, which is what NSS (Firefox, Papers) sends, makes it push request
-//! after request to the phone, and approving them fails. Inside Firefox the
-//! driver is loaded directly and this never shows; through p11-kit it does.
+//! Before loading the driver, it gives the driver an ordinary process:
+//! signals back to their defaults (p11-kit server ignores some, and ignored
+//! signals survive exec), and the p11-kit channel moved off stdin/stdout,
+//! which become /dev/null and stderr. A driver that runs helper programs or
+//! writes to stdout then behaves as it does inside an app.
+//!
+//! TESSERA_REMOTE_LOAD=raw serves the driver's own function list (dlopen +
+//! C_GetFunctionList) instead of p11-kit's managed wrapper around it.
 
 use libloading::{Library, Symbol};
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::path::PathBuf;
-use std::sync::OnceLock;
 use std::{fs, os::unix::fs::PermissionsExt};
 
 use crate::paths;
 
 type ModuleLoad = unsafe extern "C" fn(*const c_char, c_int) -> *mut c_void;
+type GetFunctionList = unsafe extern "C" fn(*mut *mut c_void) -> std::ffi::c_ulong;
 type ModuleRelease = unsafe extern "C" fn(*mut c_void);
 type ServeTokens =
     unsafe extern "C" fn(*const *const c_char, usize, *mut c_void, c_int, c_int) -> c_int;
 
-type CkUlong = std::ffi::c_ulong;
-type SignFn = unsafe extern "C" fn(CkUlong, *mut u8, CkUlong, *mut u8, *mut CkUlong) -> CkUlong;
-
-const CKR_OK: CkUlong = 0;
-const CKR_BUFFER_TOO_SMALL: CkUlong = 0x150;
-/// Position of C_Sign in CK_FUNCTION_LIST, after CK_VERSION (padded to a
-/// pointer).
-const C_SIGN_INDEX: usize = 43;
-/// Number of functions in CK_FUNCTION_LIST (2.x) and CK_FUNCTION_LIST_3_0.
-const FUNCTIONS_V2: usize = 68;
-const FUNCTIONS_V3: usize = 92;
-
-static DRIVER_SIGN: OnceLock<SignFn> = OnceLock::new();
-
-/// C_Sign that asks the driver for the length first (see the module docs).
-unsafe extern "C" fn sign_length_first(
-    session: CkUlong,
-    data: *mut u8,
-    data_len: CkUlong,
-    signature: *mut u8,
-    signature_len: *mut CkUlong,
-) -> CkUlong {
-    let Some(sign) = DRIVER_SIGN.get() else {
-        return 0x6; // CKR_FUNCTION_FAILED
-    };
-    if !signature.is_null() && !signature_len.is_null() {
-        if std::env::var_os("TESSERA_DEBUG_SIGN").is_some() {
-            eprintln!("tessera remote: length query before C_Sign");
-        }
-        let mut needed: CkUlong = 0;
-        let rv = sign(session, data, data_len, std::ptr::null_mut(), &mut needed);
-        if rv != CKR_OK {
-            return rv;
-        }
-        if needed > *signature_len {
-            *signature_len = needed;
-            return CKR_BUFFER_TOO_SMALL;
-        }
-    }
-    sign(session, data, data_len, signature, signature_len)
+extern "C" {
+    fn signal(signum: i32, handler: usize) -> usize;
+    fn sigprocmask(how: i32, set: *const u64, old: *mut u64) -> i32;
+    fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
+    fn dup2(old: i32, new: i32) -> i32;
 }
 
-/// A copy of the driver's function list with C_Sign replaced. Leaked: it
-/// lives as long as the process.
-unsafe fn with_sign_length_first(module: *mut c_void) -> *mut c_void {
-    let version = *(module as *const u8);
-    let n = if version >= 3 {
-        FUNCTIONS_V3
-    } else {
-        FUNCTIONS_V2
-    };
-    let words = 1 + n; // CK_VERSION padded to one pointer, then functions
-    let mut copy = vec![0usize; words];
-    std::ptr::copy_nonoverlapping(module as *const usize, copy.as_mut_ptr(), words);
-    let slot = 1 + C_SIGN_INDEX;
-    let original = copy[slot];
-    if original == 0 {
-        return module;
+const SIG_DFL: usize = 0;
+const SIG_SETMASK: i32 = 2;
+const F_DUPFD_CLOEXEC: i32 = 1030;
+
+/// Signals back to their default action, none blocked.
+unsafe fn reset_signals() {
+    for s in 1..65 {
+        if s != 9 && s != 19 {
+            signal(s, SIG_DFL);
+        }
     }
-    let _ = DRIVER_SIGN.set(std::mem::transmute::<usize, SignFn>(original));
-    copy[slot] = sign_length_first as *const () as usize;
-    Box::leak(copy.into_boxed_slice()).as_mut_ptr() as *mut c_void
+    let empty = [0u64; 16]; // sigset_t
+    sigprocmask(SIG_SETMASK, empty.as_ptr(), std::ptr::null_mut());
+}
+
+/// Move the p11-kit channel (stdin, stdout) to new descriptors closed on
+/// exec, put /dev/null on stdin and stderr on stdout. Returns (in, out).
+unsafe fn move_channel() -> Option<(c_int, c_int)> {
+    let input = fcntl(0, F_DUPFD_CLOEXEC, 3);
+    let output = fcntl(1, F_DUPFD_CLOEXEC, 3);
+    if input < 0 || output < 0 {
+        return None;
+    }
+    let null = std::fs::File::open("/dev/null").ok()?;
+    use std::os::fd::AsRawFd;
+    if dup2(null.as_raw_fd(), 0) < 0 || dup2(2, 1) < 0 {
+        return None;
+    }
+    Some((input, output))
 }
 
 pub fn run(args: &[String]) -> i32 {
@@ -112,6 +88,8 @@ pub fn run(args: &[String]) -> i32 {
     // SAFETY: libp11-kit's public API (p11-kit/p11-kit.h, p11-kit/remote.h);
     // the pointers passed stay alive for the calls.
     unsafe {
+        reset_signals();
+        let (fd_in, fd_out) = move_channel().unwrap_or((0, 1));
         let lib = match Library::new("libp11-kit.so.0") {
             Ok(l) => l,
             Err(e) => {
@@ -135,23 +113,47 @@ pub fn run(args: &[String]) -> i32 {
         let Ok(c_provider) = CString::new(provider) else {
             return 2;
         };
-        let module = load(c_provider.as_ptr(), 0);
+        let raw = std::env::var("TESSERA_REMOTE_LOAD").as_deref() == Ok("raw");
+        let mut driver: Option<Library> = None;
+        let module = if raw {
+            let lib = match Library::new(provider) {
+                Ok(l) => l,
+                Err(e) => {
+                    eprintln!("tessera remote: {e}");
+                    return 1;
+                }
+            };
+            let mut list: *mut c_void = std::ptr::null_mut();
+            let rv = match lib.get::<GetFunctionList>(b"C_GetFunctionList\0") {
+                Ok(f) => f(&mut list),
+                Err(_) => 1,
+            };
+            driver = Some(lib);
+            if rv != 0 {
+                list = std::ptr::null_mut();
+            }
+            list
+        } else {
+            load(c_provider.as_ptr(), 0)
+        };
         if module.is_null() {
             eprintln!("tessera remote: could not load {provider}");
             return 1;
         }
-        let served = if std::env::var("TESSERA_SIGN_LENGTH_FIRST").as_deref() == Ok("1") {
-            with_sign_length_first(module)
-        } else {
-            module
-        };
+        eprintln!(
+            "tessera remote: serving {provider} ({}, channel on fds {fd_in}/{fd_out})",
+            if raw { "raw" } else { "managed" }
+        );
         let c_tokens: Vec<CString> = tokens
             .iter()
             .filter_map(|t| CString::new(*t).ok())
             .collect();
         let ptrs: Vec<*const c_char> = c_tokens.iter().map(|c| c.as_ptr()).collect();
-        let rv = serve(ptrs.as_ptr(), ptrs.len(), served, 0, 1);
-        release(module);
+        let rv = serve(ptrs.as_ptr(), ptrs.len(), module, fd_in, fd_out);
+        if driver.is_none() {
+            release(module);
+        }
+        drop(driver);
         rv
     }
 }
