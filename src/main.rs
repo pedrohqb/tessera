@@ -126,11 +126,16 @@ pub const MAX_STRIKES: u32 = 3;
 #[derive(Default)]
 pub struct Health {
     strikes: std::collections::HashMap<String, u32>,
+    /// Drivers stopped after MAX_STRIKES: started again when a card shows up.
+    given_up: std::collections::HashSet<String>,
+    /// The readers with a card at the last listing.
+    cards: Option<Vec<String>>,
 }
 
 impl Health {
     pub fn reset(&mut self) {
         self.strikes.clear();
+        self.given_up.clear();
     }
 
     /// Listings in a row without an answer from this driver.
@@ -152,6 +157,30 @@ pub fn check_drivers(
     for id in &snap.ok {
         health.strikes.remove(id);
     }
+    // Pulling the token out can leave a driver (SafeSign, say) without an
+    // answer until it is stopped; putting a token in starts it again.
+    let cards: Vec<String> = match &snap.readers {
+        status::Readers::Ok(rs) => rs
+            .iter()
+            .filter(|r| r.card_present)
+            .map(|r| r.name.clone())
+            .collect(),
+        status::Readers::NoService(_) => vec![],
+    };
+    let inserted = health
+        .cards
+        .as_ref()
+        .is_some_and(|old| cards.iter().any(|c| !old.contains(c)));
+    health.cards = Some(cards);
+    if inserted {
+        for d in ds {
+            if health.given_up.remove(&d.id) {
+                eprintln!("tessera: {}: a token was inserted, starting it again", d.id);
+                health.strikes.remove(&d.id);
+                srv.restart_driver(d);
+            }
+        }
+    }
     for id in &snap.timed_out {
         let n = health.strikes.entry(id.clone()).or_insert(0);
         *n += 1;
@@ -159,9 +188,10 @@ pub fn check_drivers(
             srv.stop_driver(
                 id,
                 i18n::t(
-                    "No answer 3 times in a row. Press Restart to try again, or switch it off.",
+                    "No answer 3 times in a row (was the token pulled out?). It starts again when a token is inserted, or press Restart.",
                 ),
             );
+            health.given_up.insert(id.clone());
         } else if let Some(d) = ds.iter().find(|d| &d.id == id) {
             srv.restart_driver(d);
         }
