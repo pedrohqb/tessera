@@ -35,6 +35,31 @@ add-extensions:
     autodelete: true
 
 modules:
+  # The PC/SC client library (libpcsclite), which the runtime does not ship.
+  # Only the library is kept: it talks to the host's pcscd through the socket
+  # --socket=pcsc exposes (PCSCLITE_CSOCK_NAME). The protocol is backward
+  # compatible, so it works with older pcscd versions on the host.
+  - name: pcsc-lite
+    buildsystem: meson
+    config-opts:
+      - -Dlibsystemd=false
+      - -Dlibudev=false
+      - -Dpolkit=false
+      - -Dusb=false
+      - -Dserial=false
+      - -Ddocumentation=false
+    cleanup:
+      - /bin
+      - /sbin
+      - /lib/systemd
+      - /share/man
+      - /share/doc
+    sources:
+      - type: git
+        url: https://github.com/LudovicRousseau/PCSC.git
+        tag: 2.5.3
+        commit: 58de510789550941e6548399e024083f54b8d4f5
+
   # OpenSC: open-source driver for PIV, YubiKey, CAC and many national eIDs.
   - name: opensc
     buildsystem: autotools
