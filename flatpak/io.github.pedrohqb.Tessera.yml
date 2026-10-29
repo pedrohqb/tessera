@@ -47,7 +47,6 @@ modules:
       - -Dpolkit=false
       - -Dusb=false
       - -Dserial=false
-      - -Ddocumentation=false
     cleanup:
       - /bin
       - /sbin
