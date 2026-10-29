@@ -52,13 +52,15 @@ jobs:
             exit $status
           fi
           flatpak build-bundle repo tessera.flatpak io.github.pedrohqb.Tessera
-      - name: Release tarball (the binary built against the runtime)
+      - name: Release tarball (everything under /app, built against the runtime)
         run: |
-          mkdir -p dist/tessera
-          cp -a build-dir/files/bin/tessera build-dir/files/bin/apply_extra dist/tessera/
-          cp -a build-dir/files/share dist/tessera/
-          mkdir -p dist/tessera/lib/tessera
-          cp -a build-dir/files/lib/tessera/drivers dist/tessera/lib/tessera/
+          # The whole /app tree: Tessera, its data and driver descriptions,
+          # plus the libraries it bundles (libpcsclite, OpenSC) and
+          # OpenSC's configuration. Laid out as /app, so a package can unpack
+          # it there.
+          mkdir -p dist
+          cp -a build-dir/files dist/tessera
+          rm -rf dist/tessera/include dist/tessera/lib/pkgconfig dist/tessera/lib/debug
           tar -C dist -czf tessera-x86_64.tar.gz tessera
       - uses: actions/upload-artifact@v4
         with:
