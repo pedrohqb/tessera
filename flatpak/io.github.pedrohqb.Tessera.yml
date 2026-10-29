@@ -10,7 +10,10 @@ separate-locales: false
 finish-args:
   - --share=ipc
   - --socket=wayland
-  - --socket=fallback-x11
+  # x11, not fallback-x11: the vendors' tools (SerproID's JavaFX app,
+  # SafeSign's Token Administration) draw only through X11, which needs the
+  # X socket (XWayland) even when Tessera itself is on Wayland.
+  - --socket=x11
   - --device=dri
   # The token drivers talk to the host's pcscd, which owns the USB readers.
   - --socket=pcsc
