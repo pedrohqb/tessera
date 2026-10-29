@@ -259,18 +259,51 @@ pub fn probe_sign(module: &str) -> i32 {
         let Some(key) = keys.first().copied() else {
             continue;
         };
-        let started = std::time::Instant::now();
-        eprintln!("sign: C_Sign(CKM_SHA256_RSA_PKCS) — approve on the phone if asked...");
-        match session.sign(&Mechanism::Sha256RsaPkcs, key, b"Tessera signing test") {
-            Ok(sig) => {
-                eprintln!("sign: OK, {} bytes in {:?}", sig.len(), started.elapsed());
-                return 0;
+        let mechs = ctx.get_mechanism_list(slot).unwrap_or_default();
+        eprintln!("sign: mechanisms: {mechs:?}");
+        // SHA-256 of "Tessera signing test", the way TLS clients sign: the
+        // hash computed by the application, the token only signs it.
+        let digest: [u8; 32] = [
+            0x39, 0x9b, 0x35, 0xde, 0x55, 0x97, 0xb9, 0xa1, 0xab, 0xcb, 0x61, 0x17, 0x32, 0xa6,
+            0x7b, 0xbf, 0x79, 0x49, 0xc4, 0x6c, 0x71, 0xc2, 0x53, 0xd6, 0x96, 0x51, 0x34, 0x0b,
+            0x52, 0x85, 0xd9, 0x6e,
+        ];
+        // RSA PKCS#1 v1.5 (TLS 1.2): DigestInfo(SHA-256) || hash.
+        let mut digest_info = vec![
+            0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+            0x01, 0x05, 0x00, 0x04, 0x20,
+        ];
+        digest_info.extend_from_slice(&digest);
+        let pss = cryptoki::mechanism::rsa::PkcsPssParams {
+            hash_alg: cryptoki::mechanism::MechanismType::SHA256,
+            mgf: cryptoki::mechanism::rsa::PkcsMgfType::MGF1_SHA256,
+            s_len: 32.into(),
+        };
+        let wanted = std::env::var("TESSERA_MECH").unwrap_or_default();
+        let tries: Vec<(&str, Mechanism, &[u8])> = vec![
+            ("CKM_RSA_PKCS (TLS 1.2)", Mechanism::RsaPkcs, &digest_info),
+            (
+                "CKM_RSA_PKCS_PSS (TLS 1.3)",
+                Mechanism::RsaPkcsPss(pss),
+                &digest,
+            ),
+        ];
+        let mut result = 1;
+        for (name, mech, data) in tries {
+            if !wanted.is_empty() && !name.contains(&wanted) {
+                continue;
             }
-            Err(e) => {
-                eprintln!("sign: failed after {:?}: {e}", started.elapsed());
-                return 1;
+            let started = std::time::Instant::now();
+            eprintln!("sign: C_Sign({name}) — approve on the phone if asked...");
+            match session.sign(&mech, key, data) {
+                Ok(sig) => {
+                    eprintln!("sign: OK, {} bytes in {:?}", sig.len(), started.elapsed());
+                    result = 0;
+                }
+                Err(e) => eprintln!("sign: failed after {:?}: {e}", started.elapsed()),
             }
         }
+        return result;
     }
     eprintln!("sign: no token with a private key");
     1
