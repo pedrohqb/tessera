@@ -41,6 +41,10 @@ struct Hub {
     host_view: RefCell<Option<status::HostView>>,
     host_checked: RefCell<Option<HostCheck>>,
     host_busy: Cell<bool>,
+    /// Checks in a row that did not find Tessera's tokens: one is not shown
+    /// (it may fall in a restart, when nothing is published yet), and is
+    /// checked again after 5 s.
+    host_misses: Cell<u32>,
     /// The open window, if any (dropped when the window is destroyed).
     win: RefCell<Option<Rc<Win>>>,
     tray: RefCell<Option<tray::Tray>>,
@@ -63,6 +67,10 @@ impl Hub {
         // once (see refresh): a driver that hangs would hang every app.
         *self.host.borrow_mut() = apps::write_host_modules(&ds, &[]).map_err(|e| format!("{e:#}"));
         *self.drivers.borrow_mut() = ds;
+        // Check what the apps see again once the drivers are back.
+        *self.host_checked.borrow_mut() = None;
+        *self.host_view.borrow_mut() = None;
+        self.host_misses.set(0);
     }
 
     /// Stop serving: servers down and nothing left published on the host
@@ -267,6 +275,7 @@ fn update_service(hub: &Hub, win: &Win) {
             ),
             true,
         ),
+        (Ok(_), Some(status::HostView::Unknown)) => (t("Checking…").to_string(), false),
         (Ok(_), Some(status::HostView::Off)) => (off, true),
         (Ok(_), None) if apps::host_server_answers() => (t("Checking…").to_string(), false),
         (Ok(_), None) => (off, true),
@@ -459,10 +468,13 @@ fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
         .borrow()
         .as_ref()
         .is_some_and(|w| w.window.is_visible());
+    let every = if hub.host_misses.get() > 0 { 5 } else { 30 };
     let due = match &*hub.host_checked.borrow() {
         None => true,
         Some((when, last)) => {
-            *last != ours || (visible && when.elapsed() > Duration::from_secs(30))
+            *last != ours
+                || ((visible || hub.host_misses.get() > 0)
+                    && when.elapsed() > Duration::from_secs(every))
         }
     };
     if !due || hub.host_busy.replace(true) {
@@ -470,10 +482,24 @@ fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
     }
     *hub.host_checked.borrow_mut() = Some((std::time::Instant::now(), ours.clone()));
     let hub = hub.clone();
+    let generation = hub.generation.get();
     glib::spawn_future_local(async move {
         let view = gio::spawn_blocking(move || status::host_view(&ours)).await;
         hub.host_busy.set(false);
+        if generation != hub.generation.get() {
+            // Started before a restart: the answer says nothing about now.
+            return;
+        }
         if let Ok(view) = view {
+            use status::HostView::{Unknown, WithoutTessera};
+            let miss = matches!(view, WithoutTessera | Unknown);
+            hub.host_misses
+                .set(if miss { hub.host_misses.get() + 1 } else { 0 });
+            match view {
+                Unknown => return,
+                WithoutTessera if hub.host_misses.get() < 2 => return,
+                _ => {}
+            }
             *hub.host_view.borrow_mut() = Some(view);
             let win = hub.win.borrow().clone();
             if let Some(win) = win {
@@ -1160,6 +1186,7 @@ pub fn run() -> ExitCode {
                 host_view: RefCell::new(None),
                 host_checked: RefCell::new(None),
                 host_busy: Cell::new(false),
+                host_misses: Cell::new(0),
                 win: RefCell::new(None),
                 tray: RefCell::new(None),
                 tray_events: tx,

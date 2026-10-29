@@ -453,6 +453,8 @@ pub enum HostView {
     Sees(usize),
     /// Tessera has no token to look for.
     NothingToCheck,
+    /// The listing failed or took too long: nothing learned.
+    Unknown,
 }
 
 /// Must run off the main thread. `ours` are the tokens Tessera serves.
@@ -479,7 +481,7 @@ pub fn host_view(ours: &[(String, String)]) -> HostView {
                 HostView::WithoutTessera
             }
         }
-        Err(_) => HostView::WithoutTessera,
+        Err(_) => HostView::Unknown,
     }
 }
 

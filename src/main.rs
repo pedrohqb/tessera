@@ -109,6 +109,9 @@ fn print_status() -> ExitCode {
         }
         status::HostView::Sees(n) => format!("on; apps see {n} of {} token(s)", ours.len()),
         status::HostView::NothingToCheck => "answers (no token to check)".to_string(),
+        status::HostView::Unknown => {
+            "could not list the tokens through it (it failed or took too long)".to_string()
+        }
     };
     println!(
         "\nSystem p11-kit server ({}): {view}",
