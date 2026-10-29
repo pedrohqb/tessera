@@ -135,6 +135,13 @@ fn parse_cert(label: String, der: &[u8]) -> Option<Certificate> {
     })
 }
 
+/// Token fields are fixed-size, padded with spaces, and some drivers
+/// (SerproID) pad with NUL bytes instead.
+fn clean(s: &str) -> String {
+    s.trim_matches(|c: char| c == '\0' || c.is_whitespace())
+        .to_string()
+}
+
 /// `tessera probe-module MODULE`: load a driver directly, without p11-kit,
 /// and report each step, to tell a driver error from a crash.
 pub fn probe_module(module: &str) -> i32 {
@@ -202,10 +209,10 @@ pub fn list_tokens_in_process() -> Result<String, String> {
         }
         let mut token = Token {
             driver: String::new(),
-            label: info.label().trim().to_string(),
-            manufacturer: info.manufacturer_id().trim().to_string(),
-            model: info.model().trim().to_string(),
-            serial: info.serial_number().trim().to_string(),
+            label: clean(info.label()),
+            manufacturer: clean(info.manufacturer_id()),
+            model: clean(info.model()),
+            serial: clean(info.serial_number()),
             certificates: vec![],
         };
         if let Ok(session) = ctx.open_ro_session(slot) {
