@@ -104,8 +104,7 @@ fn print_status() -> ExitCode {
                 .to_string()
         }
         status::HostView::WithoutTessera => {
-            "apps do NOT see Tessera's tokens (server off, or turned on after Tessera started)"
-                .to_string()
+            "apps do NOT see Tessera's tokens (server off)".to_string()
         }
         status::HostView::Sees(n) => format!("on; apps see {n} of {} token(s)", ours.len()),
         status::HostView::NothingToCheck => "answers (no token to check)".to_string(),

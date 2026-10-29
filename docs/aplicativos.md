@@ -7,7 +7,7 @@ Na janela, cada aplicativo tem até dois passos, com os mesmos nomes em todos:
 
 Um passo feito aparece com ✓ e sem botão. O resumo de cada aplicativo diz "Pronto", "Falta o passo 1", "Falta o passo 2" ou "Faltam os passos 1 e 2".
 
-Antes de tudo, o servidor do sistema precisa estar ligado, uma vez por usuário: `systemctl --user enable --now p11-kit-server.socket`. A linha "Conexão com o sistema" da janela confere isso de ponta a ponta: pelo soquete do sistema, o Tessera lista os tokens que um aplicativo enxergaria e procura os seus (pelo nome e número de série). Fica vermelha se ninguém responde ou se os tokens do Tessera não estão lá. Só ver o soquete não basta: com o servidor do sistema desligado, o servidor de confiança do próprio Flatpak responde no mesmo caminho, e foi isso que enganou a primeira versão dessa linha. A conferência se repete a cada 30 s com a janela aberta e sempre que a lista de tokens muda; `tessera status` mostra o mesmo resultado no terminal.
+Antes de tudo, o servidor do sistema precisa estar ligado, uma vez por usuário: `systemctl --user enable --now p11-kit-server.socket`. A linha "Conexão com o sistema" da janela confere isso de ponta a ponta: pelo soquete do sistema, o Tessera lista os tokens que um aplicativo enxergaria e procura os seus (pelo nome e número de série). Fica vermelha se ninguém responde ou se os tokens do Tessera não estão lá. Só ver o soquete não basta: com o servidor do sistema desligado, o servidor de confiança do próprio Flatpak responde no mesmo caminho, e foi isso que enganou a primeira versão dessa linha. A conferência se repete a cada 15 s com a janela aberta e sempre que a lista de tokens muda; `tessera status` mostra o mesmo resultado no terminal.
 
 ## PJeOffice Pro (FlatPark)
 

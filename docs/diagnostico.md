@@ -17,7 +17,7 @@
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
-| "Conexão com o sistema" vermelha | `p11-kit-server.socket` desligado, ou ligado depois de o Tessera abrir | `systemctl --user enable --now p11-kit-server.socket`, depois sair do Tessera e abrir de novo; `tessera status` mostra o mesmo resultado |
+| "Conexão com o sistema" vermelha | `p11-kit-server.socket` desligado | `systemctl --user enable --now p11-kit-server.socket`; a linha volta sozinha em até 15 s, sem reiniciar o Tessera; `tessera status` mostra o mesmo resultado |
 | O aplicativo não vê token nenhum | falta o passo 1, ou o aplicativo foi aberto antes do passo 1 ou antes de o driver ser publicado | Passo 1, depois fechar e abrir o aplicativo |
 | O Tessera vê o token, o aplicativo não | o driver ainda não respondeu (não publicado) ou o aplicativo é anterior à publicação | Ver o estado do driver na janela; reabrir o aplicativo |
 | Driver "Parado: sem resposta 3 vezes seguidas" | o driver trava (por exemplo, sem token) | **Reiniciar**, ou desligar o driver se não for usado |

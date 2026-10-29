@@ -254,7 +254,7 @@ fn update_service(hub: &Hub, win: &Win) {
     }
     let off = format!(
         "{} {}",
-        t("Off: the apps cannot see the tokens. Run once in a terminal, then quit and reopen Tessera:"),
+        t("Off: the apps cannot see the tokens. Run once in a terminal:"),
         apps::HOST_SERVER_COMMAND
     );
     let (text, bad) = match (&*hub.host.borrow(), &*hub.host_view.borrow()) {
@@ -270,7 +270,7 @@ fn update_service(hub: &Hub, win: &Win) {
         (Ok(_), Some(status::HostView::WithoutTessera)) => (
             format!(
                 "{} {}",
-                t("The apps do not see Tessera's tokens: the system's p11-kit server is off, or was turned on after Tessera started. Run once in a terminal, then quit and reopen Tessera:"),
+                t("The apps do not see Tessera's tokens: the system's p11-kit server is off. Run once in a terminal:"),
                 apps::HOST_SERVER_COMMAND
             ),
             true,
@@ -460,7 +460,7 @@ fn supervise(hub: &Rc<Hub>) {
 type HostCheck = (std::time::Instant, Vec<(String, String)>);
 
 /// Ask, through the system's p11-kit server, whether apps see Tessera's
-/// tokens: when they change, and every 30 s with the window open (each
+/// tokens: when they change, and every 15 s with the window open (each
 /// check loads the drivers again through that server).
 fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
     let visible = hub
@@ -468,7 +468,7 @@ fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
         .borrow()
         .as_ref()
         .is_some_and(|w| w.window.is_visible());
-    let every = if hub.host_misses.get() > 0 { 5 } else { 30 };
+    let every = if hub.host_misses.get() > 0 { 5 } else { 15 };
     let due = match &*hub.host_checked.borrow() {
         None => true,
         Some((when, last)) => {
