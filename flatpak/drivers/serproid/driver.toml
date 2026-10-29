@@ -12,7 +12,11 @@ create_dirs = ["~/.config/serproid/certificados"]
 # so the library finds what the app downloaded.
 # Its built-in OpenSSL looks for CA certificates in Debian's /usr/lib/ssl,
 # which the runtime doesn't have: point it at the runtime's bundle.
+# The library uses libgcc_s's unwinder (_Unwind_Resume_or_Rethrow) without
+# listing libgcc_s as a dependency; p11-kit-remote, a C program, doesn't
+# load it, so dlopen fails with "undefined symbol". Preload it.
 [env]
+LD_PRELOAD = "libgcc_s.so.1"
 XDG_CONFIG_HOME = "~/.config"
 SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt"
 SSL_CERT_DIR = "/etc/ssl/certs"
