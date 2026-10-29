@@ -2,7 +2,7 @@
 """Sign with RSA-PSS (SHA-256) through a PKCS#11 module, the way Firefox does
 for TLS 1.3 client authentication (read-only session, one C_Sign).
 
-usage: sign-test.py MODULE [TOKEN-LABEL-PREFIX] [rw] [len] [oslock] [iface] [reinit] [fixed|random ...]
+usage: sign-test.py MODULE [TOKEN-LABEL-PREFIX] [rw] [len] [oslock] [iface] [reinit] [mimic] [clobber] [fixed|random ...]
 
 Each fixed/random word is one signature: "fixed" signs the same 32 bytes
 every time, "random" signs fresh random bytes. "rw" opens a read-write
@@ -10,7 +10,12 @@ session, "len" asks for the signature length first (as the cryptoki crate
 does), "oslock" initializes the module with CKF_OS_LOCKING_OK (as p11-kit
 does), "iface" takes the function list from C_GetInterface (PKCS#11 3.0,
 which recent p11-kit prefers) instead of C_GetFunctionList, "reinit" does
-C_Initialize, C_Finalize, C_Initialize first (as a p11-kit connection does).
+C_Initialize, C_Finalize, C_Initialize first, "mimic" makes the calls that
+p11-kit server makes before an app's own (two rounds of C_GetInfo,
+C_GetSlotList, C_GetSlotInfo, C_GetTokenInfo and a session opened and
+closed, with C_Finalize/C_Initialize between them), "clobber" overwrites
+the PSS parameters right after C_SignInit (through p11-kit they live in a
+buffer that is reused once C_SignInit returns).
 Prints how long each signature took and what it is: the
 signature is opened with the key's public modulus and checked as RSA-PSS
 (SHA-256, MGF1-SHA256, salt 32) and as PKCS#1 v1.5. PIN=... logs in first (not needed
@@ -100,7 +105,8 @@ class TokenInfo(C.Structure):
 
 
 # Index of each function in CK_FUNCTION_LIST (after CK_VERSION).
-IDX = dict(C_Initialize=0, C_Finalize=1, C_GetSlotList=4, C_GetTokenInfo=6,
+IDX = dict(C_Initialize=0, C_Finalize=1, C_GetInfo=2, C_GetSlotList=4,
+           C_GetSlotInfo=5, C_GetTokenInfo=6,
            C_OpenSession=12, C_CloseSession=13, C_Login=18, C_GetAttributeValue=24,
            C_FindObjectsInit=26,
            C_FindObjects=27, C_FindObjectsFinal=28, C_SignInit=42, C_Sign=43)
@@ -118,8 +124,10 @@ def main():
     oslock = "oslock" in sys.argv[2:]
     iface = "iface" in sys.argv[2:]
     reinit = "reinit" in sys.argv[2:]
+    mimic = "mimic" in sys.argv[2:]
+    clobber = "clobber" in sys.argv[2:]
     for a in sys.argv[2:]:
-        if a in ("rw", "len", "oslock", "iface", "reinit"):
+        if a in ("rw", "len", "oslock", "iface", "reinit", "mimic", "clobber"):
             continue
         if a in ("fixed", "random"):
             runs.append(a)
@@ -160,6 +168,35 @@ def main():
     check("C_Initialize", f("C_Initialize", P)(
         C.byref(init_args) if oslock else None))
     print(f"init: {'CKF_OS_LOCKING_OK' if oslock else 'NULL'}")
+    def probe_round():
+        buf = (C.c_ubyte * 512)()
+        f("C_GetInfo", P)(buf)
+        cnt = CK_ULONG()
+        gsl = f("C_GetSlotList", C.c_ubyte, C.POINTER(CK_ULONG), C.POINTER(CK_ULONG))
+        gsl(1, None, C.byref(cnt))
+        ids = (CK_ULONG * max(cnt.value, 1))()
+        gsl(1, ids, C.byref(cnt))
+        for sl in ids[: cnt.value]:
+            f("C_GetSlotInfo", CK_ULONG, P)(sl, buf)
+            f("C_GetTokenInfo", CK_ULONG, P)(sl, buf)
+            h = CK_ULONG()
+            if f("C_OpenSession", CK_ULONG, CK_ULONG, P, P, C.POINTER(CK_ULONG))(
+                    sl, CKF_SERIAL_SESSION, None, None, C.byref(h)) == 0:
+                f("C_CloseSession", CK_ULONG)(h)
+        return ids[: cnt.value]
+
+    if mimic:
+        probe_round()
+        check("C_Finalize", f("C_Finalize", P)(None))
+        check("C_Initialize", f("C_Initialize", P)(
+            C.byref(init_args) if oslock else None))
+        ids = probe_round()
+        buf = (C.c_ubyte * 512)()
+        for sl in ids:
+            f("C_GetSlotInfo", CK_ULONG, P)(sl, buf)
+            f("C_GetSlotInfo", CK_ULONG, P)(sl, buf)
+            f("C_GetTokenInfo", CK_ULONG, P)(sl, buf)
+        print("init: made p11-kit server's calls first")
     if reinit:
         n0 = CK_ULONG()
         f("C_GetSlotList", C.c_ubyte, C.POINTER(CK_ULONG), C.POINTER(CK_ULONG))(
@@ -229,7 +266,8 @@ def main():
     sign = f("C_Sign", CK_ULONG, P, CK_ULONG, P, PU)
     status = 0
     print(f"session: {'read-write' if rw else 'read-only'}, "
-          f"length query: {'yes' if ask_len else 'no'}")
+          f"length query: {'yes' if ask_len else 'no'}"
+          f"{', PSS parameters overwritten after C_SignInit' if clobber else ''}")
     for i, kind in enumerate(runs, 1):
         data = FIXED if kind == "fixed" else os.urandom(32)
         out = (C.c_ubyte * 512)()
@@ -237,7 +275,10 @@ def main():
         print(f"[{i}] {kind}: signing — approve on the phone if asked...",
               flush=True)
         t = time.monotonic()
+        params.hashAlg, params.mgf, params.sLen = CKM_SHA256, CKG_MGF1_SHA256, 32
         rv = sign_init(sess, C.byref(mech), key)
+        if clobber:
+            params.hashAlg, params.mgf, params.sLen = 0xDEADBEEF, 0xDEADBEEF, 0
         if rv == 0 and ask_len:
             rv = sign(sess, data, len(data), None, C.byref(out_len))
         if rv == 0:

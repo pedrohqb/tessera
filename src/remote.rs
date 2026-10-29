@@ -13,6 +13,9 @@
 //! which become /dev/null and stderr. A driver that runs helper programs or
 //! writes to stdout then behaves as it does inside an app.
 //!
+//! The driver always gets mechanism parameters that stay valid after the
+//! *Init call that passed them (see stable.rs): SerproID needs that.
+//!
 //! TESSERA_REMOTE_LOAD=raw serves the driver's own function list (dlopen +
 //! C_GetFunctionList) instead of p11-kit's managed wrapper around it.
 
@@ -144,10 +147,13 @@ pub fn run(args: &[String]) -> i32 {
             "tessera remote: serving {provider} ({}, channel on fds {fd_in}/{fd_out})",
             if raw { "raw" } else { "managed" }
         );
+        // Always: the driver gets mechanism parameters that stay valid
+        // after the *Init call (see stable.rs).
+        let served = crate::stable::wrap(module);
         let served = if std::env::var("TESSERA_REMOTE_TRACE").as_deref() == Ok("1") {
-            crate::trace::wrap(module)
+            crate::trace::wrap(served)
         } else {
-            module
+            served
         };
         let c_tokens: Vec<CString> = tokens
             .iter()

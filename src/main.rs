@@ -20,6 +20,7 @@ mod paths;
 mod remote;
 mod server;
 mod settings;
+mod stable;
 mod status;
 mod trace;
 mod ui;
