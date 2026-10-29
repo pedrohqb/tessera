@@ -42,6 +42,8 @@ modules:
   - name: pcsc-lite
     buildsystem: meson
     config-opts:
+      # Plain /app/lib, where the loader and pkg-config look.
+      - --libdir=lib
       - -Dlibsystemd=false
       - -Dlibudev=false
       - -Dpolkit=false
