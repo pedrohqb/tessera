@@ -180,6 +180,15 @@ pub fn probe_module(module: &str) -> i32 {
                                 ),
                                 Err(e) => eprintln!("probe:   slot without token: {e}"),
                             }
+                            if let Ok(mechs) = ctx.get_mechanism_list(s) {
+                                eprintln!("probe:   {} mechanism(s):", mechs.len());
+                                for m in mechs {
+                                    match ctx.get_mechanism_info(s, m) {
+                                        Ok(i) => eprintln!("probe:     {m} {i:?}"),
+                                        Err(_) => eprintln!("probe:     {m}"),
+                                    }
+                                }
+                            }
                         }
                     }
                     Err(e) => eprintln!("probe: C_GetSlotList: {e}"),
