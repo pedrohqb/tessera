@@ -144,12 +144,17 @@ pub fn run(args: &[String]) -> i32 {
             "tessera remote: serving {provider} ({}, channel on fds {fd_in}/{fd_out})",
             if raw { "raw" } else { "managed" }
         );
+        let served = if std::env::var("TESSERA_REMOTE_TRACE").as_deref() == Ok("1") {
+            crate::trace::wrap(module)
+        } else {
+            module
+        };
         let c_tokens: Vec<CString> = tokens
             .iter()
             .filter_map(|t| CString::new(*t).ok())
             .collect();
         let ptrs: Vec<*const c_char> = c_tokens.iter().map(|c| c.as_ptr()).collect();
-        let rv = serve(ptrs.as_ptr(), ptrs.len(), module, fd_in, fd_out);
+        let rv = serve(ptrs.as_ptr(), ptrs.len(), served, fd_in, fd_out);
         if driver.is_none() {
             release(module);
         }

@@ -21,6 +21,7 @@ mod remote;
 mod server;
 mod settings;
 mod status;
+mod trace;
 mod ui;
 
 use std::path::PathBuf;

@@ -2,14 +2,16 @@
 """Sign with RSA-PSS (SHA-256) through a PKCS#11 module, the way Firefox does
 for TLS 1.3 client authentication (read-only session, one C_Sign).
 
-usage: sign-test.py MODULE [TOKEN-LABEL-PREFIX] [rw] [len] [oslock] [iface] [fixed|random ...]
+usage: sign-test.py MODULE [TOKEN-LABEL-PREFIX] [rw] [len] [oslock] [iface] [reinit] [fixed|random ...]
 
 Each fixed/random word is one signature: "fixed" signs the same 32 bytes
 every time, "random" signs fresh random bytes. "rw" opens a read-write
 session, "len" asks for the signature length first (as the cryptoki crate
 does), "oslock" initializes the module with CKF_OS_LOCKING_OK (as p11-kit
 does), "iface" takes the function list from C_GetInterface (PKCS#11 3.0,
-which recent p11-kit prefers) instead of C_GetFunctionList. Prints how long each signature took and what it is: the
+which recent p11-kit prefers) instead of C_GetFunctionList, "reinit" does
+C_Initialize, C_Finalize, C_Initialize first (as a p11-kit connection does).
+Prints how long each signature took and what it is: the
 signature is opened with the key's public modulus and checked as RSA-PSS
 (SHA-256, MGF1-SHA256, salt 32) and as PKCS#1 v1.5. PIN=... logs in first (not needed
 for SerproID). Uses only the standard library.
@@ -115,8 +117,9 @@ def main():
     ask_len = "len" in sys.argv[2:]
     oslock = "oslock" in sys.argv[2:]
     iface = "iface" in sys.argv[2:]
+    reinit = "reinit" in sys.argv[2:]
     for a in sys.argv[2:]:
-        if a in ("rw", "len", "oslock", "iface"):
+        if a in ("rw", "len", "oslock", "iface", "reinit"):
             continue
         if a in ("fixed", "random"):
             runs.append(a)
@@ -157,6 +160,14 @@ def main():
     check("C_Initialize", f("C_Initialize", P)(
         C.byref(init_args) if oslock else None))
     print(f"init: {'CKF_OS_LOCKING_OK' if oslock else 'NULL'}")
+    if reinit:
+        n0 = CK_ULONG()
+        f("C_GetSlotList", C.c_ubyte, C.POINTER(CK_ULONG), C.POINTER(CK_ULONG))(
+            1, None, C.byref(n0))
+        check("C_Finalize", f("C_Finalize", P)(None))
+        check("C_Initialize", f("C_Initialize", P)(
+            C.byref(init_args) if oslock else None))
+        print("init: finalized and initialized again")
     n = CK_ULONG()
     get_slots = f("C_GetSlotList", C.c_ubyte, PU, PU)
     check("C_GetSlotList", get_slots(1, None, C.byref(n)))
