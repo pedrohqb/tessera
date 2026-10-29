@@ -69,6 +69,8 @@ modules:
       - --disable-notify
       - --disable-strict
       - --sysconfdir=/app/etc
+      # pcsc-lite installs its headers in include/PCSC.
+      - PCSC_CFLAGS=-I/app/include/PCSC
     cleanup:
       - /bin
       - /include
