@@ -11,8 +11,9 @@
 set -eu
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 H=${TESSERA_GUI_DIR:-/tmp/tessera-gui}
-mkdir -p "$H/run" "$H/modules" "$H/drivers/softhsm" "$H/hsm"
-chmod 700 "$H/run"
+RUN=${TESSERA_GUI_RUNTIME:-$H/run}   # e.g. /run/user/$UID, for screenshots
+mkdir -p "$RUN" "$H/modules" "$H/drivers/softhsm" "$H/hsm"
+chmod 700 "$RUN"
 if [ ! -f "$H/hsm/conf" ]; then
     printf 'directories.tokendir = %s/hsm\nobjectstore.backend = file\n' "$H" > "$H/hsm/conf"
     SOFTHSM2_CONF=$H/hsm/conf softhsm2-util --init-token --free --label Test --pin 1234 --so-pin 1234 >/dev/null
@@ -26,12 +27,12 @@ module = "/usr/lib/softhsm/libsofthsm2.so"
 SOFTHSM2_CONF = "$H/hsm/conf"
 EOT
 cat > "$H/env.sh" <<EOT
-export DISPLAY=:99 XDG_RUNTIME_DIR=$H/run GDK_BACKEND=x11 GSK_RENDERER=cairo NO_AT_BRIDGE=1 \\
+export DISPLAY=:99 XDG_RUNTIME_DIR=$RUN GDK_BACKEND=x11 GSK_RENDERER=cairo NO_AT_BRIDGE=1 \\
   TESSERA_DRIVERS_PATH=$H/drivers TESSERA_HOST_MODULES=$H/modules LANG=\${LANG:-pt_BR.UTF-8}
 [ -f $H/bus ] && export DBUS_SESSION_BUS_ADDRESS=\$(cat $H/bus) || true
 EOT
 . "$H/env.sh"
-Xvfb :99 -screen 0 1100x1300x24 >/dev/null 2>&1 &
+Xvfb :99 -screen 0 ${TESSERA_GUI_SCREEN:-1100x1300}x24 >/dev/null 2>&1 &
 sleep 1
 exec dbus-run-session -- bash -c "
   $(command -v python3.12 || echo python3) '$repo/tools/gui-test/fake-watcher.py' '$H/watcher.log' &
