@@ -201,6 +201,81 @@ pub fn probe_module(module: &str) -> i32 {
     1
 }
 
+/// `tessera probe-sign MODULE`: sign a short test text with the first
+/// private key found, to see where a signature fails. With a cloud
+/// certificate this sends a real authorization request. If the token asks
+/// for a PIN, it is read from TESSERA_PIN.
+pub fn probe_sign(module: &str) -> i32 {
+    use cryptoki::mechanism::Mechanism;
+    use cryptoki::session::UserType;
+    use cryptoki::types::AuthPin;
+    let ctx = match Pkcs11::new(module) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("sign: load failed: {e}");
+            return 2;
+        }
+    };
+    if let Err(e) = ctx.initialize(CInitializeArgs::new(CInitializeFlags::OS_LOCKING_OK)) {
+        eprintln!("sign: C_Initialize failed: {e}");
+        return 2;
+    }
+    let slots = ctx.get_slots_with_token().unwrap_or_default();
+    for slot in slots {
+        let Ok(info) = ctx.get_token_info(slot) else {
+            continue;
+        };
+        eprintln!(
+            "sign: token {:?}, login required: {}",
+            clean(info.label()),
+            info.login_required()
+        );
+        let session = match ctx
+            .open_rw_session(slot)
+            .or_else(|_| ctx.open_ro_session(slot))
+        {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("sign: C_OpenSession failed: {e}");
+                continue;
+            }
+        };
+        if info.login_required() {
+            match std::env::var("TESSERA_PIN") {
+                Ok(pin) => {
+                    if let Err(e) = session.login(UserType::User, Some(&AuthPin::from(pin))) {
+                        eprintln!("sign: C_Login failed: {e}");
+                        continue;
+                    }
+                    eprintln!("sign: logged in");
+                }
+                Err(_) => eprintln!("sign: no TESSERA_PIN; trying without login"),
+            }
+        }
+        let keys = session
+            .find_objects(&[Attribute::Class(ObjectClass::PRIVATE_KEY)])
+            .unwrap_or_default();
+        eprintln!("sign: {} private key(s)", keys.len());
+        let Some(key) = keys.first().copied() else {
+            continue;
+        };
+        let started = std::time::Instant::now();
+        eprintln!("sign: C_Sign(CKM_SHA256_RSA_PKCS) — approve on the phone if asked...");
+        match session.sign(&Mechanism::Sha256RsaPkcs, key, b"Tessera signing test") {
+            Ok(sig) => {
+                eprintln!("sign: OK, {} bytes in {:?}", sig.len(), started.elapsed());
+                return 0;
+            }
+            Err(e) => {
+                eprintln!("sign: failed after {:?}: {e}", started.elapsed());
+                return 1;
+            }
+        }
+    }
+    eprintln!("sign: no token with a private key");
+    1
+}
+
 /// Runs in the child process: list tokens and their public certificates
 /// through p11-kit-client.so, at P11_KIT_SERVER_ADDRESS.
 pub fn list_tokens_in_process() -> Result<String, String> {

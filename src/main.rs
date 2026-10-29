@@ -168,6 +168,13 @@ fn main() -> ExitCode {
         }
         Some("serve") => return serve(),
         Some("remote") => return ExitCode::from(remote::run(&args[2..]) as u8),
+        Some("probe-sign") => {
+            let Some(module) = args.get(2) else {
+                eprintln!("usage: tessera probe-sign MODULE");
+                return ExitCode::FAILURE;
+            };
+            return ExitCode::from(status::probe_sign(module) as u8);
+        }
         Some("probe-module") => {
             let Some(module) = args.get(2) else {
                 eprintln!("usage: tessera probe-module MODULE");
