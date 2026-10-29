@@ -40,10 +40,41 @@ pub fn has_module(dir: &Path) -> bool {
 
 /// Firefox holds its profile locked while running; adding a module then would
 /// be lost or corrupt the database.
+///
+/// While it runs, Firefox holds a POSIX record lock (fcntl) on the profile's
+/// .parentlock. That lock goes away with the process, even when it is
+/// killed, unlike the "lock" symlink, which a killed Firefox leaves behind
+/// (and which made "Set up" refuse forever). Locks work across sandboxes:
+/// they belong to the file, not to a PID namespace.
 pub fn profile_in_use(dir: &Path) -> bool {
-    // Firefox keeps a "lock" symlink in the profile while it runs and
-    // removes it on exit (the .parentlock file stays).
-    fs::symlink_metadata(dir.join("lock")).is_ok()
+    #[repr(C)]
+    struct Flock {
+        l_type: i16,
+        l_whence: i16,
+        l_start: i64,
+        l_len: i64,
+        l_pid: i32,
+    }
+    extern "C" {
+        fn fcntl(fd: i32, cmd: i32, ...) -> i32;
+    }
+    const F_GETLK: i32 = 5;
+    const F_WRLCK: i16 = 1;
+    const F_UNLCK: i16 = 2;
+    use std::os::fd::AsRawFd;
+    let Ok(file) = fs::File::open(dir.join(".parentlock")) else {
+        return false;
+    };
+    let mut lock = Flock {
+        l_type: F_WRLCK,
+        l_whence: 0,
+        l_start: 0,
+        l_len: 0,
+        l_pid: 0,
+    };
+    // SAFETY: F_GETLK reads and fills the flock struct passed by pointer.
+    let rv = unsafe { fcntl(file.as_raw_fd(), F_GETLK, &mut lock as *mut Flock) };
+    rv == 0 && lock.l_type != F_UNLCK
 }
 
 type NssInitialize =
@@ -174,4 +205,40 @@ pub fn add_module(dir: &Path) -> Result<Outcome> {
     }
     let stderr = String::from_utf8_lossy(&out.stderr);
     Err(anyhow!("{}", stderr.trim()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::profile_in_use;
+    use std::process::{Command, Stdio};
+    use std::{fs, thread, time::Duration};
+
+    #[test]
+    fn firefox_lock_is_the_fcntl_lock_on_parentlock() {
+        let dir = std::env::temp_dir().join(format!("tessera-lock-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        // A stale "lock" symlink, as a killed Firefox leaves it, is ignored.
+        let _ = std::os::unix::fs::symlink("127.0.0.1:+1", dir.join("lock"));
+        fs::write(dir.join(".parentlock"), b"").unwrap();
+        assert!(!profile_in_use(&dir));
+        // Another process holding the lock, as a running Firefox does.
+        let script = format!(
+            "import fcntl,time; f=open('{}','r+'); fcntl.lockf(f, fcntl.LOCK_EX); print('locked', flush=True); time.sleep(5)",
+            dir.join(".parentlock").display()
+        );
+        let mut child = Command::new("python3")
+            .args(["-c", &script])
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("python3");
+        let mut out = child.stdout.take().unwrap();
+        let mut buf = [0u8; 7];
+        std::io::Read::read_exact(&mut out, &mut buf).unwrap();
+        thread::sleep(Duration::from_millis(50));
+        assert!(profile_in_use(&dir));
+        child.kill().unwrap();
+        child.wait().unwrap();
+        assert!(!profile_in_use(&dir));
+        fs::remove_dir_all(&dir).unwrap();
+    }
 }

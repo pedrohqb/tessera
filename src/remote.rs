@@ -35,7 +35,7 @@ type ServeTokens =
 extern "C" {
     fn signal(signum: i32, handler: usize) -> usize;
     fn sigprocmask(how: i32, set: *const u64, old: *mut u64) -> i32;
-    fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
+    fn fcntl(fd: i32, cmd: i32, ...) -> i32;
     fn dup2(old: i32, new: i32) -> i32;
 }
 
