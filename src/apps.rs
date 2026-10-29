@@ -19,30 +19,100 @@ use std::fs;
 use crate::drivers::Driver;
 use crate::paths;
 
+/// How an app is set up once it may reach the host's p11-kit server.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Setup {
+    /// Register p11-kit-client.so in every Firefox profile.
+    Firefox,
+    /// An empty NSS database of its own (NSS's roots module, p11-kit in the
+    /// runtime, already reaches the server).
+    Papers,
+    /// Register p11-kit-client.so in the browser's ~/.pki/nssdb.
+    Chromium,
+    /// Nothing: the app's package already does it (PJeOffice Pro).
+    None,
+}
+
 pub struct ClientApp {
     pub id: &'static str,
     pub name: &'static str,
+    pub icon: &'static str,
+    pub setup: Setup,
+    /// More `flatpak override` options the app needs.
+    pub override_extra: &'static str,
 }
 
 pub const FIREFOX: ClientApp = ClientApp {
     id: "org.mozilla.firefox",
     name: "Firefox",
+    icon: "web-browser-symbolic",
+    setup: Setup::Firefox,
+    override_extra: "",
+};
+pub const CHROMIUM: ClientApp = ClientApp {
+    id: "org.chromium.Chromium",
+    name: "Chromium",
+    icon: "web-browser-symbolic",
+    setup: Setup::Chromium,
+    override_extra: "",
+};
+/// Chrome's package keeps no ~/.pki, so the module registered there would
+/// be gone at the next start: --persist=.pki keeps it in its data folder.
+pub const CHROME: ClientApp = ClientApp {
+    id: "com.google.Chrome",
+    name: "Google Chrome",
+    icon: "web-browser-symbolic",
+    setup: Setup::Chromium,
+    override_extra: " --persist=.pki",
+};
+pub const BRAVE: ClientApp = ClientApp {
+    id: "com.brave.Browser",
+    name: "Brave",
+    icon: "web-browser-symbolic",
+    setup: Setup::Chromium,
+    override_extra: "",
 };
 pub const PAPERS: ClientApp = ClientApp {
     id: "org.gnome.Papers",
     name: "Papers",
+    icon: "x-office-document-symbolic",
+    setup: Setup::Papers,
+    override_extra: "",
 };
 pub const PJEOFFICE: ClientApp = ClientApp {
     id: "br.jus.cnj.PJeOfficePro",
     name: "PJeOffice Pro",
+    icon: "emblem-ok-symbolic",
+    setup: Setup::None,
+    override_extra: "",
 };
+
+/// The apps shown in the window, in order.
+pub const APPS: [&ClientApp; 5] = [&FIREFOX, &CHROMIUM, &CHROME, &BRAVE, &PAPERS];
 
 /// The one-time host command that starts the host's p11-kit server.
 pub const HOST_SERVER_COMMAND: &str = "systemctl --user enable --now p11-kit-server.socket";
 
 /// The command that lets a sandboxed app reach the host's p11-kit server.
-pub fn override_command(app_id: &str) -> String {
-    format!("flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 {app_id}")
+pub fn override_command(app: &ClientApp) -> String {
+    format!(
+        "flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11{} {}",
+        app.override_extra, app.id
+    )
+}
+
+/// The NSS database a Chromium-based browser reads (~/.pki/nssdb in its
+/// sandbox): the real one for Chromium, which may use the home folder; the
+/// one kept in its data folder for the others.
+pub fn chromium_nssdb(app: &ClientApp) -> std::path::PathBuf {
+    if app.id == CHROMIUM.id {
+        paths::home().join(".pki/nssdb")
+    } else {
+        paths::home()
+            .join(".var/app")
+            .join(app.id)
+            .join(".pki/nssdb")
+    }
 }
 
 /// Has `flatpak override --user` given this app the p11-kit socket?

@@ -75,7 +75,8 @@ const PT_BR: &[(&str, &str)] = &[
     ("Driver files missing", "Arquivos do driver ausentes"),
     // Apps
     ("Apps", "Aplicativos"),
-    ("Apps that use the tokens through Tessera.", "Aplicativos que usam os tokens por meio do Tessera."),
+    ("Apps that use the tokens through Tessera. Each needs the two steps once.",
+     "Aplicativos que usam os tokens por meio do Tessera. Cada um precisa dos dois passos, uma vez."),
     ("Copy the command that lets this app reach Tessera",
      "Copiar o comando que permite a este aplicativo acessar o Tessera"),
     ("Command copied", "Comando copiado"),
@@ -124,4 +125,10 @@ const PT_BR: &[(&str, &str)] = &[
     ("Starting…", "Iniciando…"),
     ("No answer 3 times in a row. Press Restart to try again, or switch it off.",
      "Sem resposta 3 vezes seguidas. Aperte Reiniciar para tentar de novo, ou desligue o driver."),
+    ("is set up: restart it to load the module", "configurado: reinicie-o para carregar o módulo"),
+    ("Adds the module to the browser's certificate database; restart the browser afterwards",
+     "Adiciona o módulo ao banco de certificados do navegador; reinicie o navegador depois"),
+    ("has no certificate database yet: do step 1, open the browser once, then restart Tessera and try again",
+     "ainda não tem banco de certificados: faça o passo 1, abra o navegador uma vez, reinicie o Tessera e tente de novo"),
+    ("Could not turn on starting at login", "Não foi possível ativar o início automático"),
 ];

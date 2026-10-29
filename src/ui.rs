@@ -144,6 +144,13 @@ impl Win {
     fn toast(&self, text: &str) {
         self.toasts.add_toast(adw::Toast::new(text));
     }
+
+    /// For messages too long for a toast (what went wrong and what to do).
+    fn alert(&self, heading: &str, body: &str) {
+        let dialog = adw::AlertDialog::new(Some(heading), Some(body));
+        dialog.add_response("ok", "OK");
+        dialog.present(Some(&self.window));
+    }
 }
 
 fn plain_row(title: &str, subtitle: &str, icon: &str) -> adw::ActionRow {
@@ -549,30 +556,25 @@ fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     update_drivers(hub, win);
 }
 
-/// Which NSS database, if any, also needs the proxy module.
-#[derive(Clone, Copy)]
-enum NssTarget {
-    /// Every profile of the Firefox Flatpak.
-    Firefox,
-    /// The database Tessera keeps for Papers.
-    Papers,
-}
+use apps::{ClientApp, Setup};
 
-/// Is this app ready: (has the p11-kit socket, its NSS database is set).
-fn app_state(app: &apps::ClientApp, target: NssTarget) -> (bool, bool) {
+/// Is this app ready: (has the p11-kit socket, its NSS side is set up).
+fn app_state(app: &ClientApp) -> (bool, bool) {
     let socket = apps::has_socket_override(app.id);
-    let nss = match target {
-        NssTarget::Papers => nss::papers_ready(&paths::papers_nss_dir()),
-        NssTarget::Firefox => {
+    let nss = match app.setup {
+        Setup::Papers => nss::papers_ready(&paths::papers_nss_dir()),
+        Setup::Firefox => {
             let profiles = paths::firefox_profiles();
             !profiles.is_empty() && profiles.iter().all(|p| nss::has_module(p))
         }
+        Setup::Chromium => nss::has_module(&apps::chromium_nssdb(app)),
+        Setup::None => true,
     };
     (socket, nss)
 }
 
-fn app_subtitle(app: &apps::ClientApp, target: NssTarget) -> String {
-    let state = match app_state(app, target) {
+fn app_subtitle(app: &ClientApp) -> String {
+    let state = match app_state(app) {
         (true, true) => t("Ready"),
         (false, true) => t("Step 1 missing"),
         (true, false) => t("Step 2 missing"),
@@ -582,12 +584,12 @@ fn app_subtitle(app: &apps::ClientApp, target: NssTarget) -> String {
 }
 
 /// The NSS work of step 2, in a child process. Returns a line for the user.
-fn set_up_nss(target: NssTarget) -> Result<String, String> {
-    match target {
-        NssTarget::Papers => nss::set_up_papers(&paths::papers_nss_dir())
+fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
+    match app.setup {
+        Setup::Papers => nss::set_up_papers(&paths::papers_nss_dir())
             .map(|_| t("Papers is set up").to_string())
             .map_err(|e| format!("{e:#}")),
-        NssTarget::Firefox => {
+        Setup::Firefox => {
             let profiles = paths::firefox_profiles();
             if profiles.is_empty() {
                 return Err(
@@ -602,31 +604,47 @@ fn set_up_nss(target: NssTarget) -> Result<String, String> {
             }
             Ok(format!("{} ({})", t("Firefox is set up"), profiles.len()))
         }
+        Setup::Chromium => {
+            let db = apps::chromium_nssdb(app);
+            if !db.join("cert9.db").exists() {
+                return Err(format!(
+                    "{} {}",
+                    app.name,
+                    t("has no certificate database yet: do step 1, open the browser once, then restart Tessera and try again")
+                ));
+            }
+            nss::add_module(&db).map_err(|e| format!("{}: {e:#}", db.display()))?;
+            Ok(format!(
+                "{} {}",
+                app.name,
+                t("is set up: restart it to load the module")
+            ))
+        }
+        Setup::None => Ok(String::new()),
     }
 }
 
 fn set_up_app(
     win: &Rc<Win>,
-    app: &'static apps::ClientApp,
-    target: NssTarget,
+    app: &'static ClientApp,
     status: adw::ExpanderRow,
     step1: adw::ActionRow,
 ) {
     // Registering the client module needs no running driver.
     let win = win.clone();
     glib::spawn_future_local(async move {
-        let res = gio::spawn_blocking(move || set_up_nss(target)).await;
+        let res = gio::spawn_blocking(move || set_up_nss(app)).await;
         match res {
             Ok(Ok(done)) => win.toast(&done),
-            Ok(Err(e)) => win.toast(&format!("{}: {e}", t("Could not set up"))),
+            Ok(Err(e)) => win.alert(t("Could not set up"), &e),
             Err(_) => win.toast(t("Could not set up")),
         }
-        status.set_subtitle(&app_subtitle(app, target));
+        status.set_subtitle(&app_subtitle(app));
         step1_state(&step1, app);
     });
 }
 
-fn step1_state(row: &adw::ActionRow, app: &apps::ClientApp) {
+fn step1_state(row: &adw::ActionRow, app: &ClientApp) {
     if apps::has_socket_override(app.id) {
         row.set_title(t("1. The app may reach the system's p11-kit server ✓"));
     } else {
@@ -636,20 +654,15 @@ fn step1_state(row: &adw::ActionRow, app: &apps::ClientApp) {
     }
 }
 
-fn client_row(
-    win: &Rc<Win>,
-    app: &'static apps::ClientApp,
-    icon: &str,
-    target: NssTarget,
-) -> adw::ExpanderRow {
+fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> adw::ExpanderRow {
     let row = adw::ExpanderRow::builder()
         .use_markup(false)
         .title(app.name)
-        .subtitle(app_subtitle(app, target))
+        .subtitle(app_subtitle(app))
         .build();
-    row.add_prefix(&gtk::Image::from_icon_name(icon));
+    row.add_prefix(&gtk::Image::from_icon_name(app.icon));
 
-    let cmd = apps::override_command(app.id);
+    let cmd = apps::override_command(app);
     let step1 = adw::ActionRow::builder()
         .use_markup(false)
         .subtitle(&cmd)
@@ -662,11 +675,10 @@ fn client_row(
     let step2 = adw::ActionRow::builder()
         .use_markup(false)
         .title(t("2. Set up the app"))
-        .subtitle(match target {
-            NssTarget::Firefox => {
-                t("Close Firefox first: adds the module to every Firefox profile")
-            }
-            NssTarget::Papers => t("Makes the certificate database Papers reads when signing"),
+        .subtitle(match app.setup {
+            Setup::Firefox => t("Close Firefox first: adds the module to every Firefox profile"),
+            Setup::Papers => t("Makes the certificate database Papers reads when signing"),
+            _ => t("Adds the module to the browser's certificate database; restart the browser afterwards"),
         })
         .build();
     let button = gtk::Button::builder()
@@ -677,14 +689,14 @@ fn client_row(
         let (w, status, s1) = (Rc::downgrade(win), row.clone(), step1.clone());
         button.connect_clicked(move |_| {
             if let Some(win) = w.upgrade() {
-                set_up_app(&win, app, target, status.clone(), s1.clone());
+                set_up_app(&win, app, status.clone(), s1.clone());
             }
         });
     }
     step2.add_suffix(&button);
     row.add_row(&step2);
 
-    if matches!(target, NssTarget::Firefox) {
+    if app.setup == Setup::Firefox {
         let manual = adw::ActionRow::builder()
             .use_markup(false)
             .title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"))
@@ -699,27 +711,19 @@ fn client_row(
 fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::builder()
         .title(t("Apps"))
-        .description(t("Apps that use the tokens through Tessera."))
+        .description(t(
+            "Apps that use the tokens through Tessera. Each needs the two steps once.",
+        ))
         .build();
-    group.add(&client_row(
-        win,
-        &apps::FIREFOX,
-        "web-browser-symbolic",
-        NssTarget::Firefox,
-    ));
-    group.add(&client_row(
-        win,
-        &apps::PAPERS,
-        "x-office-document-symbolic",
-        NssTarget::Papers,
-    ));
-
+    for app in apps::APPS {
+        group.add(&client_row(win, app));
+    }
     // PJeOffice Pro (FlatPark) already has access to the host's p11-kit
     // server socket and loads p11-kit-client.so through its own bridge.
     let pje = plain_row(
         apps::PJEOFFICE.name,
         t("Works once the system connection is on (no setup needed)"),
-        "emblem-ok-symbolic",
+        apps::PJEOFFICE.icon,
     );
     group.add(&pje);
     group
@@ -886,7 +890,6 @@ fn setup_actions(app: &adw::Application, hub: &Rc<Hub>) {
     );
     {
         let hub = hub.clone();
-        let app2 = app.clone();
         autostart.connect_activate(move |action, _| {
             let want = !action
                 .state()
@@ -894,7 +897,6 @@ fn setup_actions(app: &adw::Application, hub: &Rc<Hub>) {
                 .unwrap_or(false);
             let action = action.clone();
             let hub = hub.clone();
-            let app2 = app2.clone();
             glib::spawn_future_local(async move {
                 match request_background(want).await {
                     Ok(granted) => {
@@ -904,13 +906,9 @@ fn setup_actions(app: &adw::Application, hub: &Rc<Hub>) {
                     }
                     Err(e) => {
                         eprintln!("tessera: background portal: {e}");
-                        if let Some(win) = app2.active_window() {
-                            if let Some(overlay) = win
-                                .child()
-                                .and_then(|c| c.downcast::<adw::ToastOverlay>().ok())
-                            {
-                                overlay.add_toast(adw::Toast::new(&format!("{e}")));
-                            }
+                        let win = hub.win.borrow().clone();
+                        if let Some(win) = win {
+                            win.alert(t("Could not turn on starting at login"), &format!("{e}"));
                         }
                     }
                 }

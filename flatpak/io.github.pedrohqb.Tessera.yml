@@ -33,6 +33,15 @@ finish-args:
   # each profile's NSS database. Only pkcs11.txt changes.
   - --filesystem=~/.var/app/org.mozilla.firefox/config/mozilla/firefox
   - --filesystem=~/.var/app/org.mozilla.firefox/.mozilla/firefox
+  # The NSS databases (~/.pki/nssdb) of the Chromium-based browsers, where
+  # "Set up" registers the module: Chromium may use the home folder, so its
+  # database is the real ~/.pki/nssdb; Brave and Chrome (with the
+  # --persist=.pki the window suggests) keep it in their data folder. No
+  # :create: the browser makes its database the first time it runs, and
+  # Tessera does not make folders for browsers that are not installed.
+  - --filesystem=~/.pki/nssdb
+  - --filesystem=~/.var/app/com.brave.Browser/.pki/nssdb
+  - --filesystem=~/.var/app/com.google.Chrome/.pki/nssdb
   # Read-only: whether `flatpak override --user` already gave an app the
   # p11-kit socket, to show it in the window.
   - --filesystem=xdg-data/flatpak/overrides:ro
