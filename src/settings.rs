@@ -9,6 +9,9 @@ use crate::paths;
 pub struct Settings {
     #[serde(default)]
     pub autostart: bool,
+    /// No icon in the tray (it shows by default while Tessera runs).
+    #[serde(default)]
+    pub hide_tray: bool,
     /// Drivers the user switched off.
     #[serde(default)]
     pub disabled_drivers: Vec<String>,

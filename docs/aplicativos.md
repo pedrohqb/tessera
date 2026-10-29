@@ -1,9 +1,11 @@
 # Aplicativos
 
-Todo aplicativo Flatpak precisa de duas coisas para usar os tokens do Tessera:
+Na janela, cada aplicativo tem até dois passos, com os mesmos nomes em todos:
 
-1. **Chegar ao servidor p11-kit do sistema:** a permissão `--filesystem=xdg-run/p11-kit/pkcs11`. A janela do Tessera mostra o comando com um botão de copiar e marca ✓ quando o `override` já existe. Depois do comando, é preciso fechar e abrir o aplicativo de novo.
-2. **Carregar o `p11-kit-client.so` do runtime:** `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`. Como isso é feito muda de aplicativo para aplicativo, e é o que o botão **Configurar** resolve.
+1. **Passo 1 · acesso ao servidor p11-kit do sistema:** a permissão `--filesystem=xdg-run/p11-kit/pkcs11`. A janela mostra o comando com um botão de copiar e marca ✓ quando o `override` já existe (sem reiniciar o Tessera). Depois do comando, é preciso fechar e abrir o aplicativo de novo.
+2. **Passo 2 · banco de certificados:** fazer o NSS do aplicativo chegar ao p11-kit (o `p11-kit-client.so` do runtime, `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`, ou o módulo de raízes). Como isso é feito muda de aplicativo para aplicativo, e é o que o botão **Configurar** resolve. Nos navegadores Chromium não há passo 2, a não ser para retirar um módulo duplicado ("Passo 2 · retirar o módulo duplicado", botão **Retirar**).
+
+Um passo feito aparece com ✓ e sem botão. O resumo de cada aplicativo diz "Pronto", "Falta o passo 1", "Falta o passo 2" ou "Faltam os passos 1 e 2".
 
 Antes de tudo, o servidor do sistema precisa estar ligado, uma vez por usuário: `systemctl --user enable --now p11-kit-server.socket`. A linha "Conexão com o sistema" da janela confere isso de ponta a ponta: pelo soquete do sistema, o Tessera lista os tokens que um aplicativo enxergaria e procura os seus (pelo nome e número de série). Fica vermelha se ninguém responde ou se os tokens do Tessera não estão lá. Só ver o soquete não basta: com o servidor do sistema desligado, o servidor de confiança do próprio Flatpak responde no mesmo caminho, e foi isso que enganou a primeira versão dessa linha. A conferência se repete a cada 30 s com a janela aberta e sempre que a lista de tokens muda; `tessera status` mostra o mesmo resultado no terminal.
 

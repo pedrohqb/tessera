@@ -64,7 +64,7 @@ A supervisão roda no serviço, com ou sem janela (`supervise` em `src/ui.rs`, `
 ## Janela, bandeja e segundo plano
 
 - O serviço é um `adw::Application` com uma "hold": continua rodando quando a janela fecha.
-- Com a janela fechada, aparece um ícone na bandeja (StatusNotifierItem, pela biblioteca `ksni`) com o resumo ("Servindo · 2/2 driver(s) · 2 publicado(s) · 2 token(s)"), **Abrir o Tessera** e **Sair (parar de servir os tokens)**. O GNOME mostra esse ícone com a extensão AppIndicator, que o Bluefin, o Aurora e o Ubuntu já trazem; o KDE mostra sem extensão. O mesmo resumo vai para o portal Background, que o GNOME mostra na lista de aplicativos em segundo plano.
+- Enquanto o serviço roda, com a janela aberta ou fechada, há um ícone na bandeja (dá para tirá-lo no menu, em **Mostrar ícone na bandeja**) (StatusNotifierItem, pela biblioteca `ksni`) com o resumo ("Servindo · 2/2 driver(s) · 2 publicado(s) · 2 token(s)"), **Abrir o Tessera** e **Sair (parar de servir os tokens)**. O GNOME mostra esse ícone com a extensão AppIndicator, que o Bluefin, o Aurora e o Ubuntu já trazem; o KDE mostra sem extensão. O mesmo resumo vai para o portal Background, que o GNOME mostra na lista de aplicativos em segundo plano.
 - `tessera --background` inicia só o serviço. É o comando que o portal Background usa quando o início automático está ligado.
 
 ## Permissões do Flatpak

@@ -27,7 +27,7 @@ Host: p11-kit-server.socket ($XDG_RUNTIME_DIR/p11-kit/pkcs11) ─ host trust sto
 
 **Why not inside the sandbox?** Flatpak puts `user-config: none` into every sandbox's `/etc/pkcs11/pkcs11.conf`, and replaces `$XDG_RUNTIME_DIR/p11-kit` with its own trust-store server. So no sandboxed process can load a custom p11-kit configuration or serve on the default socket. One server per driver needs no configuration, and the host's p11-kit does the joining.
 
-The window shows the service, the system connection, the card readers, the tokens with their certificates, and the drivers, each with its state, an on/off switch and buttons for the vendors' tools. It also sets up Firefox, Chromium, Chrome, Edge, Brave, Papers and Okular. The service keeps running when the window is closed, with an icon in the tray (StatusNotifierItem; on GNOME through the AppIndicator extension, which Bluefin and Aurora ship), and it can start at login (menu → *Start automatically at login*).
+The window shows the service, the system connection, the card readers, the tokens with their certificates, and the drivers, each with its state, an on/off switch and buttons for the vendors' tools. It also sets up Firefox, Chromium, Chrome, Edge, Brave, Papers and Okular. The service keeps running when the window is closed, and shows an icon in the tray while it runs (StatusNotifierItem; on GNOME through the AppIndicator extension, which Bluefin and Aurora ship; menu → *Show an icon in the tray* turns it off), and it can start at login (menu → *Start automatically at login*).
 
 Each driver is listed, and published to the host only while it answers. One that stops answering is restarted, and stopped after three times in a row so it cannot hang the apps.
 

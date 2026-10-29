@@ -142,6 +142,7 @@ struct Win {
     drivers: Section,
     /// (driver id, its row, the row's own subtitle) for update_drivers.
     driver_rows: RefCell<Vec<(String, adw::ActionRow, String)>>,
+    app_rows: RefCell<Vec<AppRows>>,
     last: RefCell<String>,
 }
 
@@ -437,6 +438,10 @@ fn supervise(hub: &Rc<Hub>) {
         if let Some(win) = win {
             update_service(&hub, &win);
             update_drivers(&hub, &win);
+            if win.window.is_visible() {
+                // A step done in a terminal shows without restarting.
+                update_apps(&win);
+            }
             apply_snapshot(&win, snap);
         }
     });
@@ -481,14 +486,9 @@ fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
 /// Keep the tray icon and the background-apps status in step.
 fn update_status(hub: &Rc<Hub>) {
     let text = hub.status_text();
-    let visible = hub
-        .win
-        .borrow()
-        .as_ref()
-        .is_some_and(|w| w.window.is_visible());
     {
         let mut tray = hub.tray.borrow_mut();
-        if visible {
+        if hub.settings.borrow().hide_tray {
             tray.take();
         } else if let Some(t) = tray.as_ref() {
             t.set_status(&text);
@@ -644,19 +644,23 @@ fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
 
 use apps::{ClientApp, Setup};
 
-/// Is this app ready: (has the p11-kit socket, its NSS side is set up).
+/// Is this app ready: (has the p11-kit socket, step 2 is done or not needed).
 fn app_state(app: &ClientApp) -> (bool, bool) {
-    let socket = apps::has_socket_override(app.id);
-    let nss = match app.setup {
-        Setup::Poppler => nss::poppler_db_ready(&paths::poppler_nss_dir(app.id)),
+    (apps::has_socket_override(app.id), !step2_needed(app))
+}
+
+/// Does step 2 still have something to do? The Chromium browsers need no
+/// step 2 at all, unless an older Tessera left a module to remove.
+fn step2_needed(app: &ClientApp) -> bool {
+    match app.setup {
+        Setup::Poppler => !nss::poppler_db_ready(&paths::poppler_nss_dir(app.id)),
         Setup::Firefox => {
             let profiles = paths::firefox_profiles();
-            !profiles.is_empty() && profiles.iter().all(|p| nss::has_module(p))
+            profiles.is_empty() || !profiles.iter().all(|p| nss::has_module(p))
         }
-        Setup::Chromium => !apps::chromium_nssdb(app).is_some_and(|db| nss::has_module(&db)),
-        Setup::None => true,
-    };
-    (socket, nss)
+        Setup::Chromium => apps::chromium_nssdb(app).is_some_and(|db| nss::has_module(&db)),
+        Setup::None => false,
+    }
 }
 
 fn app_subtitle(app: &ClientApp) -> String {
@@ -664,22 +668,20 @@ fn app_subtitle(app: &ClientApp) -> String {
         (true, true) => t("Ready"),
         (false, true) => t("Step 1 missing"),
         (true, false) => t("Step 2 missing"),
-        (false, false) => t("Not set up"),
+        (false, false) => t("Steps 1 and 2 missing"),
     };
     format!("{} · {state}", app.id)
+}
+
+fn step2_done(app: &ClientApp) -> String {
+    format!("{}: {}", app.name, t("step 2 done; restart the app"))
 }
 
 /// The NSS work of step 2, in a child process. Returns a line for the user.
 fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
     match app.setup {
         Setup::Poppler => nss::set_up_poppler_db(&paths::poppler_nss_dir(app.id))
-            .map(|_| {
-                format!(
-                    "{} {}",
-                    app.name,
-                    t("is set up: restart it to load the module")
-                )
-            })
+            .map(|_| step2_done(app))
             .map_err(|e| format!("{e:#}")),
         Setup::Firefox => {
             let profiles = paths::firefox_profiles();
@@ -694,7 +696,7 @@ fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
             for p in &profiles {
                 nss::add_module(p).map_err(|e| format!("{}: {e:#}", p.display()))?;
             }
-            Ok(format!("{} ({})", t("Firefox is set up"), profiles.len()))
+            Ok(step2_done(app))
         }
         // Chromium loads the root-certificates module (libnssckbi.so) by
         // itself, and in the Flatpak runtime that is p11-kit, which reaches
@@ -705,28 +707,86 @@ fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
         Setup::Chromium => match apps::chromium_nssdb(app) {
             Some(db) if nss::has_module(&db) => {
                 nss::set_up_poppler_db(&db).map_err(|e| format!("{}: {e:#}", db.display()))?;
-                Ok(format!(
-                    "{} {}",
-                    app.name,
-                    t("is set up: the duplicate module was removed; restart the browser")
-                ))
+                Ok(step2_done(app))
             }
-            _ => Ok(format!(
-                "{} {}",
-                app.name,
-                t("needs nothing more: step 1 is enough")
-            )),
+            _ => Ok(step2_done(app)),
         },
         Setup::None => Ok(String::new()),
     }
 }
 
-fn set_up_app(
-    win: &Rc<Win>,
+/// The rows of one app, refreshed by update_apps.
+struct AppRows {
     app: &'static ClientApp,
-    status: adw::ExpanderRow,
+    row: adw::ExpanderRow,
     step1: adw::ActionRow,
-) {
+    copy: gtk::Button,
+    step2: adw::ActionRow,
+    button: gtk::Button,
+    manual: Option<adw::ActionRow>,
+}
+
+/// Show each step as done or to do; a step with nothing to do has no
+/// button, and the Chromium browsers show step 2 only to remove an old
+/// module.
+fn update_app(r: &AppRows) {
+    let app = r.app;
+    let (s1, s2) = app_state(app);
+    r.row.set_subtitle(&app_subtitle(app));
+    let cmd = apps::override_command(app);
+    if s1 {
+        r.step1.set_title(&format!(
+            "{} ✓",
+            t("Step 1 · access to the system's p11-kit server")
+        ));
+        r.step1.set_subtitle(&format!(
+            "{} ({cmd})",
+            t("Done: the app can reach the system's p11-kit server")
+        ));
+    } else {
+        r.step1
+            .set_title(t("Step 1 · access to the system's p11-kit server"));
+        r.step1.set_subtitle(&format!(
+            "{} {cmd}",
+            t("Run once in a terminal, then restart the app:")
+        ));
+    }
+    r.copy.set_visible(!s1);
+
+    let chromium = app.setup == Setup::Chromium;
+    r.step2.set_visible(!chromium || !s2);
+    let title = if chromium {
+        t("Step 2 · remove the duplicate module")
+    } else {
+        t("Step 2 · certificate database")
+    };
+    if s2 {
+        r.step2.set_title(&format!("{title} ✓"));
+        r.step2.set_subtitle(match app.setup {
+            Setup::Firefox => t("Done: Tessera's module is in every Firefox profile"),
+            _ => t("Done: the app has its own certificate database"),
+        });
+    } else {
+        r.step2.set_title(title);
+        r.step2.set_subtitle(match app.setup {
+            Setup::Firefox => t("Close Firefox first: adds the module to every Firefox profile"),
+            Setup::Poppler => t("Makes the certificate database the app reads when signing"),
+            _ => t("An older Tessera added a module that makes the browser ask for the PIN twice. Close the browser first"),
+        });
+    }
+    r.button.set_visible(!s2);
+    if let Some(m) = &r.manual {
+        m.set_visible(!s2);
+    }
+}
+
+fn update_apps(win: &Win) {
+    for r in win.app_rows.borrow().iter() {
+        update_app(r);
+    }
+}
+
+fn set_up_app(win: &Rc<Win>, app: &'static ClientApp) {
     // Registering the client module needs no running driver.
     let win = win.clone();
     glib::spawn_future_local(async move {
@@ -736,64 +796,46 @@ fn set_up_app(
             Ok(Err(e)) => win.alert(t("Could not set up"), &e),
             Err(_) => win.toast(t("Could not set up")),
         }
-        status.set_subtitle(&app_subtitle(app));
-        step1_state(&step1, app);
+        update_apps(&win);
     });
 }
 
-fn step1_state(row: &adw::ActionRow, app: &ClientApp) {
-    if apps::has_socket_override(app.id) {
-        row.set_title(t("1. The app may reach the system's p11-kit server ✓"));
-    } else {
-        row.set_title(t(
-            "1. Let the app reach the system's p11-kit server (run once in a terminal, then restart the app)",
-        ));
-    }
-}
-
-fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> adw::ExpanderRow {
+fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
     let row = adw::ExpanderRow::builder()
         .use_markup(false)
         .title(app.name)
-        .subtitle(app_subtitle(app))
         .build();
     row.add_prefix(&app_icon(app));
 
-    let cmd = apps::override_command(app);
     let step1 = adw::ActionRow::builder()
         .use_markup(false)
-        .subtitle(&cmd)
         .subtitle_selectable(true)
         .build();
-    step1_state(&step1, app);
-    step1.add_suffix(&copy_button(win, cmd));
+    let copy = copy_button(win, apps::override_command(app));
+    step1.add_suffix(&copy);
     row.add_row(&step1);
 
-    let step2 = adw::ActionRow::builder()
-        .use_markup(false)
-        .title(t("2. Set up the app"))
-        .subtitle(match app.setup {
-            Setup::Firefox => t("Close Firefox first: adds the module to every Firefox profile"),
-            Setup::Poppler => t("Makes the certificate database the app reads when signing"),
-            _ => t("Nothing to add: the browser reaches the tokens through its root-certificates module once step 1 is done. The button removes the module an older Tessera added, which made it ask for the PIN twice"),
-        })
-        .build();
+    let step2 = adw::ActionRow::builder().use_markup(false).build();
     let button = gtk::Button::builder()
-        .label(t("Set up"))
+        .label(if app.setup == Setup::Chromium {
+            t("Remove")
+        } else {
+            t("Set up")
+        })
         .valign(gtk::Align::Center)
         .build();
     {
-        let (w, status, s1) = (Rc::downgrade(win), row.clone(), step1.clone());
+        let w = Rc::downgrade(win);
         button.connect_clicked(move |_| {
             if let Some(win) = w.upgrade() {
-                set_up_app(&win, app, status.clone(), s1.clone());
+                set_up_app(&win, app);
             }
         });
     }
     step2.add_suffix(&button);
     row.add_row(&step2);
 
-    if app.setup == Setup::Firefox {
+    let manual = (app.setup == Setup::Firefox).then(|| {
         let manual = adw::ActionRow::builder()
             .use_markup(false)
             .title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"))
@@ -801,25 +843,42 @@ fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> adw::ExpanderRow {
             .subtitle_selectable(true)
             .build();
         row.add_row(&manual);
-    }
-    row
+        manual
+    });
+    let rows = AppRows {
+        app,
+        row,
+        step1,
+        copy,
+        step2,
+        button,
+        manual,
+    };
+    update_app(&rows);
+    rows
 }
 
 fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::builder()
         .title(t("Apps"))
         .description(t(
-            "Apps that use the tokens through Tessera. Each needs the two steps once.",
+            "Apps that use the tokens through Tessera. Each needs one or two steps, once.",
         ))
         .build();
     for app in apps::APPS {
-        group.add(&client_row(win, app));
+        let rows = client_row(win, app);
+        group.add(&rows.row);
+        win.app_rows.borrow_mut().push(rows);
     }
     // PJeOffice Pro (FlatPark) already has access to the host's p11-kit
     // server socket and loads p11-kit-client.so through its own bridge.
     let pje = plain_row(
         apps::PJEOFFICE.name,
-        t("Works once the system connection is on (no setup needed)"),
+        &format!(
+            "{} · {}",
+            apps::PJEOFFICE.id,
+            t("No steps: the system connection is enough")
+        ),
         "",
     );
     pje.add_prefix(&app_icon(&apps::PJEOFFICE));
@@ -835,6 +894,7 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         Some(t("Start automatically at login")),
         Some("app.autostart"),
     );
+    menu.append(Some(t("Show an icon in the tray")), Some("app.tray"));
     menu.append(Some(t("About Tessera")), Some("app.about"));
     menu.append(Some(t("Quit")), Some("app.quit"));
     header.pack_end(
@@ -886,6 +946,7 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         tokens: Section::new(t("Tokens"), None),
         drivers: Section::new(t("Drivers"), None),
         driver_rows: RefCell::new(vec![]),
+        app_rows: RefCell::new(vec![]),
         last: RefCell::new(String::new()),
     });
     win.host_row
@@ -1015,6 +1076,23 @@ fn setup_actions(app: &adw::Application, hub: &Rc<Hub>) {
         });
     }
     app.add_action(&autostart);
+
+    let show_tray = gio::SimpleAction::new_stateful(
+        "tray",
+        None,
+        &(!hub.settings.borrow().hide_tray).to_variant(),
+    );
+    {
+        let hub = hub.clone();
+        show_tray.connect_activate(move |action, _| {
+            let show = !action.state().and_then(|v| v.get::<bool>()).unwrap_or(true);
+            action.set_state(&show.to_variant());
+            hub.settings.borrow_mut().hide_tray = !show;
+            hub.settings.borrow().save();
+            update_status(&hub);
+        });
+    }
+    app.add_action(&show_tray);
 
     let about = gio::SimpleAction::new("about", None);
     {
