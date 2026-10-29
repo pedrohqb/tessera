@@ -5,7 +5,7 @@ Todo aplicativo Flatpak precisa de duas coisas para usar os tokens do Tessera:
 1. **Chegar ao servidor p11-kit do sistema:** a permissão `--filesystem=xdg-run/p11-kit/pkcs11`. A janela do Tessera mostra o comando com um botão de copiar e marca ✓ quando o `override` já existe. Depois do comando, é preciso fechar e abrir o aplicativo de novo.
 2. **Carregar o `p11-kit-client.so` do runtime:** `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`. Como isso é feito muda de aplicativo para aplicativo, e é o que o botão **Configurar** resolve.
 
-Antes de tudo, o servidor do sistema precisa estar ligado, uma vez por usuário: `systemctl --user enable --now p11-kit-server.socket`. A linha "Conexão com o sistema" da janela fica vermelha enquanto ele não responde.
+Antes de tudo, o servidor do sistema precisa estar ligado, uma vez por usuário: `systemctl --user enable --now p11-kit-server.socket`. A linha "Conexão com o sistema" da janela confere isso de ponta a ponta: pelo soquete do sistema, o Tessera lista os tokens que um aplicativo enxergaria e procura os seus (pelo nome e número de série). Fica vermelha se ninguém responde ou se os tokens do Tessera não estão lá. Só ver o soquete não basta: com o servidor do sistema desligado, o servidor de confiança do próprio Flatpak responde no mesmo caminho, e foi isso que enganou a primeira versão dessa linha. A conferência se repete a cada 30 s com a janela aberta e sempre que a lista de tokens muda; `tessera status` mostra o mesmo resultado no terminal.
 
 ## PJeOffice Pro (FlatPark)
 
@@ -16,7 +16,7 @@ Antes de tudo, o servidor do sistema precisa estar ligado, uma vez por usuário:
 `org.mozilla.firefox`.
 
 1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.mozilla.firefox`
-2. Feche o Firefox e aperte **Configurar**. O Tessera lê o `profiles.ini` (em `~/.var/app/org.mozilla.firefox/config/mozilla/firefox` no Firefox 147 em diante, ou em `.mozilla/firefox` nos anteriores) e registra o módulo "Tessera (p11-kit)" no banco NSS de **todos** os perfis. Com o Firefox aberto, o perfil está trancado (o arquivo `lock`), e o Tessera avisa em vez de mexer.
+2. Feche o Firefox e aperte **Configurar**. O Tessera lê o `profiles.ini` (em `~/.var/app/org.mozilla.firefox/config/mozilla/firefox` no Firefox 147 em diante, ou em `.mozilla/firefox` nos anteriores) e registra o módulo "Tessera (p11-kit)" no banco NSS de **todos** os perfis. Com o Firefox aberto, o perfil está trancado (uma trava `fcntl` no arquivo `.parentlock`; o link `lock` pode sobrar de um Firefox que fechou mal e não conta), e o Tessera avisa em vez de mexer.
 
 Também dá para fazer à mão: Configurações → Privacidade e Segurança → Dispositivos de segurança → Carregar, arquivo `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`.
 
@@ -24,18 +24,20 @@ No Gerenciador de dispositivos, aparece um módulo com os slots do SerproID, do 
 
 ## Chromium, Google Chrome, Microsoft Edge e Brave
 
-`org.chromium.Chromium`, `com.google.Chrome`, `com.microsoft.Edge`, `com.brave.Browser`. Os navegadores baseados no Chromium leem os certificados de cliente e os módulos PKCS#11 do banco NSS do usuário, `~/.pki/nssdb`, e não têm tela para carregar módulos. O **Configurar** registra o `p11-kit-client.so` nesse banco. Onde o banco fica depende do pacote ([manifestos do Flathub](https://github.com/flathub)):
+`org.chromium.Chromium`, `com.google.Chrome`, `com.microsoft.Edge`, `com.brave.Browser`. Os navegadores baseados no Chromium leem os certificados de cliente e os módulos PKCS#11 do banco NSS do usuário e não têm tela para carregar módulos. O **Configurar** registra o `p11-kit-client.so` nesse banco. O passo 1 é só o override do socket, como nos outros.
 
-| Navegador | Banco NSS | Passo 1 |
+Onde fica o banco ([documentação do Chromium](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/cert_management.md)): desde o Chromium 146, em `$XDG_DATA_HOME/pki/nssdb`, que no Flatpak é `~/.var/app/<navegador>/data/pki/nssdb`. Se existir o banco antigo, `~/.pki/nssdb`, ele vence. O Tessera segue a mesma regra:
+
+| Navegador | Banco antigo (vence, se existir) | Banco novo |
 |---|---|---|
-| Chromium | o `~/.pki/nssdb` real (o pacote pode usar a pasta pessoal) | override do socket |
-| Microsoft Edge | `~/.var/app/com.microsoft.Edge/.pki/nssdb` (o pacote tem `--persist=.pki`) | override do socket |
-| Brave | `~/.var/app/com.brave.Browser/.pki/nssdb` (o pacote tem `--persist=.pki`) | override do socket |
-| Google Chrome | `~/.var/app/com.google.Chrome/.pki/nssdb`, **só com `--persist=.pki`** | override do socket **e** `--persist=.pki` |
+| Chromium | o `~/.pki/nssdb` real (o pacote pode usar a pasta pessoal) | `~/.var/app/org.chromium.Chromium/data/pki/nssdb` |
+| Google Chrome | `~/.var/app/com.google.Chrome/.pki/nssdb` (só com `--persist=.pki`) | `~/.var/app/com.google.Chrome/data/pki/nssdb` |
+| Microsoft Edge | `~/.var/app/com.microsoft.Edge/.pki/nssdb` (o pacote tem `--persist=.pki`) | `~/.var/app/com.microsoft.Edge/data/pki/nssdb` |
+| Brave | `~/.var/app/com.brave.Browser/.pki/nssdb` (o pacote tem `--persist=.pki`) | `~/.var/app/com.brave.Browser/data/pki/nssdb` |
 
-O pacote do Chrome não guarda o `~/.pki`: sem `--persist=.pki`, o registro se perderia sempre que o Chrome fechasse. Por isso o comando do passo 1 do Chrome inclui essa opção.
+No teste de 29 de outubro de 2026, o Chrome, o Edge e o Brave usavam o banco novo. A primeira versão do Tessera procurava só o antigo e dizia que não havia banco.
 
-O navegador cria o banco na primeira vez que roda. Se o banco ainda não existir, o **Configurar** explica: faça o passo 1, abra o navegador uma vez, reinicie o Tessera (para ele enxergar a pasta nova) e tente de novo. Depois de configurar, reinicie o navegador.
+O navegador cria o banco na primeira vez que roda. O Flatpak só mostra ao Tessera as pastas que já existiam quando ele abriu. Por isso, se o banco ainda não existir, o **Configurar** explica: faça o passo 1, abra o navegador uma vez e feche, saia do Tessera e abra de novo, e tente outra vez. Depois de configurar, reinicie o navegador.
 
 > Ainda não testado com token real. Se o navegador também carregar sozinho o módulo de raízes do runtime, como acontece no Papers, cada certificado vai aparecer duas vezes, e a solução será a mesma do Papers.
 

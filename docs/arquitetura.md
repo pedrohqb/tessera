@@ -77,11 +77,11 @@ A supervisão roda no serviço, com ou sem janela (`supervise` em `src/ui.rs`, `
 | `--socket=x11`, `--socket=wayland` | A janela; o X11 completo porque o SerproID (JavaFX) e o Token Administration só desenham por X11 |
 | `--filesystem=xdg-run/tessera:create` | Os soquetes dos servidores dos drivers |
 | `--filesystem=xdg-config/pkcs11:create` | Gravar os `tessera-*.module`; nenhum outro arquivo é tocado |
-| `--filesystem=xdg-run/p11-kit/pkcs11` | Só para mostrar se o servidor do sistema está ligado |
+| `--filesystem=xdg-run/p11-kit/pkcs11` | Conferir se os aplicativos veem os tokens do Tessera pelo servidor do sistema (veja [Aplicativos](aplicativos.md)) |
 | `--filesystem=xdg-data/flatpak/overrides:ro` | Mostrar se o passo 1 de cada aplicativo já foi feito |
 | `--filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create`, `~/.var/app/org.kde.okular/config/mozilla:create` | O banco NSS próprio do Papers e do Okular |
 | `--filesystem=~/.var/app/org.mozilla.firefox/config/mozilla/firefox` e `.../.mozilla/firefox` | Registrar o módulo nos perfis do Firefox |
-| `--filesystem=~/.pki/nssdb`, `~/.var/app/com.brave.Browser/.pki/nssdb`, `~/.var/app/com.google.Chrome/.pki/nssdb`, `~/.var/app/com.microsoft.Edge/.pki/nssdb` | Registrar o módulo no banco NSS do Chromium, do Brave, do Chrome e do Edge |
+| `--filesystem=~/.pki/nssdb` e, para o Chromium, o Brave, o Chrome e o Edge, `~/.var/app/<navegador>/data/pki/nssdb` e `~/.var/app/<navegador>/.pki/nssdb` | Registrar o módulo no banco NSS dos navegadores baseados no Chromium (o novo, desde o Chromium 146, e o antigo) |
 | `--talk-name=org.kde.StatusNotifierWatcher` | O ícone na bandeja |
 | `--persist=.config/serproid` | A pasta de certificados e o log do SerproID ficam nos dados do próprio Tessera |
 

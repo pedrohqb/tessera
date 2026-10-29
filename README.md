@@ -91,8 +91,8 @@ Tessera writes and updates the `tessera-*.module` files itself, through its `xdg
 2. Close Firefox. In Tessera, press *Set up* and choose the profile folder. Or, in Firefox: *Settings → Privacy & Security → Security Devices → Load*, module file `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`.
 
 **Chromium, Google Chrome, Microsoft Edge, Brave** (`org.chromium.Chromium`, `com.google.Chrome`, `com.microsoft.Edge`, `com.brave.Browser`):
-1. The same override. Chrome also needs `--persist=.pki`, because its package keeps no `~/.pki` (the window's command includes it).
-2. Open the browser once, then press *Set up* in Tessera: it registers `p11-kit-client.so` in the browser's `~/.pki/nssdb` (the real one for Chromium, which may use the home folder; the one in its data folder for the others). Restart the browser.
+1. The same override.
+2. Open the browser once and close it, then press *Set up* in Tessera: it registers `p11-kit-client.so` in the browser's NSS database. Since Chromium 146 that is `~/.var/app/<id>/data/pki/nssdb`; an older `~/.pki/nssdb`, if there is one, wins (the real one for Chromium, which may use the home folder). If the browser made its database after Tessera started, quit and reopen Tessera first. Restart the browser.
 
 **Papers** (`org.gnome.Papers`):
 1. ```sh
@@ -110,7 +110,7 @@ The host's p11-kit server serves the host's trust store as well, so these apps k
 tessera                     open the window (and start the token service)
 tessera --background        start the token service without a window
 tessera serve               run only the token service, in the foreground
-tessera status              print drivers, readers and tokens
+tessera status              print drivers, readers, tokens and whether apps see them
 tessera nss-setup DIR       register p11-kit-client.so in the NSS database DIR
 ```
 

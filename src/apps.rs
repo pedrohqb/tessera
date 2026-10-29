@@ -39,8 +39,6 @@ pub struct ClientApp {
     pub name: &'static str,
     pub icon: &'static str,
     pub setup: Setup,
-    /// More `flatpak override` options the app needs.
-    pub override_extra: &'static str,
 }
 
 pub const FIREFOX: ClientApp = ClientApp {
@@ -48,45 +46,36 @@ pub const FIREFOX: ClientApp = ClientApp {
     name: "Firefox",
     icon: "web-browser-symbolic",
     setup: Setup::Firefox,
-    override_extra: "",
 };
 pub const CHROMIUM: ClientApp = ClientApp {
     id: "org.chromium.Chromium",
     name: "Chromium",
     icon: "web-browser-symbolic",
     setup: Setup::Chromium,
-    override_extra: "",
 };
-/// Chrome's package keeps no ~/.pki, so the module registered there would
-/// be gone at the next start: --persist=.pki keeps it in its data folder.
 pub const CHROME: ClientApp = ClientApp {
     id: "com.google.Chrome",
     name: "Google Chrome",
     icon: "web-browser-symbolic",
     setup: Setup::Chromium,
-    override_extra: " --persist=.pki",
 };
-/// Edge keeps ~/.pki in its data folder (--persist=.pki), like Brave.
 pub const EDGE: ClientApp = ClientApp {
     id: "com.microsoft.Edge",
     name: "Microsoft Edge",
     icon: "web-browser-symbolic",
     setup: Setup::Chromium,
-    override_extra: "",
 };
 pub const BRAVE: ClientApp = ClientApp {
     id: "com.brave.Browser",
     name: "Brave",
     icon: "web-browser-symbolic",
     setup: Setup::Chromium,
-    override_extra: "",
 };
 pub const PAPERS: ClientApp = ClientApp {
     id: "org.gnome.Papers",
     name: "Papers",
     icon: "x-office-document-symbolic",
     setup: Setup::Poppler,
-    override_extra: "",
 };
 /// Okular signs through poppler too (KDE runtime, same freedesktop base).
 pub const OKULAR: ClientApp = ClientApp {
@@ -94,14 +83,12 @@ pub const OKULAR: ClientApp = ClientApp {
     name: "Okular",
     icon: "x-office-document-symbolic",
     setup: Setup::Poppler,
-    override_extra: "",
 };
 pub const PJEOFFICE: ClientApp = ClientApp {
     id: "br.jus.cnj.PJeOfficePro",
     name: "PJeOffice Pro",
     icon: "emblem-ok-symbolic",
     setup: Setup::None,
-    override_extra: "",
 };
 
 /// The apps shown in the window, in order.
@@ -115,23 +102,27 @@ pub const HOST_SERVER_COMMAND: &str = "systemctl --user enable --now p11-kit-ser
 /// The command that lets a sandboxed app reach the host's p11-kit server.
 pub fn override_command(app: &ClientApp) -> String {
     format!(
-        "flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11{} {}",
-        app.override_extra, app.id
+        "flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 {}",
+        app.id
     )
 }
 
-/// The NSS database a Chromium-based browser reads (~/.pki/nssdb in its
-/// sandbox): the real one for Chromium, which may use the home folder; the
-/// one kept in its data folder for the others.
-pub fn chromium_nssdb(app: &ClientApp) -> std::path::PathBuf {
-    if app.id == CHROMIUM.id {
+/// The NSS database a Chromium-based browser reads: since Chromium 146,
+/// $XDG_DATA_HOME/pki/nssdb (in Flatpak, ~/.var/app/<id>/data/pki/nssdb),
+/// unless the older ~/.pki/nssdb exists, which then wins. ~/.pki is the real
+/// one for Chromium, which may use the home folder, and the one kept by
+/// --persist=.pki for the others. None until the browser has made one
+/// (Tessera sees the folder only if it existed when Tessera started).
+pub fn chromium_nssdb(app: &ClientApp) -> Option<std::path::PathBuf> {
+    let data = paths::home().join(".var/app").join(app.id);
+    let legacy = if app.id == CHROMIUM.id {
         paths::home().join(".pki/nssdb")
     } else {
-        paths::home()
-            .join(".var/app")
-            .join(app.id)
-            .join(".pki/nssdb")
-    }
+        data.join(".pki/nssdb")
+    };
+    [legacy, data.join("data/pki/nssdb")]
+        .into_iter()
+        .find(|d| d.is_dir())
 }
 
 /// Has `flatpak override --user` given this app the p11-kit socket?
