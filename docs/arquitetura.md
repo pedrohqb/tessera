@@ -22,7 +22,7 @@ Token USB ──► pcscd (sistema)
 └────────────────────────────────────────────────────┘
                  ▲  --filesystem=xdg-run/p11-kit/pkcs11
                  │  + p11-kit-client.so do runtime
-   PJeOffice Pro · Firefox · Chromium · Chrome · Brave · Papers
+   PJeOffice Pro · Firefox · Chromium · Chrome · Edge · Brave · Papers · Okular
 ```
 
 1. O Tessera inicia um servidor p11-kit para cada driver ligado, cada um com o seu soquete em `$XDG_RUNTIME_DIR/tessera/<driver>`.
@@ -79,9 +79,9 @@ A supervisão roda no serviço, com ou sem janela (`supervise` em `src/ui.rs`, `
 | `--filesystem=xdg-config/pkcs11:create` | Gravar os `tessera-*.module`; nenhum outro arquivo é tocado |
 | `--filesystem=xdg-run/p11-kit/pkcs11` | Só para mostrar se o servidor do sistema está ligado |
 | `--filesystem=xdg-data/flatpak/overrides:ro` | Mostrar se o passo 1 de cada aplicativo já foi feito |
-| `--filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create` | O banco NSS próprio do Papers |
+| `--filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create`, `~/.var/app/org.kde.okular/config/mozilla:create` | O banco NSS próprio do Papers e do Okular |
 | `--filesystem=~/.var/app/org.mozilla.firefox/config/mozilla/firefox` e `.../.mozilla/firefox` | Registrar o módulo nos perfis do Firefox |
-| `--filesystem=~/.pki/nssdb`, `~/.var/app/com.brave.Browser/.pki/nssdb`, `~/.var/app/com.google.Chrome/.pki/nssdb` | Registrar o módulo no banco NSS do Chromium, do Brave e do Chrome |
+| `--filesystem=~/.pki/nssdb`, `~/.var/app/com.brave.Browser/.pki/nssdb`, `~/.var/app/com.google.Chrome/.pki/nssdb`, `~/.var/app/com.microsoft.Edge/.pki/nssdb` | Registrar o módulo no banco NSS do Chromium, do Brave, do Chrome e do Edge |
 | `--talk-name=org.kde.StatusNotifierWatcher` | O ícone na bandeja |
 | `--persist=.config/serproid` | A pasta de certificados e o log do SerproID ficam nos dados do próprio Tessera |
 

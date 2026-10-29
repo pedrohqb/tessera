@@ -11,7 +11,7 @@
 //!   tessera remote ...          (internal) serve one connection for p11-kit server
 //!   tessera list-tokens         (internal) list tokens at P11_KIT_SERVER_ADDRESS
 //!   tessera nss-add-module DIR  (internal) the NSS work of nss-setup
-//!   tessera nss-papers DIR      (internal) make the NSS database for Papers
+//!   tessera nss-poppler DIR      (internal) make the NSS database for Papers and Okular
 
 mod apps;
 mod drivers;
@@ -258,12 +258,12 @@ fn main() -> ExitCode {
                 }
             };
         }
-        Some("nss-papers") => {
+        Some("nss-poppler") => {
             let Some(dir) = args.get(2) else {
-                eprintln!("usage: tessera nss-papers DIR");
+                eprintln!("usage: tessera nss-poppler DIR");
                 return ExitCode::FAILURE;
             };
-            return match nss::set_up_papers_in_process(&PathBuf::from(dir)) {
+            return match nss::set_up_poppler_db_in_process(&PathBuf::from(dir)) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("{e:#}");

@@ -128,14 +128,15 @@ pub fn p11kit_server_command() -> PathBuf {
     PathBuf::from("/usr/libexec/p11-kit/p11-kit-server")
 }
 
-/// Papers reads its signing certificates through poppler, which looks first
-/// for a Firefox-style profile under $XDG_CONFIG_HOME/mozilla/firefox. In the
-/// Papers Flatpak that is inside its own data directory, so a small NSS
-/// database there is the one Papers will open.
-pub fn papers_nss_dir() -> PathBuf {
+/// Papers and Okular sign through poppler, which looks first for a
+/// Firefox-style profile under $XDG_CONFIG_HOME/mozilla/firefox. In a Flatpak
+/// that is inside the app's own data folder, so a small NSS database there is
+/// the one the app opens.
+pub fn poppler_nss_dir(app_id: &str) -> PathBuf {
     home()
-        .join(".var/app/org.gnome.Papers/config/mozilla/firefox")
-        .join("tessera.default")
+        .join(".var/app")
+        .join(app_id)
+        .join("config/mozilla/firefox/tessera.default")
 }
 
 /// Where the Firefox Flatpak keeps its profiles (Firefox 147+ uses

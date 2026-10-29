@@ -54,13 +54,13 @@ type PortGetError = unsafe extern "C" fn() -> c_int;
 type DeleteModule = unsafe extern "C" fn(*const c_char, *mut c_int) -> c_int;
 
 /// Is the Papers database there, without the client module?
-pub fn papers_ready(dir: &Path) -> bool {
+pub fn poppler_db_ready(dir: &Path) -> bool {
     dir.join("cert9.db").exists() && !has_module(dir)
 }
 
 /// Runs in the child process: create the database (or open it) and remove
 /// the client module an older Tessera registered there.
-pub fn set_up_papers_in_process(dir: &Path) -> Result<()> {
+pub fn set_up_poppler_db_in_process(dir: &Path) -> Result<()> {
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
     // SAFETY: as in add_module_in_process (nss.h, secmod.h).
     unsafe {
@@ -96,17 +96,17 @@ pub fn set_up_papers_in_process(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Called from the GUI: runs `tessera nss-papers <dir>`.
-pub fn set_up_papers(dir: &Path) -> Result<Outcome> {
-    if papers_ready(dir) {
+/// Called from the GUI: runs `tessera nss-poppler <dir>`.
+pub fn set_up_poppler_db(dir: &Path) -> Result<Outcome> {
+    if poppler_db_ready(dir) {
         return Ok(Outcome::AlreadyPresent);
     }
     let exe = std::env::current_exe().context("finding our own executable")?;
     let out = Command::new(exe)
-        .arg("nss-papers")
+        .arg("nss-poppler")
         .arg(dir)
         .output()
-        .context("running nss-papers")?;
+        .context("running nss-poppler")?;
     if out.status.success() {
         return Ok(Outcome::Added);
     }

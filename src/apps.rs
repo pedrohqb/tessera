@@ -24,9 +24,10 @@ use crate::paths;
 pub enum Setup {
     /// Register p11-kit-client.so in every Firefox profile.
     Firefox,
-    /// An empty NSS database of its own (NSS's roots module, p11-kit in the
+    /// Signs through poppler: an empty NSS database of its own, in the
+    /// first place poppler looks (NSS's roots module, p11-kit in the
     /// runtime, already reaches the server).
-    Papers,
+    Poppler,
     /// Register p11-kit-client.so in the browser's ~/.pki/nssdb.
     Chromium,
     /// Nothing: the app's package already does it (PJeOffice Pro).
@@ -65,6 +66,14 @@ pub const CHROME: ClientApp = ClientApp {
     setup: Setup::Chromium,
     override_extra: " --persist=.pki",
 };
+/// Edge keeps ~/.pki in its data folder (--persist=.pki), like Brave.
+pub const EDGE: ClientApp = ClientApp {
+    id: "com.microsoft.Edge",
+    name: "Microsoft Edge",
+    icon: "web-browser-symbolic",
+    setup: Setup::Chromium,
+    override_extra: "",
+};
 pub const BRAVE: ClientApp = ClientApp {
     id: "com.brave.Browser",
     name: "Brave",
@@ -76,7 +85,15 @@ pub const PAPERS: ClientApp = ClientApp {
     id: "org.gnome.Papers",
     name: "Papers",
     icon: "x-office-document-symbolic",
-    setup: Setup::Papers,
+    setup: Setup::Poppler,
+    override_extra: "",
+};
+/// Okular signs through poppler too (KDE runtime, same freedesktop base).
+pub const OKULAR: ClientApp = ClientApp {
+    id: "org.kde.okular",
+    name: "Okular",
+    icon: "x-office-document-symbolic",
+    setup: Setup::Poppler,
     override_extra: "",
 };
 pub const PJEOFFICE: ClientApp = ClientApp {
@@ -88,7 +105,9 @@ pub const PJEOFFICE: ClientApp = ClientApp {
 };
 
 /// The apps shown in the window, in order.
-pub const APPS: [&ClientApp; 5] = [&FIREFOX, &CHROMIUM, &CHROME, &BRAVE, &PAPERS];
+pub const APPS: [&ClientApp; 7] = [
+    &FIREFOX, &CHROMIUM, &CHROME, &EDGE, &BRAVE, &PAPERS, &OKULAR,
+];
 
 /// The one-time host command that starts the host's p11-kit server.
 pub const HOST_SERVER_COMMAND: &str = "systemctl --user enable --now p11-kit-server.socket";

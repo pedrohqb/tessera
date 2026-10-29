@@ -562,7 +562,7 @@ use apps::{ClientApp, Setup};
 fn app_state(app: &ClientApp) -> (bool, bool) {
     let socket = apps::has_socket_override(app.id);
     let nss = match app.setup {
-        Setup::Papers => nss::papers_ready(&paths::papers_nss_dir()),
+        Setup::Poppler => nss::poppler_db_ready(&paths::poppler_nss_dir(app.id)),
         Setup::Firefox => {
             let profiles = paths::firefox_profiles();
             !profiles.is_empty() && profiles.iter().all(|p| nss::has_module(p))
@@ -586,8 +586,14 @@ fn app_subtitle(app: &ClientApp) -> String {
 /// The NSS work of step 2, in a child process. Returns a line for the user.
 fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
     match app.setup {
-        Setup::Papers => nss::set_up_papers(&paths::papers_nss_dir())
-            .map(|_| t("Papers is set up").to_string())
+        Setup::Poppler => nss::set_up_poppler_db(&paths::poppler_nss_dir(app.id))
+            .map(|_| {
+                format!(
+                    "{} {}",
+                    app.name,
+                    t("is set up: restart it to load the module")
+                )
+            })
             .map_err(|e| format!("{e:#}")),
         Setup::Firefox => {
             let profiles = paths::firefox_profiles();
@@ -677,7 +683,7 @@ fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> adw::ExpanderRow {
         .title(t("2. Set up the app"))
         .subtitle(match app.setup {
             Setup::Firefox => t("Close Firefox first: adds the module to every Firefox profile"),
-            Setup::Papers => t("Makes the certificate database Papers reads when signing"),
+            Setup::Poppler => t("Makes the certificate database the app reads when signing"),
             _ => t("Adds the module to the browser's certificate database; restart the browser afterwards"),
         })
         .build();

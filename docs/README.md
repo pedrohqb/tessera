@@ -8,7 +8,7 @@ Esta documentação registra como o Tessera funciona, por que ele é como é, e 
 |---|---|
 | [Arquitetura](arquitetura.md) | Como os tokens saem do sandbox do Tessera e chegam aos aplicativos; por que não há atalho mais simples; supervisão dos drivers |
 | [Drivers](drivers.md) | Cada driver: origem, verificação, desempacotamento "limpo", dependências e as peculiaridades encontradas (sobretudo do SerproID) |
-| [Aplicativos](aplicativos.md) | PJeOffice Pro, Firefox, Chromium, Chrome, Brave e Papers: o que cada um precisa e por quê |
+| [Aplicativos](aplicativos.md) | PJeOffice Pro, Firefox, Chromium, Chrome, Edge, Brave, Papers e Okular: o que cada um precisa e por quê |
 | [Instalação e uso](uso.md) | Preparar o sistema, instalar, a janela, a bandeja, o início automático e a linha de comando |
 | [Diagnóstico](diagnostico.md) | Onde ficam os logs, as ferramentas de teste e o caminho para investigar um problema |
 | [Histórico](historico.md) | A sequência de problemas encontrados nos testes de 28 e 29 de outubro de 2026 e como cada um foi resolvido |
@@ -29,4 +29,4 @@ Testado em 29 de outubro de 2026 num Bluefin, com um token GD Burti (SafeSign, c
 - Papers: assinatura de PDF com os dois, cada certificado listado uma vez.
 - Token Administration do SafeSign e aplicativo do SerproID abertos pelo Tessera.
 
-Chromium, Chrome e Brave estão implementados e testados com um token de teste, ainda sem teste com token real.
+Chromium, Chrome, Edge, Brave e Okular estão implementados e testados com um token de teste, ainda sem teste com token real.

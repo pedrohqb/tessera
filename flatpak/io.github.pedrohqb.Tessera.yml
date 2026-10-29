@@ -28,6 +28,8 @@ finish-args:
   # The small NSS database Tessera sets up for Papers, which poppler finds
   # first (see paths.rs). Nothing else of Papers is visible.
   - --filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create
+  # The same for Okular, which signs through poppler too.
+  - --filesystem=~/.var/app/org.kde.okular/config/mozilla:create
   # The Firefox Flatpak's profiles (Firefox 147+ keeps them under config/,
   # older releases under .mozilla/), so "Set up" can register the module in
   # each profile's NSS database. Only pkcs11.txt changes.
@@ -42,6 +44,7 @@ finish-args:
   - --filesystem=~/.pki/nssdb
   - --filesystem=~/.var/app/com.brave.Browser/.pki/nssdb
   - --filesystem=~/.var/app/com.google.Chrome/.pki/nssdb
+  - --filesystem=~/.var/app/com.microsoft.Edge/.pki/nssdb
   # Read-only: whether `flatpak override --user` already gave an app the
   # p11-kit socket, to show it in the window.
   - --filesystem=xdg-data/flatpak/overrides:ro

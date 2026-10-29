@@ -20,7 +20,7 @@
       <li>Drivers included: SafeSign IC, SafeNet Authentication Client and SerproID; more can be added as extensions</li>
       <li>Vendor drivers are downloaded from the vendors at install time and checked against pinned checksums</li>
       <li>Opens the vendors' tools, such as SafeSign's Token Administration and the SerproID app</li>
-      <li>Sets up Firefox, Chromium, Google Chrome, Brave and Papers to use the tokens, and shows the command that lets them reach Tessera</li>
+      <li>Sets up Firefox, Chromium, Google Chrome, Microsoft Edge, Brave, Papers and Okular to use the tokens, and shows the command that lets them reach Tessera</li>
       <li>Publishes a driver only while it answers, so a driver that hangs cannot hang the apps</li>
       <li>Keeps running in the background with an icon in the tray, and can start at login</li>
     </ul>
@@ -51,7 +51,7 @@
   <releases>
     <release version="0.1.0" date="2026-10-29">
       <description>
-        <p>First release: one p11-kit server per driver (SafeSign IC, SafeNet Authentication Client, SerproID), published through the host p11-kit server; readers, tokens and certificates; set-up for Firefox, Chromium, Google Chrome, Brave and Papers; tray icon and start at login.</p>
+        <p>First release: one p11-kit server per driver (SafeSign IC, SafeNet Authentication Client, SerproID), published through the host p11-kit server; readers, tokens and certificates; set-up for Firefox, Chromium, Google Chrome, Microsoft Edge, Brave, Papers and Okular; tray icon and start at login.</p>
       </description>
     </release>
   </releases>

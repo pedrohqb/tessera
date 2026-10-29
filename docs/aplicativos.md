@@ -22,13 +22,14 @@ Também dá para fazer à mão: Configurações → Privacidade e Segurança →
 
 No Gerenciador de dispositivos, aparece um módulo com os slots do SerproID, do SafeSign e da confiança do sistema. O "Módulo integrado de raízes" é o conjunto de raízes que vem com o próprio Firefox, não o p11-kit, então não há duplicata.
 
-## Chromium, Google Chrome e Brave
+## Chromium, Google Chrome, Microsoft Edge e Brave
 
-`org.chromium.Chromium`, `com.google.Chrome`, `com.brave.Browser`. Os navegadores baseados no Chromium leem os certificados de cliente e os módulos PKCS#11 do banco NSS do usuário, `~/.pki/nssdb`, e não têm tela para carregar módulos. O **Configurar** registra o `p11-kit-client.so` nesse banco. Onde o banco fica depende do pacote ([manifestos do Flathub](https://github.com/flathub)):
+`org.chromium.Chromium`, `com.google.Chrome`, `com.microsoft.Edge`, `com.brave.Browser`. Os navegadores baseados no Chromium leem os certificados de cliente e os módulos PKCS#11 do banco NSS do usuário, `~/.pki/nssdb`, e não têm tela para carregar módulos. O **Configurar** registra o `p11-kit-client.so` nesse banco. Onde o banco fica depende do pacote ([manifestos do Flathub](https://github.com/flathub)):
 
 | Navegador | Banco NSS | Passo 1 |
 |---|---|---|
 | Chromium | o `~/.pki/nssdb` real (o pacote pode usar a pasta pessoal) | override do socket |
+| Microsoft Edge | `~/.var/app/com.microsoft.Edge/.pki/nssdb` (o pacote tem `--persist=.pki`) | override do socket |
 | Brave | `~/.var/app/com.brave.Browser/.pki/nssdb` (o pacote tem `--persist=.pki`) | override do socket |
 | Google Chrome | `~/.var/app/com.google.Chrome/.pki/nssdb`, **só com `--persist=.pki`** | override do socket **e** `--persist=.pki` |
 
@@ -48,6 +49,15 @@ O navegador cria o banco na primeira vez que roda. Se o banco ainda não existir
 O banco do Papers fica vazio porque, quando o NSS abre um banco, carrega sozinho o módulo de certificados raiz (`libnssckbi.so`). No runtime do Flatpak, esse arquivo é o `load-p11-kit-trust.so`, e o módulo de confiança do p11-kit, com o `override`, aponta para o servidor do sistema. Ou seja, o Papers já chega aos tokens por esse caminho. Com o `p11-kit-client.so` registrado também, cada certificado aparecia **duas vezes** na janela de assinatura. O banco próprio serve para o poppler não cair no `~/.pki/nssdb`, que lista o módulo de raízes mais uma vez. Se uma versão anterior do Tessera registrou o módulo nesse banco, o **Configurar** o retira.
 
 Num teste, o reset das permissões do Papers no Flatseal apagou o `override`, e nenhum certificado apareceu mais. Basta refazer o passo 1.
+
+## Okular
+
+`org.kde.okular`. O Okular também assina pelo poppler, então recebe o mesmo tratamento do Papers:
+
+1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.kde.okular`. O pacote tem `--filesystem=host`, mas isso não inclui o soquete do p11-kit.
+2. **Configurar** cria o banco NSS vazio em `~/.var/app/org.kde.okular/config/mozilla/firefox/tessera.default`, o primeiro lugar em que o poppler procura (o `$XDG_CONFIG_HOME` do Okular no Flatpak). Em Configurações → Configurar o Okular → Assinaturas digitais, o banco de certificados deve ficar no padrão.
+
+O Okular usa o runtime do KDE, que tem a mesma base freedesktop do runtime do GNOME e o mesmo `libnssckbi.so` do p11-kit. Ainda não foi testado com token real.
 
 ## Aplicativos nativos
 
