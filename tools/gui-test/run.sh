@@ -28,12 +28,12 @@ EOT
 cat > "$H/env.sh" <<EOT
 export DISPLAY=:99 XDG_RUNTIME_DIR=$H/run GDK_BACKEND=x11 GSK_RENDERER=cairo NO_AT_BRIDGE=1 \\
   TESSERA_DRIVERS_PATH=$H/drivers TESSERA_HOST_MODULES=$H/modules LANG=\${LANG:-pt_BR.UTF-8}
-[ -f $H/bus ] && export DBUS_SESSION_BUS_ADDRESS=\$(cat $H/bus)
+[ -f $H/bus ] && export DBUS_SESSION_BUS_ADDRESS=\$(cat $H/bus) || true
 EOT
 . "$H/env.sh"
 Xvfb :99 -screen 0 1100x1300x24 >/dev/null 2>&1 &
 sleep 1
 exec dbus-run-session -- bash -c "
-  python3 '$repo/tools/gui-test/fake-watcher.py' '$H/watcher.log' &
+  $(command -v python3.12 || echo python3) '$repo/tools/gui-test/fake-watcher.py' '$H/watcher.log' &
   sleep 0.5; echo \$DBUS_SESSION_BUS_ADDRESS > '$H/bus'
   '$repo/target/debug/tessera' $* > '$H/tessera.log' 2>&1"

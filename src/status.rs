@@ -311,7 +311,9 @@ pub fn probe_sign(module: &str) -> i32 {
 
 /// Runs in the child process: list tokens and their public certificates
 /// through p11-kit-client.so, at P11_KIT_SERVER_ADDRESS.
-pub fn list_tokens_in_process() -> Result<String, String> {
+/// With `with_certs` false, only the tokens (no certificate is read): for
+/// asking a server what it serves, cheaply.
+pub fn list_tokens_in_process(with_certs: bool) -> Result<String, String> {
     let ctx = Pkcs11::new(client_module()).map_err(|e| e.to_string())?;
     ctx.initialize(CInitializeArgs::new(CInitializeFlags::OS_LOCKING_OK))
         .map_err(|e| e.to_string())?;
@@ -332,7 +334,7 @@ pub fn list_tokens_in_process() -> Result<String, String> {
             serial: clean(info.serial_number()),
             certificates: vec![],
         };
-        if let Ok(session) = ctx.open_ro_session(slot) {
+        if let Some(session) = with_certs.then(|| ctx.open_ro_session(slot).ok()).flatten() {
             let handles = session
                 .find_objects(&[Attribute::Class(ObjectClass::CERTIFICATE)])
                 .unwrap_or_default();
@@ -366,10 +368,23 @@ pub fn list_tokens_in_process() -> Result<String, String> {
 /// Read one driver's server in a child process (p11-kit-client takes its
 /// address from the environment, so each server gets its own process).
 fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, ReadError> {
+    tokens_at(&paths::driver_socket(id), name, true)
+}
+
+/// Tokens served at a p11-kit server socket, read in a child process with
+/// a time limit.
+fn tokens_at(
+    socket: &std::path::Path,
+    name: &str,
+    with_certs: bool,
+) -> Result<Vec<Token>, ReadError> {
     let exe = std::env::current_exe().map_err(|e| Failed(e.to_string()))?;
-    let socket = paths::driver_socket(id);
-    let mut child = Command::new(exe)
-        .arg("list-tokens")
+    let mut cmd = Command::new(exe);
+    cmd.arg("list-tokens");
+    if !with_certs {
+        cmd.arg("--no-certificates");
+    }
+    let mut child = cmd
         .env(
             "P11_KIT_SERVER_ADDRESS",
             format!("unix:path={}", socket.display()),
@@ -378,6 +393,20 @@ fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, ReadError> {
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| Failed(e.to_string()))?;
+    // Read the output while the child runs: a long listing would otherwise
+    // fill the pipe and block it until the time limit.
+    let mut stdout = child.stdout.take().expect("piped");
+    let mut stderr = child.stderr.take().expect("piped");
+    let out_reader = std::thread::spawn(move || {
+        let mut b = Vec::new();
+        let _ = std::io::Read::read_to_end(&mut stdout, &mut b);
+        b
+    });
+    let err_reader = std::thread::spawn(move || {
+        let mut b = Vec::new();
+        let _ = std::io::Read::read_to_end(&mut stderr, &mut b);
+        b
+    });
     // A driver that hangs (waiting for a reader, say) must not hang the
     // window: give up after a while.
     let deadline = Instant::now() + LIST_TIMEOUT;
@@ -392,16 +421,14 @@ fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, ReadError> {
             None => std::thread::sleep(Duration::from_millis(50)),
         }
     }
-    let out = child
-        .wait_with_output()
-        .map_err(|e| Failed(e.to_string()))?;
-    if !out.status.success() {
-        return Err(Failed(
-            String::from_utf8_lossy(&out.stderr).trim().to_string(),
-        ));
+    let status = child.wait().map_err(|e| Failed(e.to_string()))?;
+    let stdout = out_reader.join().unwrap_or_default();
+    let stderr = err_reader.join().unwrap_or_default();
+    if !status.success() {
+        return Err(Failed(String::from_utf8_lossy(&stderr).trim().to_string()));
     }
     let list: TokenList =
-        toml::from_str(&String::from_utf8_lossy(&out.stdout)).map_err(|e| Failed(e.to_string()))?;
+        toml::from_str(&String::from_utf8_lossy(&stdout)).map_err(|e| Failed(e.to_string()))?;
     Ok(list
         .tokens
         .into_iter()
@@ -410,6 +437,50 @@ fn tokens_of(id: &str, name: &str) -> Result<Vec<Token>, ReadError> {
             t
         })
         .collect())
+}
+
+/// What apps see: whether the system's p11-kit server (at the socket a
+/// sandboxed app with `xdg-run/p11-kit/pkcs11` uses) serves the tokens
+/// Tessera serves. A socket that answers is not enough: without the host
+/// server, Flatpak puts its own trust-store server at that place.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HostView {
+    /// No server answers there.
+    Off,
+    /// A server answers, but not with Tessera's tokens.
+    WithoutTessera,
+    /// The apps see Tessera's tokens.
+    Sees(usize),
+    /// Tessera has no token to look for.
+    NothingToCheck,
+}
+
+/// Must run off the main thread. `ours` are the tokens Tessera serves.
+pub fn host_view(ours: &[(String, String)]) -> HostView {
+    let socket = paths::host_p11kit_socket();
+    if std::os::unix::net::UnixStream::connect(&socket).is_err() {
+        return HostView::Off;
+    }
+    if ours.is_empty() {
+        return HostView::NothingToCheck;
+    }
+    match tokens_at(&socket, "", false) {
+        Ok(seen) => {
+            let n = ours
+                .iter()
+                .filter(|(label, serial)| {
+                    seen.iter()
+                        .any(|t| &t.label == label && &t.serial == serial)
+                })
+                .count();
+            if n > 0 {
+                HostView::Sees(n)
+            } else {
+                HostView::WithoutTessera
+            }
+        }
+        Err(_) => HostView::WithoutTessera,
+    }
 }
 
 /// Readers and tokens. `drivers` are (id, name) of the running servers,

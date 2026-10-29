@@ -28,7 +28,7 @@ Depois de atualizar, saia do Tessera (menu → **Sair**) e abra de novo.
 
 ## A janela
 
-- **Serviço:** o estado dos servidores dos drivers, com **Iniciar** ou **Reiniciar**. Logo abaixo, **Conexão com o sistema**, que mostra se o `p11-kit-server.socket` responde e quantos drivers estão publicados, com o comando de ativação para copiar. Por último, **Serviço de cartões (pcscd)**.
+- **Serviço:** o estado dos servidores dos drivers, com **Iniciar** ou **Reiniciar**. Logo abaixo, **Conexão com o sistema**, que confere de ponta a ponta se os aplicativos veem os tokens do Tessera pelo `p11-kit-server.socket`, com o comando de ativação para copiar. Por último, **Serviço de cartões (pcscd)**.
 - **Leitoras:** os leitores que o `pcscd` vê e se há cartão.
 - **Tokens:** cada token com o driver e os certificados (titular, emissor, validade). Um certificado vencido aparece em destaque.
 - **Drivers:** cada driver com a sua chave liga/desliga e o seu estado: "Publicado: os aplicativos podem usar", "Iniciando…", "Sem resposta; tentando de novo (1 de 3)", "Parado: …" ou "Desligado". Os botões das ferramentas dos fornecedores (Token Administration, SerproID) ficam aqui.

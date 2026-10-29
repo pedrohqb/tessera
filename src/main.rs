@@ -93,6 +93,27 @@ fn print_status() -> ExitCode {
     for e in &snap.errors {
         println!("  error: {e}");
     }
+    let ours: Vec<(String, String)> = snap
+        .tokens
+        .iter()
+        .map(|t| (t.label.clone(), t.serial.clone()))
+        .collect();
+    let view = match status::host_view(&ours) {
+        status::HostView::Off => {
+            "OFF: nothing answers; run `systemctl --user enable --now p11-kit-server.socket`"
+                .to_string()
+        }
+        status::HostView::WithoutTessera => {
+            "apps do NOT see Tessera's tokens (server off, or turned on after Tessera started)"
+                .to_string()
+        }
+        status::HostView::Sees(n) => format!("on; apps see {n} of {} token(s)", ours.len()),
+        status::HostView::NothingToCheck => "answers (no token to check)".to_string(),
+    };
+    println!(
+        "\nSystem p11-kit server ({}): {view}",
+        paths::host_p11kit_socket().display()
+    );
     ExitCode::SUCCESS
 }
 
@@ -231,7 +252,8 @@ fn main() -> ExitCode {
             return ExitCode::from(status::probe_module(module) as u8);
         }
         Some("list-tokens") => {
-            return match status::list_tokens_in_process() {
+            let with_certs = args.get(2).map(String::as_str) != Some("--no-certificates");
+            return match status::list_tokens_in_process(with_certs) {
                 Ok(text) => {
                     print!("{text}");
                     ExitCode::SUCCESS

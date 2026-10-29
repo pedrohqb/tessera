@@ -36,6 +36,11 @@ struct Hub {
     tokens: Cell<usize>,
     /// Drivers that answered the last listing (published to the host).
     published: RefCell<Vec<String>>,
+    /// What apps see through the system's p11-kit server, and when and for
+    /// which tokens that was last checked.
+    host_view: RefCell<Option<status::HostView>>,
+    host_checked: RefCell<Option<HostCheck>>,
+    host_busy: Cell<bool>,
     /// The open window, if any (dropped when the window is destroyed).
     win: RefCell<Option<Rc<Win>>>,
     tray: RefCell<Option<tray::Tray>>,
@@ -205,32 +210,38 @@ fn update_service(hub: &Hub, win: &Win) {
     } else {
         win.service_row.remove_css_class("error");
     }
-    let server_on = apps::host_server_answers();
-    match &*hub.host.borrow() {
-        Ok(n) if server_on => {
-            win.host_row.set_subtitle(&format!(
-                "{} · {n} {} {}",
-                t("On"),
-                t("driver(s) published in"),
-                paths::host_modules_dir().display(),
-            ));
-            win.host_row.remove_css_class("error");
-        }
-        Ok(_) => {
-            win.host_row.set_subtitle(&format!(
+    let off = format!(
+        "{} {}",
+        t("Off: the apps cannot see the tokens. Run once in a terminal, then quit and reopen Tessera:"),
+        apps::HOST_SERVER_COMMAND
+    );
+    let (text, bad) = match (&*hub.host.borrow(), &*hub.host_view.borrow()) {
+        (Err(e), _) => (format!("{}: {e}", t("Could not write the host module files")), true),
+        (Ok(_), Some(status::HostView::Sees(n))) => (
+            format!("{} · {n} {}", t("On"), t("token(s) of Tessera seen by the apps")),
+            false,
+        ),
+        (Ok(n), Some(status::HostView::NothingToCheck)) => (
+            format!("{} · {n} {}", t("On"), t("driver(s) published; no token to check yet")),
+            false,
+        ),
+        (Ok(_), Some(status::HostView::WithoutTessera)) => (
+            format!(
                 "{} {}",
-                t("Off: the apps cannot see the tokens. Run once in a terminal:"),
+                t("The apps do not see Tessera's tokens: the system's p11-kit server is off, or was turned on after Tessera started. Run once in a terminal, then quit and reopen Tessera:"),
                 apps::HOST_SERVER_COMMAND
-            ));
-            win.host_row.add_css_class("error");
-        }
-        Err(e) => {
-            win.host_row.set_subtitle(&format!(
-                "{}: {e}",
-                t("Could not write the host module files")
-            ));
-            win.host_row.add_css_class("error");
-        }
+            ),
+            true,
+        ),
+        (Ok(_), Some(status::HostView::Off)) => (off, true),
+        (Ok(_), None) if apps::host_server_answers() => (t("Checking…").to_string(), false),
+        (Ok(_), None) => (off, true),
+    };
+    win.host_row.set_subtitle(&text);
+    if bad {
+        win.host_row.add_css_class("error");
+    } else {
+        win.host_row.remove_css_class("error");
     }
 }
 
@@ -382,12 +393,54 @@ fn supervise(hub: &Rc<Hub>) {
         *hub.host.borrow_mut() = host;
         hub.tokens.set(snap.tokens.len());
         *hub.published.borrow_mut() = snap.ok.clone();
+        let ours: Vec<(String, String)> = snap
+            .tokens
+            .iter()
+            .map(|t| (t.label.clone(), t.serial.clone()))
+            .collect();
+        check_host(&hub, ours);
         update_status(&hub);
         let win = hub.win.borrow().clone();
         if let Some(win) = win {
             update_service(&hub, &win);
             update_drivers(&hub, &win);
             apply_snapshot(&win, snap);
+        }
+    });
+}
+
+/// When the host was last checked, and for which (label, serial) tokens.
+type HostCheck = (std::time::Instant, Vec<(String, String)>);
+
+/// Ask, through the system's p11-kit server, whether apps see Tessera's
+/// tokens: when they change, and every 30 s with the window open (each
+/// check loads the drivers again through that server).
+fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
+    let visible = hub
+        .win
+        .borrow()
+        .as_ref()
+        .is_some_and(|w| w.window.is_visible());
+    let due = match &*hub.host_checked.borrow() {
+        None => true,
+        Some((when, last)) => {
+            *last != ours || (visible && when.elapsed() > Duration::from_secs(30))
+        }
+    };
+    if !due || hub.host_busy.replace(true) {
+        return;
+    }
+    *hub.host_checked.borrow_mut() = Some((std::time::Instant::now(), ours.clone()));
+    let hub = hub.clone();
+    glib::spawn_future_local(async move {
+        let view = gio::spawn_blocking(move || status::host_view(&ours)).await;
+        hub.host_busy.set(false);
+        if let Ok(view) = view {
+            *hub.host_view.borrow_mut() = Some(view);
+            let win = hub.win.borrow().clone();
+            if let Some(win) = win {
+                update_service(&hub, &win);
+            }
         }
     });
 }
@@ -567,7 +620,7 @@ fn app_state(app: &ClientApp) -> (bool, bool) {
             let profiles = paths::firefox_profiles();
             !profiles.is_empty() && profiles.iter().all(|p| nss::has_module(p))
         }
-        Setup::Chromium => nss::has_module(&apps::chromium_nssdb(app)),
+        Setup::Chromium => apps::chromium_nssdb(app).is_some_and(|db| nss::has_module(&db)),
         Setup::None => true,
     };
     (socket, nss)
@@ -611,14 +664,13 @@ fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
             Ok(format!("{} ({})", t("Firefox is set up"), profiles.len()))
         }
         Setup::Chromium => {
-            let db = apps::chromium_nssdb(app);
-            if !db.join("cert9.db").exists() {
+            let Some(db) = apps::chromium_nssdb(app) else {
                 return Err(format!(
                     "{} {}",
                     app.name,
-                    t("has no certificate database yet: do step 1, open the browser once, then restart Tessera and try again")
+                    t("has no certificate database yet: do step 1, open the browser once and close it, then quit and reopen Tessera and try again")
                 ));
-            }
+            };
             nss::add_module(&db).map_err(|e| format!("{}: {e:#}", db.display()))?;
             Ok(format!(
                 "{} {}",
@@ -986,6 +1038,9 @@ pub fn run() -> ExitCode {
                 busy: Cell::new(false),
                 tokens: Cell::new(0),
                 published: RefCell::new(vec![]),
+                host_view: RefCell::new(None),
+                host_checked: RefCell::new(None),
+                host_busy: Cell::new(false),
                 win: RefCell::new(None),
                 tray: RefCell::new(None),
                 tray_events: tx,
