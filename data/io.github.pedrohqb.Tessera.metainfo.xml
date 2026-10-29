@@ -23,7 +23,7 @@
       <li>Sets up Firefox and Papers to use the tokens, and shows the command that lets them reach Tessera</li>
       <li>Keeps running in the background, and can start at login</li>
     </ul>
-    <p>Apps connect to the socket at $XDG_RUNTIME_DIR/p11-kit/pkcs11 by loading p11-kit-client.so. PJeOffice Pro from FlatPark connects there already.</p>
+    <p>Tessera serves the tokens on $XDG_RUNTIME_DIR/tessera/pkcs11. A client app needs access to that socket (flatpak override --user --filesystem=xdg-run/tessera) and a line in its p11-kit configuration, which Tessera writes for Firefox and Papers.</p>
     <p>The host still needs pcscd and the CCID driver, which most distributions ship.</p>
   </description>
   <screenshots>

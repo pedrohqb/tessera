@@ -10,15 +10,16 @@
 
 ```
 Token / card ─► pcscd (host) ─► Tessera: drivers + p11-kit server
-                                        │  $XDG_RUNTIME_DIR/p11-kit/pkcs11
-                ┌───────────────────────┼───────────────────────┐
-           PJeOffice Pro             Firefox                 Papers
-          (p11-kit-client)       (p11-kit-client)        (p11-kit-client)
+                                        │  $XDG_RUNTIME_DIR/tessera/pkcs11
+                ┌───────────────────────┴───────────────────────┐
+             Firefox                                          Papers
+   (p11-kit-proxy.so + "remote:" line)            (p11-kit-proxy.so + "remote:" line)
 ```
 
-- Tessera starts `p11-kit server` with the installed drivers and serves all tokens on `$XDG_RUNTIME_DIR/p11-kit/pkcs11`.
-- Client apps load the runtime's `p11-kit-client.so`, which forwards every call to that socket. The client apps see the tokens as if the drivers were installed locally.
-- The window shows the service, the card readers, the tokens and their certificates, the installed drivers (with buttons for the vendors' tools), and the client apps.
+- Tessera starts `p11-kit server` with the installed drivers and serves all tokens on `$XDG_RUNTIME_DIR/tessera/pkcs11`.
+- A client app gets two things. The first is access to that socket, through `flatpak override --user --filesystem=xdg-run/tessera <app>`. The second is a one-line p11-kit module file in its own configuration, `~/.var/app/<app>/config/pkcs11/modules/tessera.module`, containing `remote: unix:path=…/tessera/pkcs11`. The app then loads the runtime's `p11-kit-proxy.so` and sees the tokens as if the drivers were installed locally.
+- Why not the p11-kit default socket (`$XDG_RUNTIME_DIR/p11-kit/pkcs11`)? Inside every sandbox, Flatpak replaces that directory with its own p11-kit server for the host's trust store, so no app can serve or reach anything else there.
+- The window shows the service, the card readers, the tokens and their certificates, and the installed drivers (with buttons for the vendors' tools). It also sets up the client apps.
 - The service keeps running when the window is closed. It can also start at login (menu → *Start automatically at login*).
 
 ## Drivers
@@ -51,29 +52,20 @@ Bundled drivers live in `/app/lib/tessera/drivers/<id>/`. Driver extensions, nam
 ## Requirements on the host
 
 - `pcscd` running, plus the `ccid` driver. Most distributions ship both; Fedora atomic and Universal Blue images include them.
-- No other p11-kit server on the same socket. If `p11-kit-server.socket` is enabled for your user, Tessera says so. Use one or the other:
-  ```sh
-  systemctl --user disable --now p11-kit-server.socket
-  ```
+
+Tessera uses its own socket, so it doesn't conflict with a host `p11-kit-server.socket`.
 
 ## Client apps
 
-**PJeOffice Pro** ([FlatPark](https://flatpark.org), `br.jus.cnj.PJeOfficePro`): works as is, because it already connects to the socket.
+In Tessera, expand the app under *Apps*. Step 1 gives the `flatpak override` command, with a copy button; run it once in a terminal. Step 2's *Set up* button writes the module file.
 
-**Firefox** (`org.mozilla.firefox`):
-1. Allow Firefox to reach the socket (the copy button in Tessera gives this command):
-   ```sh
-   flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.mozilla.firefox
-   ```
-2. Close Firefox. In Tessera, use *Add to a profile…* and pick the profile folder. Or, in Firefox: *Settings → Privacy & Security → Security Devices → Load*, with the module file `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`.
+**Firefox** (`org.mozilla.firefox`): close Firefox before *Set up*, then choose the profile folder. Tessera registers `p11-kit-proxy.so` in that profile. Or do it by hand in Firefox: *Settings → Privacy & Security → Security Devices → Load*, module file `/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so`.
 
-**Papers** (`org.gnome.Papers`):
-1. ```sh
-   flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.gnome.Papers
-   ```
-2. In Tessera, press *Set up*. This creates a small NSS database at `~/.var/app/org.gnome.Papers/config/mozilla/firefox/tessera.default`, which is the first place Papers (through poppler) looks for signing certificates.
+**Papers** (`org.gnome.Papers`): *Set up* also creates a small NSS database at `~/.var/app/org.gnome.Papers/config/mozilla/firefox/tessera.default`. That is the first place Papers (through poppler) looks for signing certificates.
 
-Other apps can load `p11-kit-client.so` the same way, once they can reach `xdg-run/p11-kit/pkcs11`.
+**PJeOffice Pro** ([FlatPark](https://flatpark.org), `br.jus.cnj.PJeOfficePro`) loads `p11-kit-client.so` at the default socket through its own bridge. It needs its package to grant `xdg-run/tessera` and to point the bridge at Tessera, for example with `P11_KIT_SERVER_ADDRESS=unix:path=$XDG_RUNTIME_DIR/tessera/pkcs11` in its wrapper. A user override can't do this, because Flatpak clears that variable when it sets up its trust-store server.
+
+Any other Flatpak app that loads PKCS#11 modules through p11-kit works the same way. From a terminal, `tessera setup-app <app-id>` writes the module file for that app.
 
 ## Command line
 
@@ -82,6 +74,8 @@ tessera                     open the window (and start the token service)
 tessera --background        start the token service without a window
 tessera serve               run only the token service, in the foreground
 tessera status              print readers, tokens and drivers
+tessera setup-app ID [DIR]  point the Flatpak app ID at Tessera; with DIR,
+                            also register p11-kit-proxy.so in that NSS database
 ```
 
 ## Building
@@ -119,7 +113,7 @@ O **Tessera** é uma central de tokens para Flatpak. Ele roda os drivers dos tok
 
 Os drivers dos fornecedores são baixados dos sites oficiais na instalação e conferidos pelo SHA256 fixado. Nenhum script de instalação do fornecedor é executado, seguindo a mesma "limpeza" do [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br).
 
-No sistema, basta o `pcscd` (com o driver `ccid`) em execução. Para o Firefox e o Papers, a janela do Tessera mostra o comando `flatpak override` que libera o acesso, e o botão de configuração registra o módulo `p11-kit-client.so`. O PJeOffice Pro do FlatPark funciona sem nenhuma configuração.
+No sistema, basta o `pcscd` (com o driver `ccid`) em execução. Para o Firefox e o Papers, a janela do Tessera mostra o comando `flatpak override` que libera o acesso ao soquete do Tessera, e o botão de configuração grava a linha `remote:` na configuração do p11-kit do aplicativo e registra o `p11-kit-proxy.so`. O PJeOffice Pro do FlatPark ainda precisa de um ajuste no pacote deles para usar o soquete do Tessera.
 
 ## License
 

@@ -7,6 +7,7 @@ use std::process::{Command, ExitCode};
 use std::rc::Rc;
 use std::time::Duration;
 
+use crate::apps;
 use crate::drivers::{self, Driver};
 use crate::i18n::t;
 use crate::nss;
@@ -119,17 +120,13 @@ fn copy_button(win: &Rc<Win>, text: String) -> gtk::Button {
     b
 }
 
-fn override_command(app_id: &str) -> String {
-    format!("flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 {app_id}")
-}
-
 fn update_service(hub: &Hub, win: &Win) {
     let state = hub.server.borrow_mut().poll();
     let socket = paths::socket_path();
     let (subtitle, button, warn) = match &state {
         State::Running => (format!("{} · {}", t("Running"), socket.display()), t("Restart"), false),
         State::Stopped => (t("Stopped").to_string(), t("Start"), false),
-        State::Conflict => (t("Another p11-kit server already uses this socket. Stop it (for example: systemctl --user disable --now p11-kit-server.socket) or keep using it instead of Tessera.").to_string(), t("Start"), true),
+        State::Conflict => (t("Another program already answers on this socket (is Tessera already running, for example as `tessera serve`?).").to_string(), t("Start"), true),
         State::Failed(msg) => (format!("{}: {msg}", t("The server exited")), t("Start"), true),
     };
     win.service_row.set_subtitle(&subtitle);
@@ -308,104 +305,175 @@ fn fill_drivers(hub: &Hub, win: &Rc<Win>) {
     }
 }
 
+/// Which NSS database, if any, also needs the proxy module.
+#[derive(Clone, Copy)]
+enum NssTarget {
+    /// Ask the user for a Firefox profile folder.
+    FirefoxProfile,
+    /// The database Tessera keeps for Papers.
+    Papers,
+}
+
+fn nss_toast(
+    win: &Win,
+    res: Result<anyhow::Result<nss::Outcome>, Box<dyn std::any::Any + Send>>,
+    done: &str,
+) {
+    match res {
+        Ok(Ok(_)) => win.toast(done),
+        Ok(Err(e)) => win.toast(&format!("{}: {e:#}", t("Could not set up"))),
+        Err(_) => win.toast(t("Could not set up")),
+    }
+}
+
+fn set_up_app(
+    hub: &Rc<Hub>,
+    win: &Rc<Win>,
+    app_id: &'static str,
+    nss_target: NssTarget,
+    status: adw::ExpanderRow,
+) {
+    if !matches!(hub.server.borrow_mut().poll(), State::Running) {
+        win.toast(t("Start the token service first"));
+        return;
+    }
+    if let Err(e) = apps::write_module_file(app_id) {
+        win.toast(&format!("{}: {e:#}", t("Could not set up")));
+        return;
+    }
+    status.set_subtitle(&format!("{app_id} · {}", t("Configured")));
+    match nss_target {
+        NssTarget::Papers => {
+            let win = win.clone();
+            glib::spawn_future_local(async move {
+                let res = gio::spawn_blocking(|| nss::add_module(&paths::papers_nss_dir())).await;
+                nss_toast(&win, res, t("Papers is set up"));
+            });
+        }
+        NssTarget::FirefoxProfile => {
+            let dialog = gtk::FileDialog::builder()
+                .title(t("Choose the Firefox profile folder"))
+                .modal(true)
+                .build();
+            if let Some(root) = paths::firefox_profile_roots()
+                .into_iter()
+                .find(|p| p.is_dir())
+            {
+                dialog.set_initial_folder(Some(&gio::File::for_path(root)));
+            }
+            let w = Rc::downgrade(win);
+            dialog.select_folder(Some(&win.window), gio::Cancellable::NONE, move |res| {
+                let Some(win) = w.upgrade() else { return };
+                let Some(dir) = res.ok().and_then(|f| f.path()) else {
+                    win.toast(t("Load the module by hand in Firefox (see below)"));
+                    return;
+                };
+                if nss::profile_in_use(&dir) {
+                    win.toast(t("Close Firefox first, then try again"));
+                    return;
+                }
+                glib::spawn_future_local(async move {
+                    let res = gio::spawn_blocking(move || nss::add_module(&dir)).await;
+                    nss_toast(&win, res, t("Firefox profile is set up"));
+                });
+            });
+        }
+    }
+}
+
+fn client_row(
+    hub: &Rc<Hub>,
+    win: &Rc<Win>,
+    app: &'static apps::ClientApp,
+    icon: &str,
+    nss_target: NssTarget,
+) -> adw::ExpanderRow {
+    let state = if apps::module_file_present(app.id) {
+        t("Configured")
+    } else {
+        t("Not set up")
+    };
+    let row = adw::ExpanderRow::builder()
+        .use_markup(false)
+        .title(app.name)
+        .subtitle(format!("{} · {state}", app.id))
+        .build();
+    row.add_prefix(&gtk::Image::from_icon_name(icon));
+
+    let cmd = apps::override_command(app.id);
+    let step1 = adw::ActionRow::builder()
+        .use_markup(false)
+        .title(t("1. Let the app reach Tessera (run once in a terminal)"))
+        .subtitle(&cmd)
+        .subtitle_selectable(true)
+        .build();
+    step1.add_suffix(&copy_button(win, cmd));
+    row.add_row(&step1);
+
+    let step2 = adw::ActionRow::builder()
+        .use_markup(false)
+        .title(t("2. Set up the app"))
+        .subtitle(match nss_target {
+            NssTarget::FirefoxProfile => t("Close Firefox, then choose its profile folder"),
+            NssTarget::Papers => t("Papers will find the token's certificates when signing"),
+        })
+        .build();
+    let button = gtk::Button::builder()
+        .label(t("Set up"))
+        .valign(gtk::Align::Center)
+        .build();
+    {
+        let (hub, w, status) = (hub.clone(), Rc::downgrade(win), row.clone());
+        button.connect_clicked(move |_| {
+            if let Some(win) = w.upgrade() {
+                set_up_app(&hub, &win, app.id, nss_target, status.clone());
+            }
+        });
+    }
+    step2.add_suffix(&button);
+    row.add_row(&step2);
+
+    if matches!(nss_target, NssTarget::FirefoxProfile) {
+        let manual = adw::ActionRow::builder()
+            .use_markup(false)
+            .title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"))
+            .subtitle(paths::PROXY_MODULE)
+            .subtitle_selectable(true)
+            .build();
+        row.add_row(&manual);
+    }
+    row
+}
+
 fn apps_group(hub: &Rc<Hub>, win: &Rc<Win>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::builder()
         .title(t("Apps"))
         .description(t("Apps that use the tokens through Tessera."))
         .build();
-
-    // PJeOffice Pro (FlatPark) already connects to the socket.
-    group.add(&plain_row(
-        "PJeOffice Pro",
-        t("Works automatically."),
-        "emblem-ok-symbolic",
+    group.add(&client_row(
+        hub,
+        win,
+        &apps::FIREFOX,
+        "web-browser-symbolic",
+        NssTarget::FirefoxProfile,
+    ));
+    group.add(&client_row(
+        hub,
+        win,
+        &apps::PAPERS,
+        "x-office-document-symbolic",
+        NssTarget::Papers,
     ));
 
-    // Firefox
-    let ff = adw::ExpanderRow::builder()
-        .use_markup(false)
-        .title("Firefox")
-        .subtitle("org.mozilla.firefox")
-        .build();
-    ff.add_prefix(&gtk::Image::from_icon_name("web-browser-symbolic"));
-    ff.add_suffix(&copy_button(win, override_command("org.mozilla.firefox")));
-    let ff_button = gtk::Button::builder()
-        .label(t("Add to a profile…"))
-        .valign(gtk::Align::Center)
-        .build();
-    {
-        let hub = hub.clone();
-        let w = Rc::downgrade(win);
-        ff_button.connect_clicked(move |_| {
-            let Some(win) = w.upgrade() else { return };
-            if !matches!(hub.server.borrow_mut().poll(), State::Running) {
-                win.toast(t("Start the token service first"));
-                return;
-            }
-            let dialog = gtk::FileDialog::builder().title(t("Choose the Firefox profile folder")).modal(true).build();
-            if let Some(root) = paths::firefox_profile_roots().into_iter().find(|p| p.is_dir()) {
-                dialog.set_initial_folder(Some(&gio::File::for_path(root)));
-            }
-            let w2 = Rc::downgrade(&win);
-            dialog.select_folder(Some(&win.window), gio::Cancellable::NONE, move |res| {
-                let Some(win) = w2.upgrade() else { return };
-                let Ok(folder) = res else { return };
-                let Some(dir) = folder.path() else { return };
-                if nss::profile_in_use(&dir) {
-                    win.toast(t("Close Firefox first. Or add it by hand: Settings → Privacy & Security → Security Devices → Load, module file:"));
-                    return;
-                }
-                glib::spawn_future_local(async move {
-                    let res = gio::spawn_blocking(move || nss::add_module(&dir)).await;
-                    match res {
-                        Ok(Ok(nss::Outcome::Added)) => win.toast(t("Firefox profile is set up")),
-                        Ok(Ok(nss::Outcome::AlreadyPresent)) => win.toast(t("Already set up")),
-                        Ok(Err(e)) => win.toast(&format!("{}: {e:#}", t("Could not set up"))),
-                        Err(_) => win.toast(t("Could not set up")),
-                    }
-                });
-            });
-        });
-    }
-    ff.add_suffix(&ff_button);
-    let manual = adw::ActionRow::builder()
-        .use_markup(false)
-        .title(t("Close Firefox first. Or add it by hand: Settings → Privacy & Security → Security Devices → Load, module file:"))
-        .subtitle(paths::CLIENT_MODULE)
-        .subtitle_selectable(true)
-        .build();
-    ff.add_row(&manual);
-    group.add(&ff);
-
-    // Papers
-    let papers = plain_row("Papers", "org.gnome.Papers", "x-office-document-symbolic");
-    papers.add_suffix(&copy_button(win, override_command("org.gnome.Papers")));
-    let papers_button = gtk::Button::builder()
-        .label(t("Set up"))
-        .valign(gtk::Align::Center)
-        .build();
-    {
-        let hub = hub.clone();
-        let w = Rc::downgrade(win);
-        papers_button.connect_clicked(move |_| {
-            let Some(win) = w.upgrade() else { return };
-            if !matches!(hub.server.borrow_mut().poll(), State::Running) {
-                win.toast(t("Start the token service first"));
-                return;
-            }
-            glib::spawn_future_local(async move {
-                let res = gio::spawn_blocking(|| nss::add_module(&paths::papers_nss_dir())).await;
-                match res {
-                    Ok(Ok(nss::Outcome::Added)) => win.toast(t("Papers is set up")),
-                    Ok(Ok(nss::Outcome::AlreadyPresent)) => win.toast(t("Already set up")),
-                    Ok(Err(e)) => win.toast(&format!("{}: {e:#}", t("Could not set up"))),
-                    Err(_) => win.toast(t("Could not set up")),
-                }
-            });
-        });
-    }
-    papers.add_suffix(&papers_button);
-    group.add(&papers);
+    // PJeOffice Pro (FlatPark) loads p11-kit-client.so through its own bridge,
+    // at the p11-kit default socket; it needs its package to point at
+    // Tessera's socket instead.
+    let pje = plain_row(
+        apps::PJEOFFICE.name,
+        t("Waiting for its FlatPark package to support Tessera"),
+        "dialog-information-symbolic",
+    );
+    group.add(&pje);
     group
 }
 

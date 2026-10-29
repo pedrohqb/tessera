@@ -16,10 +16,15 @@ finish-args:
   - --socket=pcsc
   # Cloud certificates (SerproID) and revocation checks by vendor tools.
   - --share=network
-  # The socket client apps connect to: $XDG_RUNTIME_DIR/p11-kit/pkcs11.
-  - --filesystem=xdg-run/p11-kit:create
-  # The small NSS database Tessera sets up for Papers, which poppler finds
-  # first (see paths.rs). Nothing else of Papers is visible.
+  # The socket client apps connect to: $XDG_RUNTIME_DIR/tessera/pkcs11.
+  # (Not the p11-kit default, xdg-run/p11-kit: inside every sandbox Flatpak
+  # puts its own trust-store server there.)
+  - --filesystem=xdg-run/tessera:create
+  # "Set up" for client apps: the p11-kit module file that points them at
+  # the socket, and for Papers the small NSS database poppler finds first
+  # (see paths.rs). Nothing else of these apps is visible.
+  - --filesystem=~/.var/app/org.mozilla.firefox/config/pkcs11:create
+  - --filesystem=~/.var/app/org.gnome.Papers/config/pkcs11:create
   - --filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create
   # SerproID keeps its certificate list in ~/.config/serproid; keep it inside
   # Tessera's own data instead of the host home.

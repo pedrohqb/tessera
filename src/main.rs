@@ -5,8 +5,11 @@
 //!   tessera --background        start the token service without a window
 //!   tessera serve               run only the token service, in the foreground
 //!   tessera status              print readers, tokens and drivers
+//!   tessera setup-app ID [DIR]  point a Flatpak app at Tessera (and register
+//!                               the module in the NSS database DIR)
 //!   tessera nss-add-module DIR  (internal) register p11-kit-client.so in DIR
 
+mod apps;
 mod drivers;
 mod i18n;
 mod nss;
@@ -123,6 +126,10 @@ extern "C" {
 }
 
 fn main() -> ExitCode {
+    // Tessera looks at its own server through p11-kit-client.so. Inside a
+    // Flatpak sandbox the client's default address is Flatpak's trust-store
+    // server, so point it at our socket (before any thread starts).
+    std::env::set_var("P11_KIT_SERVER_ADDRESS", paths::server_address());
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
         Some("status") => {
@@ -136,6 +143,28 @@ fn main() -> ExitCode {
             return print_status();
         }
         Some("serve") => return serve(),
+        Some("setup-app") => {
+            // tessera setup-app APP_ID [NSS_DIR]: what the window's "Set up"
+            // does, for scripts and testing.
+            let Some(app_id) = args.get(2) else {
+                eprintln!("usage: tessera setup-app APP_ID [NSS_DIR]");
+                return ExitCode::FAILURE;
+            };
+            if let Err(e) = apps::write_module_file(app_id) {
+                eprintln!("tessera: {e:#}");
+                return ExitCode::FAILURE;
+            }
+            println!("{}", paths::app_module_file(app_id).display());
+            if let Some(dir) = args.get(3) {
+                if let Err(e) = nss::add_module(&PathBuf::from(dir)) {
+                    eprintln!("tessera: {e:#}");
+                    return ExitCode::FAILURE;
+                }
+                println!("{dir}: {} registered", paths::PROXY_MODULE);
+            }
+            println!("Now run: {}", apps::override_command(app_id));
+            return ExitCode::SUCCESS;
+        }
         Some("nss-add-module") => {
             let Some(dir) = args.get(2) else {
                 eprintln!("usage: tessera nss-add-module DIR");
