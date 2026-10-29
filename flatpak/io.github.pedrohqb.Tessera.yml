@@ -50,6 +50,13 @@ finish-args:
   - --filesystem=~/.var/app/com.google.Chrome/data/pki/nssdb
   - --filesystem=~/.var/app/com.microsoft.Edge/.pki/nssdb
   - --filesystem=~/.var/app/com.microsoft.Edge/data/pki/nssdb
+  # Read-only: the icons Flatpak exports for the installed apps, to show each
+  # app with its own icon. The exported icons are links into each app's
+  # folder under app/, so those are needed too.
+  - --filesystem=xdg-data/flatpak/exports/share/icons:ro
+  - --filesystem=xdg-data/flatpak/app:ro
+  - --filesystem=/var/lib/flatpak/exports/share/icons:ro
+  - --filesystem=/var/lib/flatpak/app:ro
   # Read-only: whether `flatpak override --user` already gave an app the
   # p11-kit socket, to show it in the window.
   - --filesystem=xdg-data/flatpak/overrides:ro

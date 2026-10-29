@@ -87,7 +87,7 @@ pub const OKULAR: ClientApp = ClientApp {
 pub const PJEOFFICE: ClientApp = ClientApp {
     id: "br.jus.cnj.PJeOfficePro",
     name: "PJeOffice Pro",
-    icon: "emblem-ok-symbolic",
+    icon: "document-edit-symbolic",
     setup: Setup::None,
 };
 

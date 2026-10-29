@@ -79,6 +79,7 @@ A supervisão roda no serviço, com ou sem janela (`supervise` em `src/ui.rs`, `
 | `--filesystem=xdg-config/pkcs11:create` | Gravar os `tessera-*.module`; nenhum outro arquivo é tocado |
 | `--filesystem=xdg-run/p11-kit/pkcs11` | Conferir se os aplicativos veem os tokens do Tessera pelo servidor do sistema (veja [Aplicativos](aplicativos.md)) |
 | `--filesystem=xdg-data/flatpak/overrides:ro` | Mostrar se o passo 1 de cada aplicativo já foi feito |
+| `--filesystem=xdg-data/flatpak/exports/share/icons:ro`, `xdg-data/flatpak/app:ro` e os mesmos em `/var/lib/flatpak` | Mostrar cada aplicativo com o próprio ícone. Os ícones exportados são links para a pasta de cada aplicativo em `app/`, por isso ela também é necessária, só para leitura |
 | `--filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create`, `~/.var/app/org.kde.okular/config/mozilla:create` | O banco NSS próprio do Papers e do Okular |
 | `--filesystem=~/.var/app/org.mozilla.firefox/config/mozilla/firefox` e `.../.mozilla/firefox` | Registrar o módulo nos perfis do Firefox |
 | `--filesystem=~/.pki/nssdb` e, para o Chromium, o Brave, o Chrome e o Edge, `~/.var/app/<navegador>/data/pki/nssdb` e `~/.var/app/<navegador>/.pki/nssdb` | Registrar o módulo no banco NSS dos navegadores baseados no Chromium (o novo, desde o Chromium 146, e o antigo) |

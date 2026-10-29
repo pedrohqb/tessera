@@ -170,6 +170,39 @@ fn plain_row(title: &str, subtitle: &str, icon: &str) -> adw::ActionRow {
     row
 }
 
+/// The app's own icon, from the icons Flatpak exports to the desktop (see
+/// the manifest), or a generic one when the app is not installed.
+fn app_icon(app: &ClientApp) -> gtk::Image {
+    let theme = gtk::gdk::Display::default().map(|d| gtk::IconTheme::for_display(&d));
+    let name = match theme {
+        Some(theme) if theme.has_icon(app.id) => app.id,
+        _ => app.icon,
+    };
+    let image = gtk::Image::from_icon_name(name);
+    // The same width either way, so the titles line up.
+    image.set_size_request(32, 32);
+    if name == app.id {
+        image.set_pixel_size(32);
+    }
+    image
+}
+
+/// Let the icon theme find the icons of the installed Flatpak apps.
+fn add_exported_icons() {
+    let Some(display) = gtk::gdk::Display::default() else {
+        return;
+    };
+    let theme = gtk::IconTheme::for_display(&display);
+    for dir in [
+        paths::home().join(".local/share/flatpak/exports/share/icons"),
+        std::path::PathBuf::from("/var/lib/flatpak/exports/share/icons"),
+    ] {
+        if dir.is_dir() {
+            theme.add_search_path(dir);
+        }
+    }
+}
+
 fn status_page_row(title: &str, subtitle: &str) -> adw::ActionRow {
     let row = plain_row(title, subtitle, "");
     row.add_css_class("dim-label");
@@ -724,7 +757,7 @@ fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> adw::ExpanderRow {
         .title(app.name)
         .subtitle(app_subtitle(app))
         .build();
-    row.add_prefix(&gtk::Image::from_icon_name(app.icon));
+    row.add_prefix(&app_icon(app));
 
     let cmd = apps::override_command(app);
     let step1 = adw::ActionRow::builder()
@@ -787,13 +820,15 @@ fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
     let pje = plain_row(
         apps::PJEOFFICE.name,
         t("Works once the system connection is on (no setup needed)"),
-        apps::PJEOFFICE.icon,
+        "",
     );
+    pje.add_prefix(&app_icon(&apps::PJEOFFICE));
     group.add(&pje);
     group
 }
 
 fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
+    add_exported_icons();
     let header = adw::HeaderBar::new();
     let menu = gio::Menu::new();
     menu.append(
