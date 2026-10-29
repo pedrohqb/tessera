@@ -32,13 +32,13 @@
 Todas rodam dentro do sandbox do Tessera: `flatpak run --command=tessera io.github.pedrohqb.Tessera <comando>`.
 
 - **`status`:** drivers (servindo, parado, arquivos ausentes), leitores, tokens e certificados.
-- **`probe-module MÓDULO`:** carrega um driver **direto**, sem o p11-kit, e relata cada passo: inicialização (com e sem `CKF_OS_LOCKING_OK`), informações da biblioteca, slots, tokens e mecanismos. Foi o que mostrou que o SerproID funcionava direto, mas não pelo p11-kit.
+- **`probe-module MÓDULO`:** carrega um driver **direto**, sem o p11-kit, e relata cada passo: inicialização (com `CKF_OS_LOCKING_OK` e, se falhar, sem), informações da biblioteca, slots, tokens e mecanismos. Foi o que mostrou que o SerproID funcionava direto, mas não pelo p11-kit.
 - **`probe-sign MÓDULO`:** acha uma chave privada e assina um resumo SHA-256 fixo com `CKM_RSA_PKCS` e com `CKM_RSA_PKCS_PSS`. `TESSERA_PIN=…` faz o login; `TESSERA_MECH=PSS` limita aos mecanismos com esse texto no nome. Para usá-lo pelo p11-kit, passe o `p11-kit-client.so` como módulo e `P11_KIT_SERVER_ADDRESS=unix:path=$XDG_RUNTIME_DIR/tessera/<driver>`. Ele usa a biblioteca `cryptoki`, que pede o tamanho antes de assinar. Com o SerproID, isso leva ao caminho que devolve PKCS#1 v1.5 (veja [Drivers](drivers.md#serproid)). Para imitar um navegador, use o `sign-test.py`.
 - **`list-tokens`:** o que a janela usa para listar os tokens de um driver; lê `P11_KIT_SERVER_ADDRESS`.
 
 ### Registrador de chamadas
 
-Com `TESSERA_REMOTE_TRACE=1` no ambiente do servidor de um driver, o `tessera remote` anota no log do driver cada chamada PKCS#11 que chega a ele: argumentos (mecanismos, parâmetros, modelos de atributos, dados), resultado e duração. Exemplo de um servidor iniciado à mão, dentro do sandbox:
+Com `TESSERA_REMOTE_TRACE=1` no ambiente do servidor de um driver, o `tessera remote` anota no log do driver cada chamada PKCS#11 que chega a ele (menos `C_GenerateKeyPair` e `C_UnwrapKey`, que têm oito argumentos): argumentos (mecanismos, parâmetros, modelos de atributos, dados), resultado e duração. Exemplo de um servidor iniciado à mão, dentro do sandbox:
 
 ```sh
 flatpak run --command=sh io.github.pedrohqb.Tessera -c '
@@ -86,7 +86,7 @@ flatpak run --command=env io.github.pedrohqb.Tessera \
 
 | Opção | O que muda |
 |---|---|
-| `fixed` / `random` | cada palavra é uma assinatura: o mesmo resumo de sempre, ou bytes aleatórios |
+| `fixed` / `random` | cada palavra é uma assinatura: o mesmo resumo de sempre, ou bytes aleatórios (sem nenhuma, uma `random`) |
 | `rw` | sessão de leitura e escrita |
 | `len` | pergunta o tamanho antes (`C_Sign` sem buffer), como a `cryptoki` |
 | `oslock` | inicializa com `CKF_OS_LOCKING_OK`, como o p11-kit |
@@ -94,7 +94,7 @@ flatpak run --command=env io.github.pedrohqb.Tessera \
 | `reinit` | `C_Initialize`, `C_Finalize`, `C_Initialize` antes |
 | `mimic` | faz antes as chamadas que o `p11-kit-server` faz numa conexão |
 | `clobber` | apaga os parâmetros do PSS logo depois do `C_SignInit` (mostra o defeito do SerproID) |
-| `PIN=…` | faz login antes (o SerproID não precisa) |
+| variável de ambiente `PIN=…` | faz login antes (o SerproID não precisa); como argumento, viraria o prefixo do rótulo |
 | um texto | escolhe o token cujo rótulo começa com ele (padrão: `SerproID`) |
 
 ## Ferramentas externas usadas na investigação

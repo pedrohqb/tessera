@@ -112,7 +112,7 @@ tessera status              print drivers, readers and tokens
 tessera nss-setup DIR       register p11-kit-client.so in the NSS database DIR
 ```
 
-For development, these environment variables override the defaults: `TESSERA_DRIVERS_PATH` (driver directories, separated by `:`), `TESSERA_SOCKET_DIR`, `TESSERA_HOST_MODULES`, `TESSERA_P11KIT_SERVER` (p11-kit's `p11-kit-server` helper) and `TESSERA_CLIENT_MODULE`.
+For development, these environment variables override the defaults: `TESSERA_DRIVERS_PATH` (driver directories, separated by `:`), `TESSERA_SOCKET_DIR`, `TESSERA_HOST_MODULES`, `TESSERA_P11KIT_SERVER` (p11-kit's `p11-kit-server` helper) and `TESSERA_CLIENT_MODULE` (the client module `status` and `list-tokens` load).
 
 ## Building
 
@@ -126,7 +126,7 @@ cargo build
 TESSERA_DRIVERS_PATH=/path/to/drivers cargo run
 ```
 
-Every push builds a test build in GitHub Actions: `tessera-repo.tar.gz`, a small Flatpak repository. A single-file `.flatpak` bundle can't carry the drivers' extra-data, which is why it isn't used. To install the test build:
+Every push to `main` builds a test build in GitHub Actions: `tessera-repo.tar.gz`, a small Flatpak repository. A single-file `.flatpak` bundle can't carry the drivers' extra-data, which is why it isn't used. To install the test build:
 
 ```sh
 tar -xzf tessera-repo.tar.gz

@@ -24,7 +24,7 @@ Os sha256 são os mesmos do [distrobox-adv-br](https://github.com/pedrohqb/distr
 - tudo fica em `/app/extra/drivers/<driver>`, e nada é gravado fora dessa pasta;
 - um driver que falha ao desempacotar não interrompe a instalação: aparece na janela como "Arquivos do driver ausentes", e os outros continuam.
 
-Cada driver tem um `driver.toml` em `/app/lib/tessera/drivers/<driver>/`:
+Cada driver tem um `driver.toml` em `/app/lib/tessera/drivers/<driver>/`. Um trecho do do SerproID:
 
 ```toml
 name = "SerproID"
@@ -36,6 +36,9 @@ create_dirs = ["~/.config/serproid/certificados"]        # criadas antes de inic
 
 [env]                                                    # ambiente do servidor do driver
 LD_PRELOAD = "libgcc_s.so.1"
+XDG_CONFIG_HOME = "~/.config"
+SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt"
+SSL_CERT_DIR = "/etc/ssl/certs"
 
 [[tools]]                                                # botões na janela
 name = "SerproID"

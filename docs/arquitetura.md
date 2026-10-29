@@ -56,21 +56,22 @@ O ambiente de cada driver vem do `[env]` do seu `driver.toml` (por exemplo, o `L
 
 A supervisão roda no serviço, com ou sem janela (`supervise` em `src/ui.rs`, `check_drivers` em `src/main.rs`):
 
-- A cada 4 s com a janela aberta, e a cada 16 s com ela fechada, o Tessera lista os tokens de cada driver em funcionamento. Ele faz isso num processo à parte (`tessera list-tokens`), com limite de 10 s, para um driver travado não travar a janela.
-- Os drivers que respondem são publicados no sistema. Os que não respondem deixam de ser publicados e são reiniciados. Depois de 3 vezes seguidas sem resposta, o driver é parado, e o motivo aparece na sua linha da janela. Um driver travado publicado no sistema travaria todos os aplicativos que carregam o p11-kit. Foi o que aconteceu com o SafeNet sem token no primeiro teste no Firefox.
-- Cada (re)início incrementa uma "geração". Uma listagem que começou antes de um reinício é descartada. Antes dessa regra, o resultado vencido desligava o driver que acabara de voltar.
+- A cada 4 s com a janela aberta, a cada 16 s com ela fechada (e a cada 10 s no `tessera serve`), o Tessera lista os tokens de cada driver em funcionamento. Ele faz isso num processo à parte (`tessera list-tokens`), com limite de 10 s, para um driver travado não travar a janela.
+- Os drivers que respondem são publicados no sistema. Os que não respondem em 10 s deixam de ser publicados e são reiniciados; os que respondem com erro só deixam de ser publicados. Depois de 3 vezes seguidas sem resposta, o driver é parado, e o motivo aparece na sua linha da janela. Um driver travado publicado no sistema travaria todos os aplicativos que carregam o p11-kit. Foi o que aconteceu com o SafeNet sem token no primeiro teste no Firefox.
+- Cada (re)início do serviço (abrir, Iniciar/Reiniciar, ligar ou desligar um driver, Sair) incrementa uma "geração". Uma listagem que começou antes é descartada e refeita na hora. Antes dessa regra, o resultado vencido desligava o driver que acabara de voltar.
 - **Sair** para os servidores e apaga os arquivos `tessera-*.module`, para os aplicativos não esperarem por servidores que não existem.
 
 ## Janela, bandeja e segundo plano
 
 - O serviço é um `adw::Application` com uma "hold": continua rodando quando a janela fecha.
-- Com a janela fechada, aparece um ícone na bandeja (StatusNotifierItem, pela biblioteca `ksni`) com o resumo ("Servindo · 2/2 drivers · 2 publicados · 2 tokens"), **Abrir o Tessera** e **Sair**. O GNOME mostra esse ícone com a extensão AppIndicator, que o Bluefin, o Aurora e o Ubuntu já trazem; o KDE mostra sem extensão. O mesmo resumo vai para o portal Background, que o GNOME mostra na lista de aplicativos em segundo plano.
+- Com a janela fechada, aparece um ícone na bandeja (StatusNotifierItem, pela biblioteca `ksni`) com o resumo ("Servindo · 2/2 driver(s) · 2 publicado(s) · 2 token(s)"), **Abrir o Tessera** e **Sair (parar de servir os tokens)**. O GNOME mostra esse ícone com a extensão AppIndicator, que o Bluefin, o Aurora e o Ubuntu já trazem; o KDE mostra sem extensão. O mesmo resumo vai para o portal Background, que o GNOME mostra na lista de aplicativos em segundo plano.
 - `tessera --background` inicia só o serviço. É o comando que o portal Background usa quando o início automático está ligado.
 
 ## Permissões do Flatpak
 
 | Permissão | Para quê |
 |---|---|
+| `--share=ipc`, `--device=dri` | A janela (memória compartilhada do X11, aceleração gráfica) |
 | `--socket=pcsc` | Falar com o `pcscd` do sistema, que é o dono dos leitores USB |
 | `--share=network` | SerproID (nuvem) e verificações de revogação das ferramentas dos fornecedores |
 | `--socket=x11`, `--socket=wayland` | A janela; o X11 completo porque o SerproID (JavaFX) e o Token Administration só desenham por X11 |

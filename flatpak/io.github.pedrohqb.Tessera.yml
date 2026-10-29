@@ -119,7 +119,7 @@ modules:
           - repo
       # Vendor drivers, downloaded from the vendors at install time and
       # checked against these sha256 sums (the same pins as distrobox-adv-br).
-      # Sizes are filled in by scripts/pin-drivers.sh.
+      # Sizes are filled in by scripts/pin-drivers.py.
       # BEGIN DRIVERS
       - type: extra-data
         filename: safesign.deb

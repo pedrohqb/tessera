@@ -16,7 +16,8 @@ src/
   drivers.rs    descoberta e leitura dos driver.toml
   paths.rs      todos os caminhos (com as variáveis de ambiente de desenvolvimento)
   tray.rs       o ícone na bandeja (ksni)
-  settings.rs   ~/.config/tessera/settings.toml (início automático, drivers desligados)
+  settings.rs   $XDG_CONFIG_HOME/tessera/settings.toml, no Flatpak
+                ~/.var/app/io.github.pedrohqb.Tessera/config/tessera/settings.toml
   i18n.rs       tabela de tradução para o português do Brasil
 flatpak/
   io.github.pedrohqb.Tessera.yml   o manifesto (permissões, pcsc-lite, extra-data)
@@ -24,7 +25,8 @@ flatpak/
   drivers/<driver>/driver.toml     a descrição de cada driver
 data/          .desktop, metainfo, ícones (normal e simbólico), captura de tela
 scripts/       pin-drivers.py, install-test-repo.sh, sign-test.py
-tests/fake-driver/   driver PKCS#11 falso que guarda o ponteiro do mecanismo
+tests/fake-driver/   drivers PKCS#11 falsos: um guarda o ponteiro do mecanismo,
+                     outro (slow-slot-list.c) nunca responde a tempo
 tools/         spy.c (espião LD_PRELOAD), gui-test/ (a janela em Xvfb)
 docs/          esta documentação
 ```
@@ -57,7 +59,7 @@ O manifesto usa o runtime `org.gnome.Platform` 51, o Rust da extensão `rust-sta
 | `TESSERA_SOCKET_DIR` | `$XDG_RUNTIME_DIR/tessera` | soquetes dos servidores |
 | `TESSERA_HOST_MODULES` | `~/.config/pkcs11/modules` | onde gravar `tessera-*.module` |
 | `TESSERA_P11KIT_SERVER` | o primeiro que existir de `/usr/libexec/p11-kit/p11-kit-server` e afins | o ajudante do p11-kit |
-| `TESSERA_CLIENT_MODULE` | `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` | o módulo cliente |
+| `TESSERA_CLIENT_MODULE` | `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` | o módulo cliente que `list-tokens` e `status` carregam (o registro nos bancos NSS usa sempre o caminho padrão) |
 | `TESSERA_REMOTE_TRACE` | — | `1`: registrar as chamadas ao driver |
 | `TESSERA_REMOTE_LOAD` | `managed` | `raw`: servir a tabela do próprio driver |
 | `TESSERA_PIN`, `TESSERA_MECH` | — | `probe-sign`: PIN e filtro de mecanismo |
@@ -67,13 +69,13 @@ Para testar fora do Flatpak, use um usuário comum: com root, o p11-kit ignora a
 ## Testes
 
 - **Unitários:** `cargo test`.
-- **O caminho completo com SoftHSM:** inicie um `p11-kit-server` com `P11_KIT_PRIVATEDIR` apontando para um `p11-kit-remote` que execute `target/debug/tessera remote "$@"`, e assine com `scripts/sign-test.py` pelo `p11-kit-client.so` e `P11_KIT_SERVER_ADDRESS`. Com `PIN=1234`, o script faz o login no SoftHSM.
+- **O caminho completo com SoftHSM:** inicie um `p11-kit-server` com `P11_KIT_PRIVATEDIR` apontando para um `p11-kit-remote` que execute `target/debug/tessera remote "$@"`, e assine com `scripts/sign-test.py` pelo `p11-kit-client.so` e `P11_KIT_SERVER_ADDRESS`. Com a variável de ambiente `PIN=1234`, o script faz o login no SoftHSM.
 - **O defeito do SerproID:** `gcc -shared -fPIC -o libfake.so tests/fake-driver/keeps-mechanism-pointer.c` e use-o como `--provider`. Pelo `p11-kit-remote` original, o log do servidor mostra `fake: C_Sign sees … hash=<lixo> -> WRONG`; pelo `tessera remote`, `hash=0x250 … -> OK`.
-- **A janela:** `tools/gui-test/run.sh` abre o Tessera num Xvfb com uma sessão D-Bus própria, um driver SoftHSM de teste e uma bandeja falsa (`fake-watcher.py`, que registra o ícone e o menu). Daí, com `. /tmp/tessera-gui/env.sh`, `xdotool` clica e `import -window root` tira a captura. Foi assim que se testaram os botões, o Reiniciar, as chaves, o fechar e reabrir, a bandeja e o Sair. Um driver que demora de propósito (um `C_GetSlotList` com `sleep(12)`) testa as três tentativas.
+- **A janela:** `tools/gui-test/run.sh` abre o Tessera num Xvfb com uma sessão D-Bus própria, um driver SoftHSM de teste e uma bandeja falsa (`fake-watcher.py`, que registra o ícone e o menu). Daí, com `. /tmp/tessera-gui/env.sh`, `xdotool` clica e `import -window root` tira a captura. Foi assim que se testaram os botões, o Reiniciar, as chaves, o fechar e reabrir, a bandeja e o Sair. O driver `tests/fake-driver/slow-slot-list.c` (um `C_GetSlotList` que leva 12 s), compilado e posto numa pasta com um `driver.toml` em `TESSERA_DRIVERS_PATH`, testa as três tentativas.
 
 ## Integração contínua
 
-`.github/workflows/ci.yml`, a cada envio:
+`.github/workflows/ci.yml`, a cada envio para a `main`, a cada pull request, a cada tag `v*` e quando disparado à mão:
 
 1. **Build and test:** `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`.
 2. **Flatpak bundle:** `pin-drivers.py`, `flatpak-builder` (com as últimas linhas do log numa anotação, se falhar), `flatpak build-update-repo`, e os artefatos `tessera-repo.tar.gz` (repositório de teste com `install-test-repo.sh`) e `tessera-x86_64.tar.gz` (a árvore `/app` inteira, para quem quiser empacotar como extra-data).

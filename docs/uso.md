@@ -13,7 +13,7 @@ Nada mais é instalado no sistema.
 
 ## Instalar a versão de teste
 
-Cada envio para o repositório gera, na integração contínua, o artefato `tessera-x86_64`. Ele contém `tessera-repo.tar.gz`, um pequeno repositório Flatpak. Um pacote `.flatpak` avulso não serve, porque não carrega o extra-data dos drivers: a instalação falha com "Dados extras faltando nos metadados destacados".
+Cada envio para a `main` gera, na integração contínua, o artefato `tessera-x86_64`. Ele contém `tessera-repo.tar.gz`, um pequeno repositório Flatpak. Um pacote `.flatpak` avulso não serve, porque não carrega o extra-data dos drivers: a instalação falha com "Dados extras faltando nos metadados destacados".
 
 ```sh
 mkdir -p ~/Downloads/tessera-teste && cd ~/Downloads/tessera-teste
