@@ -31,22 +31,7 @@ pub fn t(s: &'static str) -> &'static str {
         .unwrap_or(s)
 }
 
-/// The same for text read at run time (the drivers' descriptions).
-pub fn translate(s: &str) -> String {
-    if !portuguese() {
-        return s.to_string();
-    }
-    PT_BR
-        .iter()
-        .find(|(en, _)| *en == s)
-        .map_or_else(|| s.to_string(), |(_, pt)| pt.to_string())
-}
-
 const PT_BR: &[(&str, &str)] = &[
-    // The drivers' descriptions (driver.toml)
-    ("SafeNet eToken 5100/5110 and IDPrime", "SafeNet eToken 5100/5110 e IDPrime"),
-    ("GD Burti and other SafeSign tokens", "GD Burti e outros tokens SafeSign"),
-    ("Cloud certificate; sign in with the SerproID app", "Certificado em nuvem; entre pelo aplicativo SerproID"),
     // Window and menu
     ("Tessera", "Tessera"),
     ("Token hub", "Central de tokens"),
@@ -147,7 +132,7 @@ const PT_BR: &[(&str, &str)] = &[
     ("No answer; trying again", "Sem resposta; tentando de novo"),
     ("of", "de"),
     ("Starting…", "Iniciando…"),
-    ("No answer 3 times in a row (was the token pulled out?). It starts again when a token is inserted, or press Restart.",
-     "Sem resposta 3 vezes seguidas (o token foi retirado?). Volta sozinho quando um token for inserido, ou aperte Reiniciar."),
+    ("No answer 3 times in a row. Press Restart to try again, or switch it off.",
+     "Sem resposta 3 vezes seguidas. Aperte Reiniciar para tentar de novo, ou desligue o driver."),
     ("Could not turn on starting at login", "Não foi possível ativar o início automático"),
 ];

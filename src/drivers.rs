@@ -111,7 +111,7 @@ fn load_one(dir: &Path) -> Result<Driver> {
         id,
         name: d.name,
         vendor: d.vendor,
-        description: crate::i18n::translate(&d.description),
+        description: d.description,
         module: resolve(dir, &d.module),
         tools,
         create_dirs: d.create_dirs,
