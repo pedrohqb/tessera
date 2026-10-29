@@ -45,6 +45,22 @@ pub fn override_command(app_id: &str) -> String {
     format!("flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 {app_id}")
 }
 
+/// Has `flatpak override --user` given this app the p11-kit socket?
+pub fn has_socket_override(app_id: &str) -> bool {
+    let Ok(text) = fs::read_to_string(paths::user_override(app_id)) else {
+        return false;
+    };
+    text.lines()
+        .filter_map(|l| l.trim().strip_prefix("filesystems="))
+        .flat_map(|v| v.split(';'))
+        .any(|f| f.trim() == "xdg-run/p11-kit/pkcs11")
+}
+
+/// Does the host's p11-kit server answer?
+pub fn host_server_answers() -> bool {
+    std::os::unix::net::UnixStream::connect(paths::host_p11kit_socket()).is_ok()
+}
+
 fn host_module_name(id: &str) -> String {
     format!("tessera-{id}.module")
 }

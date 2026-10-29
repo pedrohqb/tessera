@@ -443,10 +443,8 @@ pub fn snapshot(drivers: &[(String, String)]) -> Snapshot {
                 snap.ok.push(id);
             }
             Err(Timeout) => {
-                snap.errors.push(format!(
-                    "{name}: no answer in {} s; stopped",
-                    LIST_TIMEOUT.as_secs()
-                ));
+                // Shown on the driver's own row (see check_drivers).
+                let _ = name;
                 snap.timed_out.push(id);
             }
             Err(Failed(e)) => snap.errors.push(format!("{name}: {e}")),

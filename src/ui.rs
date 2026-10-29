@@ -15,6 +15,7 @@ use crate::paths;
 use crate::server::{Server, State};
 use crate::settings::Settings;
 use crate::status::{self, Readers, Snapshot};
+use crate::tray;
 
 /// State that outlives any window: the server keeps running in the
 /// background when the window is closed.
@@ -25,10 +26,28 @@ struct Hub {
     /// Host module files written (count), or why not.
     host: RefCell<Result<usize, String>>,
     _hold: RefCell<Option<gio::ApplicationHoldGuard>>,
+    /// Bumped by every (re)start: a listing started before it is stale and
+    /// must not stop or publish the new servers.
+    generation: Cell<u64>,
+    health: RefCell<crate::Health>,
+    /// A listing is running.
+    busy: Cell<bool>,
+    /// Tokens seen by the last listing (for the tray and the portal).
+    tokens: Cell<usize>,
+    /// Drivers that answered the last listing (published to the host).
+    published: RefCell<Vec<String>>,
+    /// The open window, if any (dropped when the window is destroyed).
+    win: RefCell<Option<Rc<Win>>>,
+    tray: RefCell<Option<tray::Tray>>,
+    tray_events: async_channel::Sender<tray::Event>,
+    status_sent: RefCell<String>,
 }
 
 impl Hub {
     fn start_server(&self) {
+        self.generation.set(self.generation.get() + 1);
+        self.health.borrow_mut().reset();
+        self.published.borrow_mut().clear();
         let ds = drivers::discover();
         let disabled = self.settings.borrow().disabled_drivers.clone();
         let result = self.server.borrow_mut().start(&ds, &disabled);
@@ -39,6 +58,29 @@ impl Hub {
         // once (see refresh): a driver that hangs would hang every app.
         *self.host.borrow_mut() = apps::write_host_modules(&ds, &[]).map_err(|e| format!("{e:#}"));
         *self.drivers.borrow_mut() = ds;
+    }
+
+    /// Stop serving: servers down and nothing left published on the host
+    /// (module files pointing at stopped servers would only make apps wait).
+    fn shut_down(&self) {
+        self.generation.set(self.generation.get() + 1);
+        self.server.borrow_mut().stop();
+        let _ = apps::write_host_modules(&self.drivers.borrow(), &[]);
+        self.tray.borrow_mut().take();
+    }
+
+    /// One line for the tray and the background-apps list.
+    fn status_text(&self) -> String {
+        let (running, total) = self.server.borrow().counts();
+        let published = self.host.borrow().as_ref().copied().unwrap_or(0);
+        format!(
+            "{} · {running}/{total} {} · {published} {} · {} {}",
+            t("Serving"),
+            t("driver(s)"),
+            t("published"),
+            self.tokens.get(),
+            t("token(s)")
+        )
     }
 
     /// (id, name) of the drivers whose server runs.
@@ -93,8 +135,9 @@ struct Win {
     readers: Section,
     tokens: Section,
     drivers: Section,
+    /// (driver id, its row, the row's own subtitle) for update_drivers.
+    driver_rows: RefCell<Vec<(String, adw::ActionRow, String)>>,
     last: RefCell<String>,
-    busy: Cell<bool>,
 }
 
 impl Win {
@@ -155,16 +198,24 @@ fn update_service(hub: &Hub, win: &Win) {
     } else {
         win.service_row.remove_css_class("error");
     }
+    let server_on = apps::host_server_answers();
     match &*hub.host.borrow() {
-        Ok(n) => {
+        Ok(n) if server_on => {
             win.host_row.set_subtitle(&format!(
-                "{n} {} {} · {} {}",
-                t("module file(s) in"),
+                "{} · {n} {} {}",
+                t("On"),
+                t("driver(s) published in"),
                 paths::host_modules_dir().display(),
-                t("run once in a terminal:"),
-                apps::HOST_SERVER_COMMAND
             ));
             win.host_row.remove_css_class("error");
+        }
+        Ok(_) => {
+            win.host_row.set_subtitle(&format!(
+                "{} {}",
+                t("Off: the apps cannot see the tokens. Run once in a terminal:"),
+                apps::HOST_SERVER_COMMAND
+            ));
+            win.host_row.add_css_class("error");
         }
         Err(e) => {
             win.host_row.set_subtitle(&format!(
@@ -288,29 +339,127 @@ fn apply_snapshot(win: &Win, snap: Snapshot) {
 
 fn refresh(hub: &Rc<Hub>, win: &Rc<Win>) {
     update_service(hub, win);
-    if win.busy.replace(true) {
+    supervise(hub);
+}
+
+/// List the tokens of every running driver, then publish the drivers that
+/// answered and restart (or, in the end, stop) those that did not. Runs with
+/// or without a window: with the window closed, a token inserted later must
+/// still reach the apps.
+fn supervise(hub: &Rc<Hub>) {
+    if hub.busy.replace(true) {
         return;
     }
-    let win = win.clone();
-    let hub = hub.clone();
+    let generation = hub.generation.get();
     let running = hub.running();
+    let hub = hub.clone();
     glib::spawn_future_local(async move {
         let snap = gio::spawn_blocking(move || status::snapshot(&running)).await;
-        win.busy.set(false);
-        if let Ok(snap) = snap {
-            let host = {
-                let ds = hub.drivers.borrow();
-                crate::check_drivers(&mut hub.server.borrow_mut(), &ds, &snap)
-            };
-            *hub.host.borrow_mut() = host;
+        hub.busy.set(false);
+        let Ok(snap) = snap else { return };
+        if generation != hub.generation.get() {
+            // The servers were restarted while this listing ran: its
+            // timeouts are about servers that no longer exist.
+            supervise(&hub);
+            return;
+        }
+        let host = {
+            let ds = hub.drivers.borrow();
+            crate::check_drivers(
+                &mut hub.server.borrow_mut(),
+                &ds,
+                &snap,
+                &mut hub.health.borrow_mut(),
+            )
+        };
+        *hub.host.borrow_mut() = host;
+        hub.tokens.set(snap.tokens.len());
+        *hub.published.borrow_mut() = snap.ok.clone();
+        update_status(&hub);
+        let win = hub.win.borrow().clone();
+        if let Some(win) = win {
             update_service(&hub, &win);
+            update_drivers(&hub, &win);
             apply_snapshot(&win, snap);
         }
     });
 }
 
+/// Keep the tray icon and the background-apps status in step.
+fn update_status(hub: &Rc<Hub>) {
+    let text = hub.status_text();
+    let visible = hub
+        .win
+        .borrow()
+        .as_ref()
+        .is_some_and(|w| w.window.is_visible());
+    {
+        let mut tray = hub.tray.borrow_mut();
+        if visible {
+            tray.take();
+        } else if let Some(t) = tray.as_ref() {
+            t.set_status(&text);
+        } else {
+            *tray = tray::Tray::show(text.clone(), tray::icon_pixmaps(), hub.tray_events.clone());
+        }
+    }
+    if *hub.status_sent.borrow() != text {
+        *hub.status_sent.borrow_mut() = text.clone();
+        glib::spawn_future_local(async move {
+            // GNOME lists background apps with this line; older portals
+            // lack SetStatus, which is fine.
+            if let Ok(proxy) = ashpd::desktop::background::BackgroundProxy::new().await {
+                let opts = ashpd::desktop::background::SetStatusOptions::default()
+                    .set_message(&text.chars().take(96).collect::<String>());
+                let _ = proxy.set_status(opts).await;
+            }
+        });
+    }
+}
+
+/// Each driver row says whether apps can use it, and why not.
+fn update_drivers(hub: &Hub, win: &Win) {
+    let disabled = hub.settings.borrow().disabled_drivers.clone();
+    let running = hub.server.borrow().running();
+    for (id, row, base) in win.driver_rows.borrow().iter() {
+        let strikes = hub.health.borrow().strikes(id);
+        let (state, bad) = if disabled.contains(id) {
+            (t("Switched off").to_string(), false)
+        } else if let Some(why) = hub.server.borrow().failure_of(id) {
+            (format!("{}: {why}", t("Stopped")), true)
+        } else if hub.published.borrow().contains(id) {
+            (t("Published: the apps can use it").to_string(), false)
+        } else if strikes > 0 && running.contains(id) {
+            (
+                format!(
+                    "{} ({strikes} {} {})",
+                    t("No answer; trying again"),
+                    t("of"),
+                    crate::MAX_STRIKES
+                ),
+                true,
+            )
+        } else if running.contains(id) {
+            (t("Starting…").to_string(), false)
+        } else {
+            (String::new(), false)
+        };
+        row.set_subtitle(&match (base.is_empty(), state.is_empty()) {
+            (true, _) => state,
+            (false, true) => base.clone(),
+            (false, false) => format!("{base}\n{state}"),
+        });
+        if bad {
+            row.add_css_class("warning");
+        } else {
+            row.remove_css_class("warning");
+        }
+    }
+}
+
 fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     win.drivers.clear();
+    win.driver_rows.borrow_mut().clear();
     let ds = hub.drivers.borrow();
     if ds.is_empty() {
         win.drivers
@@ -390,76 +539,100 @@ fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
         }
         row.add_suffix(&switch);
         win.drivers.add(&row);
+        if d.available() {
+            win.driver_rows
+                .borrow_mut()
+                .push((d.id.clone(), row.clone(), subtitle.clone()));
+        }
     }
+    drop(ds);
+    update_drivers(hub, win);
 }
 
 /// Which NSS database, if any, also needs the proxy module.
 #[derive(Clone, Copy)]
 enum NssTarget {
-    /// Ask the user for a Firefox profile folder.
-    FirefoxProfile,
+    /// Every profile of the Firefox Flatpak.
+    Firefox,
     /// The database Tessera keeps for Papers.
     Papers,
 }
 
-fn nss_toast(
-    win: &Win,
-    res: Result<anyhow::Result<nss::Outcome>, Box<dyn std::any::Any + Send>>,
-    done: &str,
-) {
-    match res {
-        Ok(Ok(_)) => win.toast(done),
-        Ok(Err(e)) => win.toast(&format!("{}: {e:#}", t("Could not set up"))),
-        Err(_) => win.toast(t("Could not set up")),
+/// Is this app ready: (has the p11-kit socket, its NSS database is set).
+fn app_state(app: &apps::ClientApp, target: NssTarget) -> (bool, bool) {
+    let socket = apps::has_socket_override(app.id);
+    let nss = match target {
+        NssTarget::Papers => nss::papers_ready(&paths::papers_nss_dir()),
+        NssTarget::Firefox => {
+            let profiles = paths::firefox_profiles();
+            !profiles.is_empty() && profiles.iter().all(|p| nss::has_module(p))
+        }
+    };
+    (socket, nss)
+}
+
+fn app_subtitle(app: &apps::ClientApp, target: NssTarget) -> String {
+    let state = match app_state(app, target) {
+        (true, true) => t("Ready"),
+        (false, true) => t("Step 1 missing"),
+        (true, false) => t("Step 2 missing"),
+        (false, false) => t("Not set up"),
+    };
+    format!("{} · {state}", app.id)
+}
+
+/// The NSS work of step 2, in a child process. Returns a line for the user.
+fn set_up_nss(target: NssTarget) -> Result<String, String> {
+    match target {
+        NssTarget::Papers => nss::set_up_papers(&paths::papers_nss_dir())
+            .map(|_| t("Papers is set up").to_string())
+            .map_err(|e| format!("{e:#}")),
+        NssTarget::Firefox => {
+            let profiles = paths::firefox_profiles();
+            if profiles.is_empty() {
+                return Err(
+                    t("No Firefox profile found: open Firefox once, then try again").into(),
+                );
+            }
+            if profiles.iter().any(|p| nss::profile_in_use(p)) {
+                return Err(t("Close Firefox first, then try again").into());
+            }
+            for p in &profiles {
+                nss::add_module(p).map_err(|e| format!("{}: {e:#}", p.display()))?;
+            }
+            Ok(format!("{} ({})", t("Firefox is set up"), profiles.len()))
+        }
     }
 }
 
 fn set_up_app(
     win: &Rc<Win>,
-    app_id: &'static str,
-    nss_target: NssTarget,
+    app: &'static apps::ClientApp,
+    target: NssTarget,
     status: adw::ExpanderRow,
+    step1: adw::ActionRow,
 ) {
-    // Registering the client module needs no running driver: the database
-    // only names p11-kit-client.so.
-    status.set_subtitle(&format!("{app_id} · {}", t("Configured")));
-    match nss_target {
-        NssTarget::Papers => {
-            let win = win.clone();
-            glib::spawn_future_local(async move {
-                let res =
-                    gio::spawn_blocking(|| nss::set_up_papers(&paths::papers_nss_dir())).await;
-                nss_toast(&win, res, t("Papers is set up"));
-            });
+    // Registering the client module needs no running driver.
+    let win = win.clone();
+    glib::spawn_future_local(async move {
+        let res = gio::spawn_blocking(move || set_up_nss(target)).await;
+        match res {
+            Ok(Ok(done)) => win.toast(&done),
+            Ok(Err(e)) => win.toast(&format!("{}: {e}", t("Could not set up"))),
+            Err(_) => win.toast(t("Could not set up")),
         }
-        NssTarget::FirefoxProfile => {
-            let dialog = gtk::FileDialog::builder()
-                .title(t("Choose the Firefox profile folder"))
-                .modal(true)
-                .build();
-            if let Some(root) = paths::firefox_profile_roots()
-                .into_iter()
-                .find(|p| p.is_dir())
-            {
-                dialog.set_initial_folder(Some(&gio::File::for_path(root)));
-            }
-            let w = Rc::downgrade(win);
-            dialog.select_folder(Some(&win.window), gio::Cancellable::NONE, move |res| {
-                let Some(win) = w.upgrade() else { return };
-                let Some(dir) = res.ok().and_then(|f| f.path()) else {
-                    win.toast(t("Load the module by hand in Firefox (see below)"));
-                    return;
-                };
-                if nss::profile_in_use(&dir) {
-                    win.toast(t("Close Firefox first, then try again"));
-                    return;
-                }
-                glib::spawn_future_local(async move {
-                    let res = gio::spawn_blocking(move || nss::add_module(&dir)).await;
-                    nss_toast(&win, res, t("Firefox profile is set up"));
-                });
-            });
-        }
+        status.set_subtitle(&app_subtitle(app, target));
+        step1_state(&step1, app);
+    });
+}
+
+fn step1_state(row: &adw::ActionRow, app: &apps::ClientApp) {
+    if apps::has_socket_override(app.id) {
+        row.set_title(t("1. The app may reach the system's p11-kit server ✓"));
+    } else {
+        row.set_title(t(
+            "1. Let the app reach the system's p11-kit server (run once in a terminal, then restart the app)",
+        ));
     }
 }
 
@@ -467,39 +640,33 @@ fn client_row(
     win: &Rc<Win>,
     app: &'static apps::ClientApp,
     icon: &str,
-    nss_target: NssTarget,
+    target: NssTarget,
 ) -> adw::ExpanderRow {
-    let state =
-        if matches!(nss_target, NssTarget::Papers) && nss::papers_ready(&paths::papers_nss_dir()) {
-            t("Configured")
-        } else {
-            t("Not set up")
-        };
     let row = adw::ExpanderRow::builder()
         .use_markup(false)
         .title(app.name)
-        .subtitle(format!("{} · {state}", app.id))
+        .subtitle(app_subtitle(app, target))
         .build();
     row.add_prefix(&gtk::Image::from_icon_name(icon));
 
     let cmd = apps::override_command(app.id);
     let step1 = adw::ActionRow::builder()
         .use_markup(false)
-        .title(t(
-            "1. Let the app reach the system's p11-kit server (run once in a terminal)",
-        ))
         .subtitle(&cmd)
         .subtitle_selectable(true)
         .build();
+    step1_state(&step1, app);
     step1.add_suffix(&copy_button(win, cmd));
     row.add_row(&step1);
 
     let step2 = adw::ActionRow::builder()
         .use_markup(false)
         .title(t("2. Set up the app"))
-        .subtitle(match nss_target {
-            NssTarget::FirefoxProfile => t("Close Firefox, then choose its profile folder"),
-            NssTarget::Papers => t("Papers will find the token's certificates when signing"),
+        .subtitle(match target {
+            NssTarget::Firefox => {
+                t("Close Firefox first: adds the module to every Firefox profile")
+            }
+            NssTarget::Papers => t("Makes the certificate database Papers reads when signing"),
         })
         .build();
     let button = gtk::Button::builder()
@@ -507,17 +674,17 @@ fn client_row(
         .valign(gtk::Align::Center)
         .build();
     {
-        let (w, status) = (Rc::downgrade(win), row.clone());
+        let (w, status, s1) = (Rc::downgrade(win), row.clone(), step1.clone());
         button.connect_clicked(move |_| {
             if let Some(win) = w.upgrade() {
-                set_up_app(&win, app.id, nss_target, status.clone());
+                set_up_app(&win, app, target, status.clone(), s1.clone());
             }
         });
     }
     step2.add_suffix(&button);
     row.add_row(&step2);
 
-    if matches!(nss_target, NssTarget::FirefoxProfile) {
+    if matches!(target, NssTarget::Firefox) {
         let manual = adw::ActionRow::builder()
             .use_markup(false)
             .title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"))
@@ -538,7 +705,7 @@ fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
         win,
         &apps::FIREFOX,
         "web-browser-symbolic",
-        NssTarget::FirefoxProfile,
+        NssTarget::Firefox,
     ));
     group.add(&client_row(
         win,
@@ -615,8 +782,8 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         readers: Section::new(t("Readers"), None),
         tokens: Section::new(t("Tokens"), None),
         drivers: Section::new(t("Drivers"), None),
+        driver_rows: RefCell::new(vec![]),
         last: RefCell::new(String::new()),
-        busy: Cell::new(false),
     });
     win.host_row
         .add_suffix(&copy_button(&win, apps::HOST_SERVER_COMMAND.to_string()));
@@ -652,18 +819,51 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         });
     }
 
+    *hub.win.borrow_mut() = Some(win.clone());
+    {
+        // Closing the window leaves the service running: forget the window
+        // (a closed window cannot be shown again) and show the tray at once.
+        let hub = hub.clone();
+        win.window.connect_close_request(move |_| {
+            hub.win.borrow_mut().take();
+            let hub = hub.clone();
+            glib::idle_add_local_once(move || update_status(&hub));
+            glib::Propagation::Proceed
+        });
+    }
+    {
+        let hub = hub.clone();
+        win.window.connect_show(move |_| update_status(&hub));
+    }
     fill_drivers(hub, &win);
     refresh(hub, &win);
-    let (hub2, w) = (hub.clone(), Rc::downgrade(&win));
-    glib::timeout_add_local(Duration::from_secs(3), move || match w.upgrade() {
-        Some(win) if win.window.is_visible() => {
-            refresh(&hub2, &win);
-            glib::ControlFlow::Continue
-        }
-        Some(_) => glib::ControlFlow::Continue,
-        None => glib::ControlFlow::Break,
-    });
     win
+}
+
+/// Open the window, or bring it to the front.
+fn present(app: &adw::Application, hub: &Rc<Hub>) {
+    let existing = hub.win.borrow().clone();
+    match existing {
+        Some(win) => win.window.present(),
+        None => build_window(app, hub).window.present(),
+    }
+}
+
+/// Checks run every few seconds with the window open, and less often
+/// without it (still often enough to publish a token inserted meanwhile).
+fn start_supervision(hub: &Rc<Hub>) {
+    let hub = hub.clone();
+    let tick = Cell::new(0u32);
+    glib::timeout_add_local(Duration::from_secs(4), move || {
+        tick.set(tick.get().wrapping_add(1));
+        let win = hub.win.borrow().clone();
+        match win {
+            Some(win) if win.window.is_visible() => refresh(&hub, &win),
+            _ if tick.get() % 4 == 0 => supervise(&hub),
+            _ => {}
+        }
+        glib::ControlFlow::Continue
+    });
 }
 
 async fn request_background(autostart: bool) -> ashpd::Result<bool> {
@@ -742,7 +942,7 @@ fn setup_actions(app: &adw::Application, hub: &Rc<Hub>) {
     {
         let (hub, app2) = (hub.clone(), app.clone());
         quit.connect_activate(move |_, _| {
-            hub.server.borrow_mut().stop();
+            hub.shut_down();
             hub._hold.borrow_mut().take();
             app2.quit();
         });
@@ -770,15 +970,38 @@ pub fn run() -> ExitCode {
     {
         let hub = hub.clone();
         app.connect_startup(move |app| {
+            let (tx, rx) = async_channel::unbounded();
             let h = Rc::new(Hub {
                 server: RefCell::new(Server::new()),
                 drivers: RefCell::new(vec![]),
                 settings: RefCell::new(Settings::load()),
                 host: RefCell::new(Ok(0)),
                 _hold: RefCell::new(Some(app.hold())),
+                generation: Cell::new(0),
+                health: RefCell::new(crate::Health::default()),
+                busy: Cell::new(false),
+                tokens: Cell::new(0),
+                published: RefCell::new(vec![]),
+                win: RefCell::new(None),
+                tray: RefCell::new(None),
+                tray_events: tx,
+                status_sent: RefCell::new(String::new()),
             });
             h.start_server();
             setup_actions(app, &h);
+            start_supervision(&h);
+            supervise(&h);
+            {
+                let (h, app) = (h.clone(), app.clone());
+                glib::spawn_future_local(async move {
+                    while let Ok(ev) = rx.recv().await {
+                        match ev {
+                            tray::Event::Open => present(&app, &h),
+                            tray::Event::Quit => app.activate_action("quit", None),
+                        }
+                    }
+                });
+            }
             *hub.borrow_mut() = Some(h);
         });
     }
@@ -790,10 +1013,7 @@ pub fn run() -> ExitCode {
                 return glib::ExitCode::FAILURE;
             };
             if !background {
-                match app.active_window() {
-                    Some(w) => w.present(),
-                    None => build_window(app, &h).window.present(),
-                }
+                present(app, &h);
             }
             glib::ExitCode::SUCCESS
         });
@@ -802,7 +1022,7 @@ pub fn run() -> ExitCode {
         let hub = hub.clone();
         app.connect_shutdown(move |_| {
             if let Some(h) = hub.borrow().as_ref() {
-                h.server.borrow_mut().stop();
+                h.shut_down();
             }
         });
     }

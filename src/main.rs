@@ -24,6 +24,7 @@ mod settings;
 mod stable;
 mod status;
 mod trace;
+mod tray;
 mod ui;
 
 use std::path::PathBuf;
@@ -95,15 +96,52 @@ fn print_status() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Publish to the host only the drivers that answered; stop the ones that
-/// hang. Shared by `serve` and the window.
+/// Consecutive listings without an answer before a driver is stopped.
+pub const MAX_STRIKES: u32 = 3;
+
+/// What the supervision remembers between two checks.
+#[derive(Default)]
+pub struct Health {
+    strikes: std::collections::HashMap<String, u32>,
+}
+
+impl Health {
+    pub fn reset(&mut self) {
+        self.strikes.clear();
+    }
+
+    /// Listings in a row without an answer from this driver.
+    pub fn strikes(&self, id: &str) -> u32 {
+        self.strikes.get(id).copied().unwrap_or(0)
+    }
+}
+
+/// After a listing: publish to the host the drivers that answered; restart
+/// one that did not, and stop it after MAX_STRIKES listings in a row (a
+/// driver that hangs would hang every app that loads it). Shared by `serve`
+/// and the window.
 pub fn check_drivers(
     srv: &mut server::Server,
     ds: &[drivers::Driver],
     snap: &status::Snapshot,
+    health: &mut Health,
 ) -> Result<usize, String> {
+    for id in &snap.ok {
+        health.strikes.remove(id);
+    }
     for id in &snap.timed_out {
-        srv.stop_driver(id, "no answer; stopped (switch it off if you don't use it)");
+        let n = health.strikes.entry(id.clone()).or_insert(0);
+        *n += 1;
+        if *n >= MAX_STRIKES {
+            srv.stop_driver(
+                id,
+                i18n::t(
+                    "No answer 3 times in a row. Press Restart to try again, or switch it off.",
+                ),
+            );
+        } else if let Some(d) = ds.iter().find(|d| &d.id == id) {
+            srv.restart_driver(d);
+        }
     }
     apps::write_host_modules(ds, &snap.ok).map_err(|e| format!("{e:#}"))
 }
@@ -127,6 +165,7 @@ fn serve() -> ExitCode {
     let _ = apps::write_host_modules(&ds, &[]);
     eprintln!("tessera: serving in {}", paths::socket_dir().display());
     let mut last = usize::MAX;
+    let mut health = Health::default();
     loop {
         let running: Vec<(String, String)> = ds
             .iter()
@@ -137,7 +176,13 @@ fn serve() -> ExitCode {
         for e in &snap.errors {
             eprintln!("tessera: {e}");
         }
-        match check_drivers(&mut srv, &ds, &snap) {
+        for id in &snap.timed_out {
+            eprintln!(
+                "tessera: {id}: no answer ({} of {MAX_STRIKES})",
+                health.strikes(id) + 1
+            );
+        }
+        match check_drivers(&mut srv, &ds, &snap, &mut health) {
             Ok(n) if n != last => {
                 eprintln!(
                     "tessera: {n} driver(s) published in {}",

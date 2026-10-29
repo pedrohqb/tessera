@@ -28,6 +28,18 @@ finish-args:
   # The small NSS database Tessera sets up for Papers, which poppler finds
   # first (see paths.rs). Nothing else of Papers is visible.
   - --filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create
+  # The Firefox Flatpak's profiles (Firefox 147+ keeps them under config/,
+  # older releases under .mozilla/), so "Set up" can register the module in
+  # each profile's NSS database. Only pkcs11.txt changes.
+  - --filesystem=~/.var/app/org.mozilla.firefox/config/mozilla/firefox
+  - --filesystem=~/.var/app/org.mozilla.firefox/.mozilla/firefox
+  # Read-only: whether `flatpak override --user` already gave an app the
+  # p11-kit socket, to show it in the window.
+  - --filesystem=xdg-data/flatpak/overrides:ro
+  # The host's p11-kit server socket, only to show whether it is on.
+  - --filesystem=xdg-run/p11-kit/pkcs11
+  # The tray icon (StatusNotifierItem).
+  - --talk-name=org.kde.StatusNotifierWatcher
   # SerproID keeps its certificate list in ~/.config/serproid; keep it inside
   # Tessera's own data instead of the host home.
   - --persist=.config/serproid

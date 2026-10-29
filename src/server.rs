@@ -183,6 +183,14 @@ impl Server {
         Ok(())
     }
 
+    /// Number of drivers whose server runs, and of those switched on.
+    pub fn counts(&self) -> (usize, usize) {
+        (
+            self.instances.iter().filter(|i| i.child.is_some()).count(),
+            self.instances.len(),
+        )
+    }
+
     pub fn stop(&mut self) {
         for inst in self.instances.drain(..) {
             if let Some(child) = inst.child {
@@ -201,6 +209,23 @@ impl Server {
                 let _ = fs::remove_file(paths::driver_socket(&inst.id));
             }
             inst.failure = Some(reason.to_string());
+        }
+    }
+
+    /// Start one driver's server again (after it stopped answering once).
+    pub fn restart_driver(&mut self, driver: &Driver) {
+        for inst in self.instances.iter_mut().filter(|i| i.id == driver.id) {
+            if let Some(child) = inst.child.take() {
+                stop_child(child);
+                let _ = fs::remove_file(paths::driver_socket(&inst.id));
+            }
+            match spawn(driver) {
+                Ok(c) => {
+                    inst.child = Some(c);
+                    inst.failure = None;
+                }
+                Err(e) => inst.failure = Some(format!("{e:#}")),
+            }
         }
     }
 
@@ -236,14 +261,23 @@ impl Server {
         if let Some(f) = &self.failure {
             return State::Failed(f.clone());
         }
+        // One driver down is shown on its own row; the service runs as long
+        // as one driver does.
+        if self.instances.iter().any(|i| i.child.is_some()) {
+            return State::Running;
+        }
         if !failures.is_empty() {
             return State::Failed(failures.join("\n"));
         }
-        if self.instances.iter().any(|i| i.child.is_some()) {
-            State::Running
-        } else {
-            State::Stopped
-        }
+        State::Stopped
+    }
+
+    /// Why a driver's server is not running, if it was started and stopped.
+    pub fn failure_of(&self, id: &str) -> Option<String> {
+        self.instances
+            .iter()
+            .find(|i| i.id == id && i.child.is_none())
+            .and_then(|i| i.failure.clone())
     }
 
     /// Ids of the drivers whose server is running.

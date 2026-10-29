@@ -143,7 +143,53 @@ pub fn papers_nss_dir() -> PathBuf {
 pub fn firefox_profile_roots() -> Vec<PathBuf> {
     let base = home().join(".var/app/org.mozilla.firefox");
     vec![
-        base.join(".config/mozilla/firefox"),
+        base.join("config/mozilla/firefox"),
         base.join(".mozilla/firefox"),
     ]
+}
+
+/// The Firefox Flatpak's profile folders, from each root's profiles.ini.
+pub fn firefox_profiles() -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for root in firefox_profile_roots() {
+        let Ok(ini) = std::fs::read_to_string(root.join("profiles.ini")) else {
+            continue;
+        };
+        let (mut path, mut relative) = (None::<String>, true);
+        let mut flush = |path: &mut Option<String>, relative: bool| {
+            if let Some(p) = path.take() {
+                let dir = if relative {
+                    root.join(&p)
+                } else {
+                    PathBuf::from(&p)
+                };
+                if dir.is_dir() && !out.contains(&dir) {
+                    out.push(dir);
+                }
+            }
+        };
+        for line in ini.lines().map(str::trim) {
+            if line.starts_with('[') {
+                flush(&mut path, relative);
+                relative = true;
+            } else if let Some(v) = line.strip_prefix("Path=") {
+                path = Some(v.to_string());
+            } else if let Some(v) = line.strip_prefix("IsRelative=") {
+                relative = v != "0";
+            }
+        }
+        flush(&mut path, relative);
+    }
+    out
+}
+
+/// The host's p11-kit server socket, as `--filesystem=xdg-run/p11-kit/pkcs11`
+/// shows it inside a sandbox.
+pub fn host_p11kit_socket() -> PathBuf {
+    runtime_dir().join("p11-kit/pkcs11")
+}
+
+/// `flatpak override --user` file for an app.
+pub fn user_override(app_id: &str) -> PathBuf {
+    home().join(".local/share/flatpak/overrides").join(app_id)
 }
