@@ -415,16 +415,13 @@ fn nss_toast(
 }
 
 fn set_up_app(
-    hub: &Rc<Hub>,
     win: &Rc<Win>,
     app_id: &'static str,
     nss_target: NssTarget,
     status: adw::ExpanderRow,
 ) {
-    if !matches!(hub.server.borrow_mut().poll(), State::Running) {
-        win.toast(t("Start the token service first"));
-        return;
-    }
+    // Registering the client module needs no running driver: the database
+    // only names p11-kit-client.so.
     status.set_subtitle(&format!("{app_id} · {}", t("Configured")));
     match nss_target {
         NssTarget::Papers => {
@@ -466,7 +463,6 @@ fn set_up_app(
 }
 
 fn client_row(
-    hub: &Rc<Hub>,
     win: &Rc<Win>,
     app: &'static apps::ClientApp,
     icon: &str,
@@ -510,10 +506,10 @@ fn client_row(
         .valign(gtk::Align::Center)
         .build();
     {
-        let (hub, w, status) = (hub.clone(), Rc::downgrade(win), row.clone());
+        let (w, status) = (Rc::downgrade(win), row.clone());
         button.connect_clicked(move |_| {
             if let Some(win) = w.upgrade() {
-                set_up_app(&hub, &win, app.id, nss_target, status.clone());
+                set_up_app(&win, app.id, nss_target, status.clone());
             }
         });
     }
@@ -532,20 +528,18 @@ fn client_row(
     row
 }
 
-fn apps_group(hub: &Rc<Hub>, win: &Rc<Win>) -> adw::PreferencesGroup {
+fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::builder()
         .title(t("Apps"))
         .description(t("Apps that use the tokens through Tessera."))
         .build();
     group.add(&client_row(
-        hub,
         win,
         &apps::FIREFOX,
         "web-browser-symbolic",
         NssTarget::FirefoxProfile,
     ));
     group.add(&client_row(
-        hub,
         win,
         &apps::PAPERS,
         "x-office-document-symbolic",
@@ -628,7 +622,7 @@ fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     page.add(&win.readers.group);
     page.add(&win.tokens.group);
     page.add(&win.drivers.group);
-    page.add(&apps_group(hub, &win));
+    page.add(&apps_group(&win));
 
     let view = adw::ToolbarView::new();
     view.add_top_bar(&header);
