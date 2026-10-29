@@ -427,7 +427,8 @@ fn set_up_app(
         NssTarget::Papers => {
             let win = win.clone();
             glib::spawn_future_local(async move {
-                let res = gio::spawn_blocking(|| nss::add_module(&paths::papers_nss_dir())).await;
+                let res =
+                    gio::spawn_blocking(|| nss::set_up_papers(&paths::papers_nss_dir())).await;
                 nss_toast(&win, res, t("Papers is set up"));
             });
         }
@@ -469,7 +470,7 @@ fn client_row(
     nss_target: NssTarget,
 ) -> adw::ExpanderRow {
     let state =
-        if matches!(nss_target, NssTarget::Papers) && nss::has_module(&paths::papers_nss_dir()) {
+        if matches!(nss_target, NssTarget::Papers) && nss::papers_ready(&paths::papers_nss_dir()) {
             t("Configured")
         } else {
             t("Not set up")

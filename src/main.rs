@@ -11,6 +11,7 @@
 //!   tessera remote ...          (internal) serve one connection for p11-kit server
 //!   tessera list-tokens         (internal) list tokens at P11_KIT_SERVER_ADDRESS
 //!   tessera nss-add-module DIR  (internal) the NSS work of nss-setup
+//!   tessera nss-papers DIR      (internal) make the NSS database for Papers
 
 mod apps;
 mod drivers;
@@ -208,6 +209,19 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("tessera: {e:#}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
+        Some("nss-papers") => {
+            let Some(dir) = args.get(2) else {
+                eprintln!("usage: tessera nss-papers DIR");
+                return ExitCode::FAILURE;
+            };
+            return match nss::set_up_papers_in_process(&PathBuf::from(dir)) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("{e:#}");
                     ExitCode::FAILURE
                 }
             };

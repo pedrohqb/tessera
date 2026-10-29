@@ -90,7 +90,7 @@ Tessera writes and updates the `tessera-*.module` files itself, through its `xdg
 1. ```sh
    flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.gnome.Papers
    ```
-2. In Tessera, press *Set up*. This creates a small NSS database at `~/.var/app/org.gnome.Papers/config/mozilla/firefox/tessera.default`, which is the first place Papers (through poppler) looks for signing certificates.
+2. In Tessera, press *Set up*. This creates an empty NSS database at `~/.var/app/org.gnome.Papers/config/mozilla/firefox/tessera.default`, which is the first place Papers (through poppler) looks for signing certificates. No module is registered in it: when NSS opens a database it loads the root-certificates module by itself, and in the Flatpak runtime that is p11-kit, which reaches the system's p11-kit server through the permission above. (Registering `p11-kit-client.so` as well would show every certificate twice; Tessera removes that entry if an earlier version added it.)
 
 The host's p11-kit server serves the host's trust store as well, so these apps keep the system's certificates.
 

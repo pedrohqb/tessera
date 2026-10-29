@@ -1,5 +1,12 @@
-//! Registering p11-kit-client.so in an NSS database (a Firefox profile, or
-//! the small database Tessera makes for Papers).
+//! Registering p11-kit-client.so in an NSS database (a Firefox profile), and
+//! the small database Tessera makes for Papers.
+//!
+//! Papers needs no module registered: when NSS opens a database it loads
+//! the root-certificates module by itself, and in the Flatpak runtime that
+//! is p11-kit, which reaches the system's p11-kit server once Papers may use
+//! its socket. Registering p11-kit-client.so too made every certificate show
+//! twice. Papers only needs a database of its own, so that poppler does not
+//! fall back to ~/.pki/nssdb (which lists the roots module again).
 //!
 //! NSS is loaded at run time from the runtime's libnss3.so, so Tessera needs
 //! neither NSS headers nor the modutil/certutil tools. The work runs in a
@@ -44,6 +51,67 @@ type NssInitialize =
 type NssShutdown = unsafe extern "C" fn() -> c_int;
 type AddNewModule = unsafe extern "C" fn(*const c_char, *const c_char, c_ulong, c_ulong) -> c_int;
 type PortGetError = unsafe extern "C" fn() -> c_int;
+type DeleteModule = unsafe extern "C" fn(*const c_char, *mut c_int) -> c_int;
+
+/// Is the Papers database there, without the client module?
+pub fn papers_ready(dir: &Path) -> bool {
+    dir.join("cert9.db").exists() && !has_module(dir)
+}
+
+/// Runs in the child process: create the database (or open it) and remove
+/// the client module an older Tessera registered there.
+pub fn set_up_papers_in_process(dir: &Path) -> Result<()> {
+    fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    // SAFETY: as in add_module_in_process (nss.h, secmod.h).
+    unsafe {
+        let lib = Library::new("libnss3.so").context("loading libnss3.so")?;
+        let init: Symbol<NssInitialize> = lib.get(b"NSS_Initialize\0")?;
+        let shutdown: Symbol<NssShutdown> = lib.get(b"NSS_Shutdown\0")?;
+        let delete: Symbol<DeleteModule> = lib.get(b"SECMOD_DeleteModule\0")?;
+        let err: Symbol<PortGetError> = lib.get(b"PORT_GetError\0")?;
+        let config = CString::new(format!("sql:{}", dir.display()))?;
+        let empty = CString::new("")?;
+        let secmod = CString::new("secmod.db")?;
+        if init(
+            config.as_ptr(),
+            empty.as_ptr(),
+            empty.as_ptr(),
+            secmod.as_ptr(),
+            0,
+        ) != 0
+        {
+            bail!("NSS_Initialize failed (NSS error {})", err());
+        }
+        if has_module(dir) {
+            let name = CString::new(paths::NSS_MODULE_NAME)?;
+            let mut kind: c_int = 0;
+            if delete(name.as_ptr(), &mut kind) != 0 {
+                let code = err();
+                shutdown();
+                bail!("SECMOD_DeleteModule failed (NSS error {code})");
+            }
+        }
+        shutdown();
+    }
+    Ok(())
+}
+
+/// Called from the GUI: runs `tessera nss-papers <dir>`.
+pub fn set_up_papers(dir: &Path) -> Result<Outcome> {
+    if papers_ready(dir) {
+        return Ok(Outcome::AlreadyPresent);
+    }
+    let exe = std::env::current_exe().context("finding our own executable")?;
+    let out = Command::new(exe)
+        .arg("nss-papers")
+        .arg(dir)
+        .output()
+        .context("running nss-papers")?;
+    if out.status.success() {
+        return Ok(Outcome::Added);
+    }
+    Err(anyhow!("{}", String::from_utf8_lossy(&out.stderr).trim()))
+}
 
 /// Runs in the child process.
 pub fn add_module_in_process(dir: &Path) -> Result<Outcome> {
