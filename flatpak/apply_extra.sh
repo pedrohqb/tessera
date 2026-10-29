@@ -9,6 +9,9 @@
 # skipped, not fatal: Tessera lists it as "driver files missing" and the
 # others keep working.
 set -u
+# The install environment has no locale; without this every bsdtar call
+# warns "Failed to set default locale".
+export LC_ALL=C
 
 extra_root="${EXTRA_ROOT:-/app/extra}"
 cd "$extra_root" || exit 1
