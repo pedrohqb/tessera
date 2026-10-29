@@ -135,6 +135,56 @@ fn parse_cert(label: String, der: &[u8]) -> Option<Certificate> {
     })
 }
 
+/// `tessera probe-module MODULE`: load a driver directly, without p11-kit,
+/// and report each step, to tell a driver error from a crash.
+pub fn probe_module(module: &str) -> i32 {
+    eprintln!("probe: loading {module}");
+    let ctx = match Pkcs11::new(module) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("probe: load failed: {e}");
+            return 2;
+        }
+    };
+    for (what, flags) in [
+        (
+            "C_Initialize(OS_LOCKING_OK)",
+            CInitializeFlags::OS_LOCKING_OK,
+        ),
+        ("C_Initialize(no flags)", CInitializeFlags::empty()),
+    ] {
+        eprintln!("probe: {what}...");
+        match ctx.initialize(CInitializeArgs::new(flags)) {
+            Ok(()) => {
+                eprintln!("probe: {what} ok");
+                match ctx.get_library_info() {
+                    Ok(i) => eprintln!("probe: library: {i:?}"),
+                    Err(e) => eprintln!("probe: C_GetInfo: {e}"),
+                }
+                match ctx.get_all_slots() {
+                    Ok(slots) => {
+                        eprintln!("probe: {} slot(s)", slots.len());
+                        for s in slots {
+                            match ctx.get_token_info(s) {
+                                Ok(t) => eprintln!(
+                                    "probe:   token {:?} ({})",
+                                    t.label().trim(),
+                                    t.model().trim()
+                                ),
+                                Err(e) => eprintln!("probe:   slot without token: {e}"),
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!("probe: C_GetSlotList: {e}"),
+                }
+                return 0;
+            }
+            Err(e) => eprintln!("probe: {what} failed: {e}"),
+        }
+    }
+    1
+}
+
 /// Runs in the child process: list tokens and their public certificates
 /// through p11-kit-client.so, at P11_KIT_SERVER_ADDRESS.
 pub fn list_tokens_in_process() -> Result<String, String> {

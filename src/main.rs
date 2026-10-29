@@ -164,6 +164,13 @@ fn main() -> ExitCode {
             return print_status();
         }
         Some("serve") => return serve(),
+        Some("probe-module") => {
+            let Some(module) = args.get(2) else {
+                eprintln!("usage: tessera probe-module MODULE");
+                return ExitCode::FAILURE;
+            };
+            return ExitCode::from(status::probe_module(module) as u8);
+        }
         Some("list-tokens") => {
             return match status::list_tokens_in_process() {
                 Ok(text) => {
