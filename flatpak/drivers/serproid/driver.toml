@@ -15,7 +15,10 @@ create_dirs = ["~/.config/serproid/certificados"]
 # The library uses libgcc_s's unwinder (_Unwind_Resume_or_Rethrow) without
 # listing libgcc_s as a dependency; p11-kit-remote, a C program, doesn't
 # load it, so dlopen fails with "undefined symbol". Preload it.
+# It signs only when asked for the signature's length first; NSS asks in
+# one step, so Tessera adds the length query (see src/remote.rs).
 [env]
+TESSERA_SIGN_LENGTH_FIRST = "1"
 LD_PRELOAD = "libgcc_s.so.1"
 XDG_CONFIG_HOME = "~/.config"
 SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt"

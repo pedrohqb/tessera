@@ -6,10 +6,18 @@
 //! Why: some drivers identify the program that loaded them. SerproID sends
 //! it with each signing request, and its server refuses
 //! `/usr/libexec/p11-kit/p11-kit-remote`; with this, the program is Tessera.
+//!
+//! With TESSERA_SIGN_LENGTH_FIRST=1 (set by a driver's `[env]`), every
+//! C_Sign with an output buffer is preceded by a length query, C_Sign with
+//! no buffer. SerproID signs only when asked in those two steps: a single
+//! C_Sign, which is what NSS (Firefox, Papers) sends, makes it push request
+//! after request to the phone, and approving them fails. Inside Firefox the
+//! driver is loaded directly and this never shows; through p11-kit it does.
 
 use libloading::{Library, Symbol};
 use std::ffi::{c_char, c_int, c_void, CString};
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::{fs, os::unix::fs::PermissionsExt};
 
 use crate::paths;
@@ -18,6 +26,70 @@ type ModuleLoad = unsafe extern "C" fn(*const c_char, c_int) -> *mut c_void;
 type ModuleRelease = unsafe extern "C" fn(*mut c_void);
 type ServeTokens =
     unsafe extern "C" fn(*const *const c_char, usize, *mut c_void, c_int, c_int) -> c_int;
+
+type CkUlong = std::ffi::c_ulong;
+type SignFn = unsafe extern "C" fn(CkUlong, *mut u8, CkUlong, *mut u8, *mut CkUlong) -> CkUlong;
+
+const CKR_OK: CkUlong = 0;
+const CKR_BUFFER_TOO_SMALL: CkUlong = 0x150;
+/// Position of C_Sign in CK_FUNCTION_LIST, after CK_VERSION (padded to a
+/// pointer).
+const C_SIGN_INDEX: usize = 43;
+/// Number of functions in CK_FUNCTION_LIST (2.x) and CK_FUNCTION_LIST_3_0.
+const FUNCTIONS_V2: usize = 68;
+const FUNCTIONS_V3: usize = 92;
+
+static DRIVER_SIGN: OnceLock<SignFn> = OnceLock::new();
+
+/// C_Sign that asks the driver for the length first (see the module docs).
+unsafe extern "C" fn sign_length_first(
+    session: CkUlong,
+    data: *mut u8,
+    data_len: CkUlong,
+    signature: *mut u8,
+    signature_len: *mut CkUlong,
+) -> CkUlong {
+    let Some(sign) = DRIVER_SIGN.get() else {
+        return 0x6; // CKR_FUNCTION_FAILED
+    };
+    if !signature.is_null() && !signature_len.is_null() {
+        if std::env::var_os("TESSERA_DEBUG_SIGN").is_some() {
+            eprintln!("tessera remote: length query before C_Sign");
+        }
+        let mut needed: CkUlong = 0;
+        let rv = sign(session, data, data_len, std::ptr::null_mut(), &mut needed);
+        if rv != CKR_OK {
+            return rv;
+        }
+        if needed > *signature_len {
+            *signature_len = needed;
+            return CKR_BUFFER_TOO_SMALL;
+        }
+    }
+    sign(session, data, data_len, signature, signature_len)
+}
+
+/// A copy of the driver's function list with C_Sign replaced. Leaked: it
+/// lives as long as the process.
+unsafe fn with_sign_length_first(module: *mut c_void) -> *mut c_void {
+    let version = *(module as *const u8);
+    let n = if version >= 3 {
+        FUNCTIONS_V3
+    } else {
+        FUNCTIONS_V2
+    };
+    let words = 1 + n; // CK_VERSION padded to one pointer, then functions
+    let mut copy = vec![0usize; words];
+    std::ptr::copy_nonoverlapping(module as *const usize, copy.as_mut_ptr(), words);
+    let slot = 1 + C_SIGN_INDEX;
+    let original = copy[slot];
+    if original == 0 {
+        return module;
+    }
+    let _ = DRIVER_SIGN.set(std::mem::transmute::<usize, SignFn>(original));
+    copy[slot] = sign_length_first as *const () as usize;
+    Box::leak(copy.into_boxed_slice()).as_mut_ptr() as *mut c_void
+}
 
 pub fn run(args: &[String]) -> i32 {
     let mut provider: Option<&str> = None;
@@ -68,12 +140,17 @@ pub fn run(args: &[String]) -> i32 {
             eprintln!("tessera remote: could not load {provider}");
             return 1;
         }
+        let served = if std::env::var("TESSERA_SIGN_LENGTH_FIRST").as_deref() == Ok("1") {
+            with_sign_length_first(module)
+        } else {
+            module
+        };
         let c_tokens: Vec<CString> = tokens
             .iter()
             .filter_map(|t| CString::new(*t).ok())
             .collect();
         let ptrs: Vec<*const c_char> = c_tokens.iter().map(|c| c.as_ptr()).collect();
-        let rv = serve(ptrs.as_ptr(), ptrs.len(), module, 0, 1);
+        let rv = serve(ptrs.as_ptr(), ptrs.len(), served, 0, 1);
         release(module);
         rv
     }
