@@ -18,7 +18,8 @@
 //! ```
 //!
 //! `library_path` is put in LD_LIBRARY_PATH for the process that loads the
-//! module (for libraries the runtime doesn't have).
+//! module (for libraries the runtime doesn't have). `env` sets other
+//! variables for that process; a leading `~/` in a value is the home folder.
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -52,6 +53,8 @@ struct DriverFile {
     create_dirs: Vec<String>,
     #[serde(default)]
     library_path: Vec<String>,
+    #[serde(default)]
+    env: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +67,8 @@ pub struct Driver {
     pub tools: Vec<Tool>,
     pub create_dirs: Vec<String>,
     pub library_path: Vec<PathBuf>,
+    /// Environment for the process that loads the module.
+    pub env: BTreeMap<String, String>,
 }
 
 impl Driver {
@@ -111,6 +116,14 @@ fn load_one(dir: &Path) -> Result<Driver> {
         tools,
         create_dirs: d.create_dirs,
         library_path: d.library_path.iter().map(|p| resolve(dir, p)).collect(),
+        env: d
+            .env
+            .into_iter()
+            .map(|(k, v)| match v.strip_prefix("~/") {
+                Some(rest) => (k, paths::home().join(rest).to_string_lossy().into_owned()),
+                None => (k, v),
+            })
+            .collect(),
     })
 }
 

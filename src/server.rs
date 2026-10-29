@@ -120,6 +120,7 @@ fn spawn(driver: &Driver) -> Result<Child> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(log);
+    cmd.envs(&driver.env);
     if !driver.library_path.is_empty() {
         let mut parts: Vec<PathBuf> = driver.library_path.clone();
         if let Some(old) = std::env::var_os("LD_LIBRARY_PATH") {

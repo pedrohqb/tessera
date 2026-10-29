@@ -5,6 +5,18 @@ module = "/app/extra/drivers/serproid/libserproidp11.so"
 library_path = ["/app/extra/drivers/serproid/usr/lib"]
 create_dirs = ["~/.config/serproid/certificados"]
 
+# The library reads serproid/certificados, serproid/ambiente and writes
+# serproid/serproid.log under the user's configuration folder. The SerproID
+# app keeps them in ~/.config/serproid (persisted by the manifest), but a
+# Flatpak sets XDG_CONFIG_HOME to the app's own config folder: point it back
+# so the library finds what the app downloaded.
+# Its built-in OpenSSL looks for CA certificates in Debian's /usr/lib/ssl,
+# which the runtime doesn't have: point it at the runtime's bundle.
+[env]
+XDG_CONFIG_HOME = "~/.config"
+SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt"
+SSL_CERT_DIR = "/etc/ssl/certs"
+
 [[tools]]
 name = "SerproID"
 exec = ["/app/extra/drivers/serproid/serproid"]
