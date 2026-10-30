@@ -11,6 +11,19 @@
 
 Nada mais é instalado no sistema.
 
+## Instalar a versão publicada
+
+Cada versão (tag `vX.Y.Z`) publica em [Releases](https://github.com/pedrohqb/tessera/releases) o `tessera-repo.tar.gz`, um pequeno repositório Flatpak com o script `install-test-repo.sh`:
+
+```sh
+mkdir -p ~/Downloads/tessera && cd ~/Downloads/tessera
+curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/tessera-repo.tar.gz
+tar -xzf tessera-repo.tar.gz
+./install-test-repo.sh
+```
+
+O runtime do GNOME vem do Flathub, que precisa estar configurado.
+
 ## Instalar a versão de teste
 
 Cada envio para a `main` gera, na integração contínua, o artefato `tessera-x86_64`. Ele contém `tessera-repo.tar.gz`, um pequeno repositório Flatpak. Um pacote `.flatpak` avulso não serve, porque não carrega o extra-data dos drivers: a instalação falha com "Dados extras faltando nos metadados destacados".
@@ -32,14 +45,14 @@ Depois de atualizar, saia do Tessera (menu → **Sair**) e abra de novo.
 - **Leitoras:** os leitores que o `pcscd` vê e se há cartão.
 - **Tokens:** cada token com o driver e os certificados (titular, emissor, validade). Um certificado vencido aparece em destaque.
 - **Drivers:** cada driver com a sua chave liga/desliga e o seu estado: "Publicado: os aplicativos podem usar", "Iniciando…", "Sem resposta; tentando de novo (1 de 3)", "Parado: …" ou "Desligado". Os botões das ferramentas dos fornecedores (Token Administration, SerproID) ficam aqui.
-- **Aplicativos:** os dois passos de cada aplicativo (veja [Aplicativos](aplicativos.md)), com o estado "Pronto", "Falta o passo 1", "Falta o passo 2" ou "Não configurado".
-- O botão de atualizar, no canto superior esquerdo, faz uma conferência na hora. O menu tem **Iniciar automaticamente no login**, **Sobre** e **Sair** (Ctrl+Q).
+- **Aplicativos:** os dois passos de cada aplicativo (veja [Aplicativos](aplicativos.md)), com o estado "Pronto", "Falta o passo 1", "Falta o passo 2" ou "Faltam os passos 1 e 2". Um passo feito aparece com ✓ e sem botão, e os estados se atualizam sozinhos, sem reiniciar o Tessera.
+- O botão de atualizar, no canto superior esquerdo, faz uma conferência na hora. O menu tem **Iniciar automaticamente no login**, **Mostrar ícone na bandeja**, **Sobre** e **Sair** (Ctrl+Q).
 
 Os erros de configuração aparecem numa caixa de diálogo, com o texto inteiro e o que fazer.
 
 ## Fechar a janela, a bandeja e o segundo plano
 
-Fechar a janela **não** para o serviço: os tokens continuam disponíveis. Um ícone aparece na bandeja com o resumo, **Abrir o Tessera** e **Sair (parar de servir os tokens)**. Um clique no ícone abre a janela. No GNOME, a bandeja depende da extensão AppIndicator, que o Bluefin já traz.
+Fechar a janela **não** para o serviço: os tokens continuam disponíveis. Enquanto o serviço roda, com a janela aberta ou fechada, há um ícone na bandeja (dá para tirá-lo no menu, em **Mostrar ícone na bandeja**) com o resumo, **Abrir o Tessera** e **Sair (parar de servir os tokens)**. Um clique no ícone abre a janela. No GNOME, a bandeja depende da extensão AppIndicator, que o Bluefin já traz.
 
 **Sair**, pelo menu ou pela bandeja, para os servidores e retira os drivers do sistema.
 

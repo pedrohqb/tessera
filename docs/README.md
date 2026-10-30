@@ -18,6 +18,7 @@ Esta documentação registra como o Tessera funciona, por que ele é como é, e 
 
 - **Para quem usa:** instale o Tessera, rode uma vez `systemctl --user enable --now p11-kit-server.socket`, e siga os dois passos de cada aplicativo na janela. O PJeOffice Pro do FlatPark não precisa de nada.
 - **Para quem mantém um pacote Flatpak que usa token:** dê ao aplicativo `--filesystem=xdg-run/p11-kit/pkcs11` e carregue o `p11-kit-client.so` do runtime. É o que o PJeOffice Pro do FlatPark já faz.
+- **Para quem precisa do Web PKI ou do WebSigner (e-SAJ):** use o [Sigillum](https://github.com/pedrohqb/sigillum), que os instala nos navegadores em Flatpak e os liga aos tokens do Tessera.
 - **Para quem empacota o SerproID em outro lugar:** leia a seção do SerproID em [Drivers](drivers.md#serproid). Há quatro peculiaridades que fazem a assinatura falhar de formas difíceis de entender.
 
 ## Situação
