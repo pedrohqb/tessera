@@ -44,6 +44,15 @@ const SIG_SETMASK: i32 = 2;
 const F_DUPFD_CLOEXEC: i32 = 1030;
 
 /// Signals back to their default action, none blocked.
+///
+/// # Safety
+///
+/// Call it only while the process has one thread, before the driver is
+/// loaded: changing signal handlers under other threads can race with them.
+/// Numbers 9 (SIGKILL) and 19 (SIGSTOP) are skipped because they cannot be
+/// changed; `signal` ignores the others' old handlers, which nothing here
+/// uses. The empty set handed to `sigprocmask` is a zeroed `sigset_t`
+/// (16 × u64 is 1024 bits, the glibc size), valid for the whole call.
 unsafe fn reset_signals() {
     for s in 1..65 {
         if s != 9 && s != 19 {
@@ -56,6 +65,14 @@ unsafe fn reset_signals() {
 
 /// Move the p11-kit channel (stdin, stdout) to new descriptors closed on
 /// exec, put /dev/null on stdin and stderr on stdout. Returns (in, out).
+///
+/// # Safety
+///
+/// Call it only before anything in the process uses descriptors 0 and 1,
+/// that is, before the driver is loaded. The calls themselves only take
+/// integers: `fcntl(F_DUPFD_CLOEXEC, 3)` returns a new descriptor (or -1)
+/// and `dup2` replaces 0 and 1. The /dev/null file is dropped at the end,
+/// which closes only its own descriptor; descriptor 0 keeps a duplicate.
 unsafe fn move_channel() -> Option<(c_int, c_int)> {
     let input = fcntl(0, F_DUPFD_CLOEXEC, 3);
     let output = fcntl(1, F_DUPFD_CLOEXEC, 3);
@@ -88,8 +105,21 @@ pub fn run(args: &[String]) -> i32 {
     if tokens.is_empty() {
         tokens.push("pkcs11:");
     }
-    // SAFETY: libp11-kit's public API (p11-kit/p11-kit.h, p11-kit/remote.h);
-    // the pointers passed stay alive for the calls.
+    // SAFETY:
+    // - reset_signals and move_channel run first, while this process still
+    //   has one thread and nothing has used descriptors 0 and 1 (see their
+    //   Safety notes).
+    // - The libp11-kit symbols are looked up by name and called with the
+    //   signatures declared above, which are those of p11-kit/p11-kit.h and
+    //   p11-kit/remote.h (p11_kit_module_load, p11_kit_module_release,
+    //   p11_kit_remote_serve_tokens); `lib` outlives every call.
+    // - With TESSERA_REMOTE_LOAD=raw, C_GetFunctionList has the PKCS#11
+    //   signature and fills `list`; `driver` keeps the library loaded until
+    //   serving ends.
+    // - `module` is a CK_FUNCTION_LIST returned by the driver or by p11-kit,
+    //   checked for null; stable::wrap and trace::wrap copy it (see theirs).
+    // - c_provider, c_tokens and ptrs are alive through the calls that use
+    //   their pointers.
     unsafe {
         reset_signals();
         let (fd_in, fd_out) = move_channel().unwrap_or((0, 1));

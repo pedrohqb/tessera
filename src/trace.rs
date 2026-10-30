@@ -105,6 +105,16 @@ fn hex(p: usize, n: usize) -> String {
 }
 
 /// A readable account of the arguments of the calls worth decoding.
+///
+/// # Safety
+///
+/// `a` are the arguments of a call to function `i` of a CK_FUNCTION_LIST
+/// that has just returned, as `tramp` passes them. Each decoded case reads
+/// only what that function's PKCS#11 signature says is a valid pointer for
+/// the call (CK_C_INITIALIZE_ARGS, a CK_ULONG count, a CK_ATTRIBUTE array of
+/// the given length, a CK_MECHANISM, a found-object array of *count
+/// entries), and only when the pointer is not null. At most 16 entries and
+/// 64 bytes are read. This runs only with TESSERA_REMOTE_TRACE=1.
 unsafe fn describe(i: usize, a: [usize; 6]) -> String {
     let ul = |p: usize| {
         if p == 0 {
@@ -193,6 +203,16 @@ unsafe fn describe(i: usize, a: [usize; 6]) -> String {
     }
 }
 
+/// Function I of the traced list: calls the driver's own and logs the call.
+///
+/// # Safety
+///
+/// Called by p11-kit with the arguments of function I. Every PKCS#11
+/// function handed to a trampoline takes at most six arguments, each an
+/// integer or a pointer (the two with eight are left out, see EIGHT_ARGS),
+/// so on x86_64 they all arrive in registers and passing six usize values
+/// forwards them unchanged; the extra ones are ignored by the callee.
+/// ORIGINAL was set by `wrap` before the list was handed out.
 unsafe extern "C" fn tramp<const I: usize>(
     a: usize,
     b: usize,
@@ -222,6 +242,13 @@ macro_rules! table {
 }
 
 /// A copy of `module` (a CK_FUNCTION_LIST) whose functions log each call.
+///
+/// # Safety
+///
+/// As stable::wrap: `module` points to a valid CK_FUNCTION_LIST (2.x, 68
+/// functions) or CK_FUNCTION_LIST_3_0 (92), whose first word holds the
+/// version and the others function pointers. Only the first 68 are traced.
+/// The copy is leaked on purpose, and wrap is called once per process.
 pub unsafe fn wrap(module: *mut c_void) -> *mut c_void {
     let _ = START.set(Instant::now());
     let version = *(module as *const u8);

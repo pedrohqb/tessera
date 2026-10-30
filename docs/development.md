@@ -77,7 +77,7 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 
 `.github/workflows/ci.yml`, on every push to `main`, on every pull request, on every `v*` tag and when triggered by hand:
 
-1. **Build and test:** `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`.
+1. **Build and test:** `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`. Clippy also checks that every `unsafe` block and `unsafe fn` carries its `// SAFETY:` or `# Safety` note (the `[lints.clippy]` table in `Cargo.toml`).
 2. **Flatpak bundle:** `pin-drivers.py`, `flatpak-builder` (with the last lines of the log in an annotation, if it fails), `flatpak build-update-repo`, and the artifacts `tessera-repo.tar.gz` (test repository with `install-test-repo.sh`) and `tessera-x86_64.tar.gz` (the whole `/app` tree, for anyone who wants to package it as extra-data).
 3. **With a `vX.Y.Z` tag:** creates the release on GitHub with both files.
 

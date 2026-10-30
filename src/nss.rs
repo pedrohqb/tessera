@@ -72,7 +72,11 @@ pub fn profile_in_use(dir: &Path) -> bool {
         l_len: 0,
         l_pid: 0,
     };
-    // SAFETY: F_GETLK reads and fills the flock struct passed by pointer.
+    // SAFETY: F_GETLK reads and fills the struct flock passed by pointer.
+    // Flock matches glibc's struct flock on x86_64 (short, short, off_t,
+    // off_t, pid_t, with the C padding repr(C) gives), `lock` is alive and
+    // writable for the call, and the descriptor belongs to `file`, open
+    // until the end of the function.
     let rv = unsafe { fcntl(file.as_raw_fd(), F_GETLK, &mut lock as *mut Flock) };
     rv == 0 && lock.l_type != F_UNLCK
 }
@@ -93,7 +97,11 @@ pub fn poppler_db_ready(dir: &Path) -> bool {
 /// the client module an older Tessera registered there.
 pub fn set_up_poppler_db_in_process(dir: &Path) -> Result<()> {
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
-    // SAFETY: as in add_module_in_process (nss.h, secmod.h).
+    // SAFETY: as in add_module_in_process (nss.h, secmod.h): the symbols are
+    // called with their declared signatures, the CStrings outlive the calls
+    // that take their pointers, and NSS is shut down on every path after a
+    // successful NSS_Initialize. This runs in a child process of its own,
+    // so NSS's global state is not shared with anything else.
     unsafe {
         let lib = Library::new("libnss3.so").context("loading libnss3.so")?;
         let init: Symbol<NssInitialize> = lib.get(b"NSS_Initialize\0")?;
@@ -150,8 +158,13 @@ pub fn add_module_in_process(dir: &Path) -> Result<Outcome> {
         return Ok(Outcome::AlreadyPresent);
     }
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
-    // SAFETY: libnss3 is a well-behaved C library; the symbols below have the
-    // signatures declared above (nss.h, secmod.h, secerr.h).
+    // SAFETY: the symbols are looked up by name in libnss3 and called with
+    // the signatures declared above, which are those of nss.h, secmod.h and
+    // secerr.h (NSS_Initialize, NSS_Shutdown, SECMOD_AddNewModule,
+    // PORT_GetError); `lib` outlives every call. The CStrings outlive the
+    // calls that take their pointers. NSS is shut down on every path after a
+    // successful NSS_Initialize. This runs in a child process of its own
+    // (`tessera nss-add-module`), so NSS's global state is not shared.
     unsafe {
         let lib = Library::new("libnss3.so").context("loading libnss3.so")?;
         let init: Symbol<NssInitialize> = lib.get(b"NSS_Initialize\0")?;

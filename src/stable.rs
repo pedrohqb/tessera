@@ -35,12 +35,22 @@ struct Kept {
     _parameter: Box<[u8]>,
 }
 
-// SAFETY: Kept only owns its boxes; the raw pointer points into its own box.
+// SAFETY: Kept only owns its two boxes. The raw pointer inside `mechanism`
+// points into `_parameter`, which Kept also owns and never changes, so moving
+// a Kept to another thread moves what the pointer points to with it. Kept is
+// only reached through the Mutex in KEPT.
 unsafe impl Send for Kept {}
 
 static ORIGINAL: OnceLock<Vec<usize>> = OnceLock::new();
 static KEPT: OnceLock<Mutex<HashMap<(usize, c_ulong), Kept>>> = OnceLock::new();
 
+/// A copy of the mechanism `m` and its parameter, owned by the Kept.
+///
+/// # Safety
+///
+/// `m` is null or points to a CK_MECHANISM valid for this call, whose
+/// `parameter` is null or points to `parameter_len` readable bytes: what
+/// PKCS#11 requires of the caller of every *Init function.
 unsafe fn keep(m: *const Mechanism) -> Option<Kept> {
     if m.is_null() {
         return None;
@@ -67,6 +77,17 @@ unsafe fn keep(m: *const Mechanism) -> Option<Kept> {
     })
 }
 
+/// The *Init function at index I of the function list, handing the driver a
+/// kept copy of the mechanism.
+///
+/// # Safety
+///
+/// Called by p11-kit as the driver's *Init function, with that function's
+/// arguments. ORIGINAL was set by `wrap` before this list was handed out, and
+/// its entry I is the driver's own function, which has the *Init signature
+/// (CK_SESSION_HANDLE, CK_MECHANISM_PTR, CK_OBJECT_HANDLE) declared as Init.
+/// The copy handed to the driver stays in KEPT until the next *Init of the
+/// same kind on the same session, so it is alive whenever the driver reads it.
 unsafe extern "C" fn init<const I: usize>(
     session: c_ulong,
     mechanism: *const c_void,
@@ -93,6 +114,15 @@ macro_rules! init_fn {
 }
 
 /// A copy of `module` (a CK_FUNCTION_LIST) with stable mechanism copies.
+///
+/// # Safety
+///
+/// `module` points to a valid CK_FUNCTION_LIST (version 2.x, 68 functions)
+/// or CK_FUNCTION_LIST_3_0 (92 functions), as C_GetFunctionList or p11-kit
+/// return. Its first word holds the CK_VERSION, whose first byte is the
+/// major version; each of the following words is a function pointer. The
+/// copy is leaked on purpose: p11-kit uses it until the process ends. Call
+/// it once per process (ORIGINAL keeps only the first module's functions).
 pub unsafe fn wrap(module: *mut c_void) -> *mut c_void {
     let version = *(module as *const u8);
     let n = if version >= 3 { 92 } else { 68 };

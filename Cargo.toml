@@ -25,3 +25,9 @@ async-channel = "2"
 lto = true
 codegen-units = 1
 strip = true
+
+# Every unsafe block and unsafe fn says why it is sound; CI runs clippy with
+# -D warnings, so a new one without its note fails the build.
+[lints.clippy]
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"
