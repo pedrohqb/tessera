@@ -151,6 +151,10 @@ A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --u
 
 ---
 
+### A fazer
+
+- Separar o `src/ui.rs` (a janela, a supervisão dos drivers e a bandeja estão no mesmo arquivo, com cerca de 1.200 linhas) em três módulos, sem mudar o comportamento. Os testes automáticos (`cargo test`) servem de rede de proteção.
+
 ### Documentação
 
 A documentação técnica, em inglês, está em [docs/](docs/README.md):
@@ -313,6 +317,10 @@ flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 For a system-wide install, use `--system` instead of `--user`.
 
 Each app's step 1 permission is undone with `flatpak override --user --reset <app>`. That command also removes any other permission you gave the app.
+
+### To do
+
+- Split `src/ui.rs` (the window, the driver supervision and the tray share one file of about 1,200 lines) into three modules, without changing behaviour. The automated tests (`cargo test`) are the safety net.
 
 ### Documentation
 
