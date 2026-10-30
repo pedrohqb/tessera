@@ -1,0 +1,55 @@
+# History
+
+How Tessera reached its current form, on October 28 and 29, 2026, with tests run on a Bluefin system with real tokens. The problems are listed in the order they appeared. Each one has the symptom, the cause and the fix.
+
+## The idea (October 28)
+
+1. **The proposal to FlatPark.** A feature suggestion (not a bug report) to FlatPark, which already packages PJeOffice Pro: offer as a Flatpak what distrobox-adv-br offers in a container, that is, SafeSign, SafeNet and SerproID, plus webpki and websigner, usable in Papers and Firefox, for immutable systems.
+2. **The maintainer's reply** proposed a "hub" app, in the style of `org.flatpark.Cellar`, with two layers: access to the tokens and, on top of it, the *native messaging* of the web signers. Decision: start with token access, because webpki and websigner are being phased out and are not worth the effort.
+3. **The design.** A standalone app, with its own icon, generic (not only ICP-Brasil), with the drivers as extensions. OpenSC stays on the host, which already has it. The chosen name was **Tessera**, the Roman token that identified its bearer. The interface is in Rust with GTK 4 and libadwaita, and the repository is `pedrohqb/tessera`, maintained by the author. The "cleanups" from distrobox-adv-br (no install scripts, no `/etc`, `libneoidp11.so`, the SerproID certificates folder) are the rule for unpacking the drivers.
+4. **First builds.** OpenSC needed `winscard.h`, so pcsc-lite was added to the package (the runtime does not ship the client library). Then came folder fixes (`--libdir=lib`, OpenSC's module and *completions* in `/app`) and a meson option that does not exist. Later OpenSC was dropped from the package: the host's copy is served through the same path.
+
+## First tests on the real system (October 29, morning)
+
+5. **Installation failed** with "Dados extras faltando nos metadados destacados" (Flatpak in Portuguese; in English, "Extra data missing in detached metadata"). A standalone `.flatpak` bundle does not carry the extra-data. The test build became a packaged Flatpak repository (`tessera-repo.tar.gz`), with a script that adds it as a local repository.
+6. **`bwrap: Can't mount on symlink destination /run/user/1000/p11-kit`.** The first design served the tokens at p11-kit's default address, but Flatpak takes that address for its own trust server. The sockets moved to `xdg-run/tessera`.
+7. **Firefox saw p11-kit, but not the token.** p11-kit's user configuration is ignored in every sandbox (`user-config: none`). Hence the current architecture: one server per driver and `remote:` files in `~/.config/pkcs11/modules`, served by the host's `p11-kit-server.socket`. An earlier recommendation, to turn that socket off, was reversed.
+8. **SafeSign with no token detected.** `libaetpkss.so` did not load because `libgdbm_compat.so.4` was missing, and the "failed to fork for accept" message came from that failure. The fix was the GDBM packages from Ubuntu 24.04. Token Administration needed wxWidgets, which now comes from the RHEL 10 RPM, as in the AUR package.
+9. **SerproID would not open.** The app's script did `cd /usr/share/…`, and the paths were rewritten during unpacking. Then came `Unable to open DISPLAY` (JavaFX), fixed with `--socket=x11`. Finally, the `~/.config/serproid/certificados` folder has to exist, as distrobox-adv-br already did.
+10. **"Não foi possível adicionar módulo" in Firefox.** SafeNet, with no token, hung, and a hung driver published on the host hangs whatever loads p11-kit. This led to supervision (only what responds is published) and the per-driver switch.
+11. **SafeSign worked in Firefox:** CERTIFICADO OAB, "Logado".
+12. **SerproID: `CKR_DEVICE_ERROR` through p11-kit, but working directly.** A server started by hand with `P11_KIT_DEBUG` showed `undefined symbol: _Unwind_Resume_or_Rethrow`. Fix: `LD_PRELOAD=libgcc_s.so.1`. The token fields came with NUL bytes, and they are now cleaned.
+13. **Orphan processes.** An orphaned server held on to the socket, and hung connections outlived the server. Fix: `PR_SET_PDEATHSIG` and one process group per server. `p11-kit server` with `P11_KIT_PRIVATEDIR` answered "'server' is not a valid command", so Tessera now runs the `p11-kit-server` helper directly.
+
+## The SerproID login (October 29, afternoon)
+
+The certificate showed up in Tessera and in Firefox, but login failed: the request reached the phone (Application "Tessera"), approving it with Face ID gave "Ops! Estamos enfrentando problemas", the request repeated, and the log showed `Retornando CKR_FUNCTION_CANCELED depois de receber 20 vezes AGUARDANDO`. In the distrobox, the same certificate worked. The cause took an afternoon to surface, because every hypothesis looked plausible:
+
+14. **The "allow-list of apps" hypothesis.** The process that loaded the driver was `p11-kit-remote`, and Tessera started handling the connections itself (`tessera remote`). It did not help. A test with a copy of Tessera named `firefox-esr` also failed.
+15. **The "it's p11-kit" hypothesis.** `probe-sign` signed in 4.5 s directly and through both p11-kit hops. That seemed to clear the path, but `probe-sign` asks for the size before signing, and that is a different code path in the driver (item 18).
+16. **The "instances knocking each other down" and "stale connection" hypotheses.** There was only one SerproID instance, and a new connection changed nothing.
+17. **The host p11-kit's log** (`log-calls: yes`) showed that Firefox requested exactly the same `CKM_RSA_PKCS_PSS` as the tests. Differences: a read-only session and a single `C_Sign`, with no size query.
+18. **The size query.** With it, the signature went through, and Tessera started doing it on its own. Login then completed, but the site replied `SSL_ERROR_DECRYPT_ERROR_ALERT`. `sign-test.py`, which checks each signature, showed "PKCS#1 v1.5 of the data as given (NOT PSS)": on that path SerproID ignores PSS. The change was reverted.
+19. **Direct tests, one at a time** (all approved with Face ID): direct works; direct with `CKF_OS_LOCKING_OK` works; with p11-kit's command line, with output to a *pipe*, with a new program name and with p11-kit's call sequence (`mimic`), it also works. Through p11-kit, with the original `p11-kit-remote`, with `tessera remote`, with signals restored, with standard input and output swapped and without the managed layer, it always fails.
+20. **`strace` and the `getenv` spy:** in both cases, the driver reads the same files, queries the same variables and opens the same connections. But the signing request sent to the cloud was **467 bytes directly and 451 through p11-kit**. So the content was changing.
+21. **The cause.** With the PSS parameters wiped right after `C_SignInit` (`sign-test.py clobber`), the direct driver failed immediately. That is, SerproID keeps the mechanism pointer and only reads the parameters in `C_Sign`. Through p11-kit, the memory has already been reused by then. A fake driver with the same defect showed the hash arriving as `0xd963a0444bf2382c` instead of `0x250`. **Fix:** `tessera remote` hands the driver a stable copy of the mechanism.
+22. **Login approved:** "Tudo Certo! seu certificado … foi validado com sucesso", at 16:32.
+
+## The other apps and the window (October 29, late afternoon)
+
+23. **PJeOffice Pro:** signing with SerproID with no configuration at all.
+24. **Papers showed each certificate twice.** Papers' NSS loads the root module on its own, which in the runtime is p11-kit and, with the `override`, reaches the host server. Together with the registered `p11-kit-client.so`, that made two paths. Fix: a separate, empty NSS database. A Flatseal *reset* wiped the `override` in the middle of the test and showed that it is needed.
+25. **Set up did nothing.** It required every driver to be running, and a SafeSign with no token was enough to block it.
+26. **SafeSign switched off in the window and Restart having no effect.** A listing started before the restart finished after it and switched off the new driver. Also, supervision only ran with the window open: with the window closed or at autostart, nothing was published. Supervision moved to the service, with generations, three attempts before stopping, and each driver's state on its row.
+27. **The window lost its reference to itself,** and results did not reach the screen. When reopened, it showed a window that had already been destroyed. Both defects showed up in a test of the window with Xvfb and xdotool.
+28. **Additions:** the tray, the status in the Background portal, removing the modules on quit, automatic Firefox Set up (all profiles), the state of step 1 and of the host server, Chromium, Chrome and Brave, errors in a dialog box, and the new icon (a tessera hospitalis in patinated bronze).
+
+## Clean test (October 29, 2026, evening)
+
+29. **PJeOffice stopped seeing the tokens.** The *reset* had turned off `p11-kit-server.socket`, and the "System connection" row said "On". With the host server off, Flatpak's own trust server answers at the same socket path, and the check only tried to connect. The row now checks end to end: it lists the tokens through the socket and looks for Tessera's.
+30. **Firefox said "Close Firefox first" while it was closed.** Tessera looked at the `lock` link, which is left behind when Firefox closes badly. The real lock is an `fcntl` on `.parentlock`, and that is what Tessera checks now.
+31. **Chrome, Edge and Brave "with no certificate database".** Since Chromium 146, the NSS database lives in `$XDG_DATA_HOME/pki/nssdb` (in a Flatpak, `~/.var/app/<browser>/data/pki/nssdb`), and no longer in `~/.pki/nssdb`, which only wins if it already exists. Tessera only looked for the old one. With this, the `--persist=.pki` that the window suggested for Chrome is no longer needed.
+32. **The SafeSign PIN asked twice in Chrome, Edge and Brave, and three times in Chromium.** Chromium loads the runtime's root module on its own, which is p11-kit and reaches the host server. With `p11-kit-client.so` registered as well, each token showed up twice. Same cause as Papers; the browsers' Set up now only removes the registration.
+33. **The SerproID notification with a broken image.** The driver calls `notify-send` with an image from its own folder, which the desktop outside the sandbox cannot open. Tessera puts first in the drivers' `PATH` a `notify-send` that swaps the icon for Tessera's.
+34. **Window adjustments:** the steps with the same names in every app ("Step 1 · access to the system's p11-kit server", "Step 2 · certificate database"), no button when there is nothing to do, and updated without restarting Tessera; each app's icon; the tray icon whenever the service runs, with a menu option to hide it.
+35. **Chromium still asked for the PIN twice.** The real `~/.pki/nssdb`, which Chromium uses instead of the new database, registered `libnssckbi.so` ("Mozilla Root Certs") by hand, on top of the one Chromium loads on its own. Without that registration, the PIN was asked once. With this, Chromium, Chrome, Edge, Brave and Okular were tested with a real token.

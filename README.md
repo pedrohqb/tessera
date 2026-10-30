@@ -1,5 +1,11 @@
 # Tessera
 
+**[Português](#português)** · **[English](#english)**
+
+---
+
+## Português
+
 O Tessera é uma central de tokens para Flatpak. Ele faz o token A3 ou o certificado em nuvem funcionar nos aplicativos em Flatpak, como o PJeOffice Pro e os navegadores, **sem instalar nenhum pacote de fornecedor no sistema**. Foi feito pensando nos sistemas imutáveis (Bluefin, Aurora, Bazzite, Fedora Silverblue e Kinoite), em que instalar o `.deb` ou o `.rpm` do fabricante do token é difícil ou impossível. Funciona também nas distribuições comuns.
 
 *Tessera* era, em latim, a pequena peça que identificava quem a portava.
@@ -25,9 +31,9 @@ Para o **Lacuna Web PKI** e o **Softplan WebSigner**, exigidos por alguns tribun
 
 ---
 
-## Instalação
+### Instalação
 
-### 1. Preparar o sistema (uma vez)
+#### 1. Preparar o sistema (uma vez)
 
 O sistema precisa de três coisas: o Flatpak com o Flathub, o serviço de cartões (`pcscd`) com o driver CCID, e o servidor p11-kit do usuário. O **Fedora** (tradicional e atômico), o **Bluefin**, o **Aurora** e o **Bazzite** já vêm com os pacotes; basta ligar os serviços, mais abaixo.
 
@@ -66,7 +72,7 @@ O segundo comando é o que deixa os aplicativos verem os tokens do Tessera. A ja
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
 
-### 2. Instalar o Tessera
+#### 2. Instalar o Tessera
 
 ```bash
 mkdir -p ~/Downloads/tessera && cd ~/Downloads/tessera && \
@@ -78,7 +84,7 @@ Na instalação, o Flatpak baixa os drivers dos sites oficiais dos fornecedores 
 
 ---
 
-## Uso
+### Uso
 
 Abra o **Tessera** pelo menu de aplicativos. Com o token conectado, ele aparece em **Tokens**, com os seus certificados. O certificado SerproID aparece depois de você entrar pelo aplicativo SerproID, no botão da linha do driver.
 
@@ -100,24 +106,24 @@ Em **Aplicativos**, cada aplicativo mostra o que falta. São no máximo dois pas
 
 Quando tudo estiver certo, o aplicativo aparece como **Pronto**, e a linha **Conexão com o sistema** diz quantos tokens do Tessera os aplicativos estão vendo.
 
-### Em segundo plano
+#### Em segundo plano
 
 - **Fechar a janela não desliga o Tessera:** os tokens continuam disponíveis, e um ícone na bandeja mostra o resumo. No GNOME, o ícone depende da extensão AppIndicator, que o Bluefin e o Aurora já trazem. Para tirar o ícone, use o menu ☰ → **Mostrar ícone na bandeja**.
 - **Sair**, pelo menu ou pela bandeja, desliga o Tessera e os tokens deixam de aparecer nos aplicativos.
 - **Para o Tessera abrir sozinho ao entrar na sessão,** use o menu ☰ → **Iniciar automaticamente no login**.
 
-### Se algo não funcionar
+#### Se algo não funcionar
 
 - **A linha "Conexão com o sistema" está vermelha:** rode `systemctl --user enable --now p11-kit-server.socket`. Ela volta ao normal sozinha em alguns segundos.
 - **O aplicativo não vê o token:** confira se ele está como **Pronto** na lista e se foi aberto de novo depois do passo 1.
 - **O token não aparece no Tessera:** tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**.
-- **Um navegador pede o PIN duas vezes:** veja [Aplicativos](docs/aplicativos.md#chromium-google-chrome-microsoft-edge-e-brave).
+- **Um navegador pede o PIN duas vezes:** veja [Aplicativos](docs/apps.md#chromium-google-chrome-microsoft-edge-and-brave).
 
-Mais casos em [Diagnóstico](docs/diagnostico.md).
+Mais casos em [Troubleshooting](docs/troubleshooting.md) (em inglês).
 
 ---
 
-## Desinstalação
+### Desinstalação
 
 Saia do Tessera (menu ☰ → **Sair**) e rode:
 
@@ -130,30 +136,170 @@ A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --u
 
 ---
 
-## Documentação
+### Documentação
 
-A documentação técnica está em [docs/](docs/README.md):
+A documentação técnica, em inglês, está em [docs/](docs/README.md):
 
-- **[Arquitetura](docs/arquitetura.md):** como o token sai do sandbox do Tessera e chega aos aplicativos, e por que não há caminho mais simples.
+- **[Architecture](docs/architecture.md):** como o token sai do sandbox do Tessera e chega aos aplicativos, e por que não há caminho mais simples.
 - **[Drivers](docs/drivers.md):** origem e verificação de cada driver, e o que foi preciso ajustar, sobretudo no SerproID.
-- **[Aplicativos](docs/aplicativos.md):** o que cada aplicativo precisa e por quê.
-- **[Instalação e uso](docs/uso.md):** a janela, a bandeja e a linha de comando.
-- **[Diagnóstico](docs/diagnostico.md):** logs, ferramentas de teste e como investigar um problema.
-- **[Histórico](docs/historico.md):** os problemas encontrados nos testes com tokens reais e como cada um foi resolvido.
-- **[Desenvolvimento](docs/desenvolvimento.md):** compilação, testes, versões e como acrescentar um driver.
+- **[Apps](docs/apps.md):** o que cada aplicativo precisa e por quê.
+- **[Installation and usage](docs/usage.md):** a janela, a bandeja e a linha de comando.
+- **[Troubleshooting](docs/troubleshooting.md):** logs, ferramentas de teste e como investigar um problema.
+- **[History](docs/history.md):** os problemas encontrados nos testes com tokens reais e como cada um foi resolvido.
+- **[Development](docs/development.md):** compilação, testes, versões e como acrescentar um driver.
 
 ---
 
-## Suporte
+### Suporte
 
 Havendo qualquer dificuldade, abra uma [issue](https://github.com/pedrohqb/tessera/issues) ou peça ajuda no grupo oficial no [Telegram](https://t.me/advogados_linux).
 
 ---
 
-## In English
-
-Tessera is a PKCS#11 token hub for Flatpak. It runs the SafeSign, SafeNet and SerproID drivers inside its own sandbox and shares the tokens with sandboxed apps (PJeOffice Pro, Firefox, Chromium-based browsers, Papers, Okular) through the host's p11-kit server, with no vendor packages on the host. The documentation, in Portuguese, starts at [docs/](docs/README.md); [Architecture](docs/arquitetura.md) explains the design.
-
-## Licença
+### Licença
 
 GPL-3.0-or-later. Os drivers dos fornecedores não fazem parte do Tessera: são baixados dos fornecedores na instalação e seguem as licenças deles.
+
+---
+
+## English
+
+Tessera is a token hub for Flatpak. It makes A3 tokens and cloud certificates work in Flatpak apps, such as PJeOffice Pro and web browsers, **without installing any vendor package on the system**. It was made with immutable systems in mind (Bluefin, Aurora, Bazzite, Fedora Silverblue and Kinoite), where installing a token vendor's `.deb` or `.rpm` is hard or impossible. It also works on regular distributions.
+
+*Tessera* was the Latin word for a small token that identified its bearer.
+
+Included:
+
+1. the **SafeSign** driver, for GD Burti tokens, currently the most used by Brazilian lawyers;
+2. the **SafeNet** driver, for SafeNet 5100 tokens, the second most used;
+3. the **SerproID** driver, for Serpro's cloud certificate, with the SerproID app;
+4. SafeSign's **Token Administration**, to change and unlock the PIN.
+
+The tokens are available to these apps:
+
+| App | For |
+|---|---|
+| PJeOffice Pro ([FlatPark](https://flatpark.org)) | signing in PJe |
+| Firefox, Chromium, Google Chrome, Microsoft Edge and Brave | certificate login on sites such as Projudi and eproc |
+| Papers and Okular | signing PDFs and checking signatures |
+
+For **Lacuna Web PKI** and **Softplan WebSigner**, required by some courts (e-SAJ, for example), also use [**Sigillum**](https://github.com/pedrohqb/sigillum), which installs them in the browsers and connects them to Tessera's tokens.
+
+### Installation
+
+#### 1. Prepare the system (once)
+
+The system needs three things: Flatpak with Flathub, the smart card service (`pcscd`) with the CCID driver, and the user's p11-kit server. **Fedora** (traditional and atomic), **Bluefin**, **Aurora** and **Bazzite** already ship the packages; just turn on the services, below.
+
+Debian, Ubuntu, Linux Mint and derivatives:
+
+```bash
+sudo apt install flatpak pcscd libccid
+```
+
+Arch Linux, Manjaro, EndeavourOS and CachyOS:
+
+```bash
+sudo pacman -S flatpak pcsclite ccid
+```
+
+openSUSE Tumbleweed:
+
+```bash
+sudo zypper in flatpak pcsc-ccid
+```
+
+Then, on any distribution, turn on the smart card service and the user's p11-kit server:
+
+```bash
+sudo systemctl enable --now pcscd.socket
+systemctl --user enable --now p11-kit-server.socket
+```
+
+The second command is what lets apps see Tessera's tokens. Tessera's window shows it too, with a copy button.
+
+**Note:** on a Fedora system where one of these packages was removed, reinstall them with `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
+
+**Note:** if Flathub is not set up yet, run:
+
+```bash
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+```
+
+#### 2. Install Tessera
+
+```bash
+mkdir -p ~/Downloads/tessera && cd ~/Downloads/tessera && \
+curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/tessera-repo.tar.gz && \
+tar -xzf tessera-repo.tar.gz && ./install-test-repo.sh
+```
+
+During installation, Flatpak downloads the drivers from the vendors' official sites and checks each one against its SHA256. To update, run the same commands with the new release.
+
+### Usage
+
+Open **Tessera** from the app menu. With the token plugged in, it appears under **Tokens**, with its certificates. The SerproID certificate appears after you sign in through the SerproID app, with the button on the driver's row.
+
+Under **Apps**, each app shows what is missing. There are at most two steps, done once:
+
+- **Step 1 · access to the system's p11-kit server:** a command to run in a terminal, with a copy button. For Firefox, for example:
+  ```bash
+  flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.mozilla.firefox
+  ```
+  Then close the app and open it again.
+- **Step 2 · certificate database:** the **Set up** button. Only Firefox, Papers and Okular have this step. For Firefox, close the browser before pressing the button.
+
+| App | Steps |
+|---|---|
+| PJeOffice Pro | none: the p11-kit server from the installation is enough |
+| Firefox | step 1 and step 2 |
+| Chromium, Chrome, Edge and Brave | step 1 only |
+| Papers and Okular | step 1 and step 2 |
+
+When everything is right, the app shows as **Ready**, and the **System connection** row tells how many of Tessera's tokens the apps see.
+
+#### In the background
+
+- **Closing the window does not stop Tessera:** the tokens stay available, and a tray icon shows a summary. On GNOME, the icon needs the AppIndicator extension, which Bluefin and Aurora ship. To remove the icon, use the ☰ menu → **Show an icon in the tray**.
+- **Quit**, from the menu or the tray, stops Tessera, and the tokens disappear from the apps.
+- **To have Tessera start when you log in,** use the ☰ menu → **Start automatically at login**.
+
+#### If something does not work
+
+- **The "System connection" row is red:** run `systemctl --user enable --now p11-kit-server.socket`. It goes back to normal by itself in a few seconds.
+- **An app does not see the token:** check that it shows as **Ready** in the list, and that it was opened again after step 1.
+- **The token does not appear in Tessera:** unplug it and plug it in again. If a driver shows as "Stopped", press **Restart**.
+- **A browser asks for the PIN twice:** see [Apps](docs/apps.md#chromium-google-chrome-microsoft-edge-and-brave).
+
+More cases in [Troubleshooting](docs/troubleshooting.md).
+
+### Uninstalling
+
+Quit Tessera (☰ menu → **Quit**) and run:
+
+```bash
+flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
+flatpak remote-delete --user tessera-test
+```
+
+Each app's step 1 permission is undone with `flatpak override --user --reset <app>`. That command also removes any other permission you gave the app.
+
+### Documentation
+
+The technical documentation is in [docs/](docs/README.md):
+
+- **[Architecture](docs/architecture.md):** how a token leaves Tessera's sandbox and reaches the apps, and why there is no simpler way.
+- **[Drivers](docs/drivers.md):** where each driver comes from, how it is checked, and what had to be adjusted, above all for SerproID.
+- **[Apps](docs/apps.md):** what each app needs, and why.
+- **[Installation and usage](docs/usage.md):** the window, the tray and the command line.
+- **[Troubleshooting](docs/troubleshooting.md):** logs, test tools and how to investigate a problem.
+- **[History](docs/history.md):** the problems found while testing with real tokens, and how each was solved.
+- **[Development](docs/development.md):** building, tests, releases and how to add a driver.
+
+### Support
+
+If you have any trouble, open an [issue](https://github.com/pedrohqb/tessera/issues) or ask in the [Telegram](https://t.me/advogados_linux) group (in Portuguese).
+
+### License
+
+GPL-3.0-or-later. The vendor drivers are not part of Tessera: they are downloaded from their vendors at installation and are covered by the vendors' own licenses.

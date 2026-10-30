@@ -1,34 +1,34 @@
-# Documentação do Tessera
+# Tessera documentation
 
-O Tessera é uma central de tokens PKCS#11 para Flatpak. Ele roda os drivers dos tokens (SafeSign/GD Burti, SafeNet e SerproID) dentro do próprio sandbox e entrega os tokens aos outros aplicativos pelo p11-kit, sem instalar pacote de fornecedor no sistema. Foi feito para sistemas imutáveis (Bluefin, Aurora, Bazzite, Fedora Silverblue e Kinoite), em que instalar o `.deb` ou o `.rpm` de um fornecedor no sistema é difícil ou impossível.
+Tessera is a PKCS#11 token hub for Flatpak. It runs the token drivers (SafeSign/GD Burti, SafeNet and SerproID) inside its own sandbox and hands the tokens to the other apps through p11-kit, without installing any vendor package on the system. It was made for immutable systems (Bluefin, Aurora, Bazzite, Fedora Silverblue and Kinoite), where installing a vendor's `.deb` or `.rpm` on the system is hard or impossible.
 
-Esta documentação registra como o Tessera funciona, por que ele é como é, e tudo o que foi descoberto ao fazê-lo funcionar com tokens reais.
+This documentation records how Tessera works, why it is the way it is, and everything that was discovered while making it work with real tokens.
 
-| Documento | O que contém |
+| Document | What it contains |
 |---|---|
-| [Arquitetura](arquitetura.md) | Como os tokens saem do sandbox do Tessera e chegam aos aplicativos; por que não há atalho mais simples; supervisão dos drivers |
-| [Drivers](drivers.md) | Cada driver: origem, verificação, desempacotamento "limpo", dependências e as peculiaridades encontradas (sobretudo do SerproID) |
-| [Aplicativos](aplicativos.md) | PJeOffice Pro, Firefox, Chromium, Chrome, Edge, Brave, Papers e Okular: o que cada um precisa e por quê |
-| [Instalação e uso](uso.md) | Preparar o sistema, instalar, a janela, a bandeja, o início automático e a linha de comando |
-| [Diagnóstico](diagnostico.md) | Onde ficam os logs, as ferramentas de teste e o caminho para investigar um problema |
-| [Histórico](historico.md) | A sequência de problemas encontrados nos testes de 28 e 29 de outubro de 2026 e como cada um foi resolvido |
-| [Desenvolvimento](desenvolvimento.md) | Estrutura do código, compilação, testes, integração contínua, versões e como acrescentar um driver |
+| [Architecture](architecture.md) | How the tokens leave Tessera's sandbox and reach the apps; why there is no simpler shortcut; supervision of the drivers |
+| [Drivers](drivers.md) | Each driver: origin, verification, "clean" unpacking, dependencies and the quirks found (above all in SerproID) |
+| [Apps](apps.md) | PJeOffice Pro, Firefox, Chromium, Chrome, Edge, Brave, Papers and Okular: what each one needs and why |
+| [Installation and usage](usage.md) | Preparing the system, installing, the window, the tray, automatic start and the command line |
+| [Troubleshooting](troubleshooting.md) | Where the logs are, the test tools and the path for investigating a problem |
+| [History](history.md) | The sequence of problems found in the tests of October 28 and 29, 2026 and how each one was solved |
+| [Development](development.md) | Code structure, building, tests, continuous integration, releases and how to add a driver |
 
-## Em uma frase, para cada pessoa
+## In one sentence, for each person
 
-- **Para quem usa:** instale o Tessera, rode uma vez `systemctl --user enable --now p11-kit-server.socket`, e siga os dois passos de cada aplicativo na janela. O PJeOffice Pro do FlatPark não precisa de nada.
-- **Para quem mantém um pacote Flatpak que usa token:** dê ao aplicativo `--filesystem=xdg-run/p11-kit/pkcs11` e carregue o `p11-kit-client.so` do runtime. É o que o PJeOffice Pro do FlatPark já faz.
-- **Para quem precisa do Web PKI ou do WebSigner (e-SAJ):** use o [Sigillum](https://github.com/pedrohqb/sigillum), que os instala nos navegadores em Flatpak e os liga aos tokens do Tessera.
-- **Para quem empacota o SerproID em outro lugar:** leia a seção do SerproID em [Drivers](drivers.md#serproid). Há quatro peculiaridades que fazem a assinatura falhar de formas difíceis de entender.
+- **For users:** install Tessera, run `systemctl --user enable --now p11-kit-server.socket` once, and follow the two steps for each app in the window. PJeOffice Pro from FlatPark needs nothing.
+- **For maintainers of a Flatpak package that uses a token:** give the app `--filesystem=xdg-run/p11-kit/pkcs11` and load the runtime's `p11-kit-client.so`. This is what PJeOffice Pro from FlatPark already does.
+- **For those who need Web PKI or WebSigner (e-SAJ):** use [Sigillum](https://github.com/pedrohqb/sigillum), which installs them in the Flatpak browsers and connects them to Tessera's tokens.
+- **For those who package SerproID elsewhere:** read the SerproID section in [Drivers](drivers.md#serproid). There are four quirks that make signing fail in ways that are hard to understand.
 
-## Situação
+## Status
 
-Testado em 29 de outubro de 2026 num Bluefin, com um token GD Burti (SafeSign, certificado da OAB) e um certificado em nuvem SerproID:
+Tested on October 29, 2026 on Bluefin, with a GD Burti token (SafeSign, OAB certificate) and a SerproID cloud certificate:
 
-- PJeOffice Pro (FlatPark): assinatura com SerproID e SafeSign.
-- Firefox (Flathub): login com certificado (TLS 1.3) com SerproID e SafeSign.
-- Papers: assinatura de PDF com os dois, cada certificado listado uma vez.
-- Token Administration do SafeSign e aplicativo do SerproID abertos pelo Tessera.
+- PJeOffice Pro (FlatPark): signing with SerproID and SafeSign.
+- Firefox (Flathub): certificate login (TLS 1.3) with SerproID and SafeSign.
+- Papers: PDF signing with both, each certificate listed once.
+- SafeSign's Token Administration and the SerproID app opened through Tessera.
 
-- Chromium, Chrome, Edge e Brave: login com certificado com SerproID e SafeSign, com o PIN pedido uma vez.
-- Okular: assinatura de PDF.
+- Chromium, Chrome, Edge and Brave: certificate login with SerproID and SafeSign, with the PIN asked once.
+- Okular: PDF signing.
