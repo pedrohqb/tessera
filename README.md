@@ -29,18 +29,12 @@ Para o **Lacuna Web PKI** e o **Softplan WebSigner**, exigidos por alguns tribun
 
 ### 1. Preparar o sistema (uma vez)
 
-O sistema precisa de três coisas: o Flatpak com o Flathub, o serviço de cartões (`pcscd`) com o driver CCID, e o servidor p11-kit do usuário. No **Bluefin, Aurora e Bazzite**, as duas primeiras já vêm prontas.
+O sistema precisa de três coisas: o Flatpak com o Flathub, o serviço de cartões (`pcscd`) com o driver CCID, e o servidor p11-kit do usuário. O **Fedora** (tradicional e atômico), o **Bluefin**, o **Aurora** e o **Bazzite** já vêm com os pacotes; basta ligar os serviços, mais abaixo.
 
 Debian, Ubuntu, Linux Mint e derivados:
 
 ```bash
 sudo apt install flatpak pcscd libccid
-```
-
-Fedora tradicional (Workstation, KDE Plasma Desktop, etc.):
-
-```bash
-sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server
 ```
 
 Arch Linux, Manjaro, EndeavourOS e CachyOS:
@@ -63,6 +57,8 @@ systemctl --user enable --now p11-kit-server.socket
 ```
 
 O segundo comando é o que deixa os aplicativos verem os tokens do Tessera. A janela do Tessera também o mostra, com um botão de copiar.
+
+**Observação:** num Fedora em que algum desses pacotes tenha sido removido, reinstale-os com `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
 
 **Observação:** se o Flathub ainda não estiver configurado, rode:
 
