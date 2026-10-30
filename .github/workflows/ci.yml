@@ -17,12 +17,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libpcsclite-dev
+          # For the tests (tests/drivers.rs, the NSS test): SoftHSM, p11-kit's
+          # server helper, client module and headers, NSS, openssl and a C
+          # compiler for the fake drivers.
+          sudo apt-get install -y softhsm2 p11-kit p11-kit-modules libp11-kit-dev libnss3 openssl gcc
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       - run: cargo fmt --check
       - run: cargo clippy --locked -- -D warnings
       - run: cargo test --locked
+        env:
+          # A test whose tools are missing fails here instead of skipping.
+          TESSERA_TEST_REQUIRE: "1"
 
   flatpak:
     name: Flatpak bundle

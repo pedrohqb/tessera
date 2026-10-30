@@ -136,3 +136,83 @@ const PT_BR: &[(&str, &str)] = &[
      "Sem resposta 3 vezes seguidas. Aperte Reiniciar para tentar de novo, ou desligue o driver."),
     ("Could not turn on starting at login", "Não foi possível ativar o início automático"),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::PT_BR;
+    use std::collections::HashSet;
+
+    /// Every string the code passes to `t(…)`, read from the sources.
+    fn ui_strings() -> Vec<(String, String)> {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut found = Vec::new();
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|e| e != "rs") || path.ends_with("i18n.rs") {
+                continue;
+            }
+            let src = std::fs::read_to_string(&path).unwrap();
+            let bytes = src.as_bytes();
+            let mut i = 0;
+            while let Some(at) = src[i..].find("t(") {
+                let start = i + at;
+                i = start + 2;
+                // A call to `t`, not to `print(`, `get(`, …
+                if start > 0
+                    && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == b'_')
+                {
+                    continue;
+                }
+                let rest = src[i..].trim_start();
+                let Some(lit) = rest.strip_prefix('"') else {
+                    continue;
+                };
+                let mut s = String::new();
+                let mut chars = lit.chars();
+                while let Some(c) = chars.next() {
+                    match c {
+                        '"' => break,
+                        '\\' => {
+                            if let Some(n) = chars.next() {
+                                s.push(match n {
+                                    'n' => '\n',
+                                    other => other,
+                                });
+                            }
+                        }
+                        c => s.push(c),
+                    }
+                }
+                let file = path.file_name().unwrap().to_string_lossy().into_owned();
+                found.push((file, s));
+            }
+        }
+        found
+    }
+
+    #[test]
+    fn every_ui_string_has_a_portuguese_translation() {
+        let keys: HashSet<&str> = PT_BR.iter().map(|(en, _)| *en).collect();
+        let missing: Vec<String> = ui_strings()
+            .into_iter()
+            .filter(|(_, s)| !keys.contains(s.as_str()))
+            .map(|(f, s)| format!("{f}: {s:?}"))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "no translation for:\n{}",
+            missing.join("\n")
+        );
+    }
+
+    #[test]
+    fn no_string_is_translated_twice() {
+        let mut seen = HashSet::new();
+        let dups: Vec<&str> = PT_BR
+            .iter()
+            .map(|(en, _)| *en)
+            .filter(|en| !seen.insert(*en))
+            .collect();
+        assert!(dups.is_empty(), "translated more than once: {dups:?}");
+    }
+}

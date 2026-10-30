@@ -68,9 +68,17 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 
 ## Tests
 
-- **Unit:** `cargo test`.
-- **The full path with SoftHSM:** start a `p11-kit-server` with `P11_KIT_PRIVATEDIR` pointing to a `p11-kit-remote` that runs `target/debug/tessera remote "$@"`, and sign with `scripts/sign-test.py` through `p11-kit-client.so` and `P11_KIT_SERVER_ADDRESS`. With the environment variable `PIN=1234`, the script logs in to SoftHSM.
-- **The SerproID defect:** `gcc -shared -fPIC -o libfake.so tests/fake-driver/keeps-mechanism-pointer.c` and use it as `--provider`. Through the original `p11-kit-remote`, the server log shows `fake: C_Sign sees … hash=<garbage> -> WRONG`; through `tessera remote`, `hash=0x250 … -> OK`.
+`cargo test` runs all the automated tests; CI runs them on every push with `TESSERA_TEST_REQUIRE=1`, so a missing tool fails the run instead of skipping a test.
+
+- **Unit tests:** driver descriptions (`drivers.rs`), the Firefox profile lock and registering/removing the client module in an NSS database (`nss.rs`, needs `libnss3.so`), and the translations: every string passed to `t(…)` has a Portuguese entry, and none has two (`i18n.rs`).
+- **End to end (`tests/drivers.rs`):** `tessera serve` with test drivers, each connection served by `tessera remote`, and `tessera probe-sign` signing through `p11-kit-client.so`, as the apps do:
+  - a SoftHSM token with an RSA key: published to the host modules folder, signs with PSS and PKCS#1 v1.5 with its PIN, and refuses a wrong PIN;
+  - `tests/fake-driver/keeps-mechanism-pointer.c`, which behaves like SerproID: signs PSS only because `stable.rs` hands it parameters that are still valid in `C_Sign` (without that copy the test fails, with `hash=<garbage> -> WRONG` in the driver's log);
+  - `tests/fake-driver/slow-slot-list.c`: never published, and its first timeout reported.
+
+  They need softhsm2, openssl, a C compiler, p11-kit's server helper, client module and headers (on Ubuntu: `softhsm2 p11-kit p11-kit-modules libp11-kit-dev libnss3 openssl gcc`). Without them, a test is skipped with a message.
+- **By hand, the full path with SoftHSM:** start a `p11-kit-server` with `P11_KIT_PRIVATEDIR` pointing to a `p11-kit-remote` that runs `target/debug/tessera remote "$@"`, and sign with `scripts/sign-test.py` through `p11-kit-client.so` and `P11_KIT_SERVER_ADDRESS`. With the environment variable `PIN=1234`, the script logs in to SoftHSM.
+- **By hand, the SerproID defect:** `gcc -shared -fPIC -o libfake.so tests/fake-driver/keeps-mechanism-pointer.c` and use it as `--provider`. Through the original `p11-kit-remote`, the server log shows `fake: C_Sign sees … hash=<garbage> -> WRONG`; through `tessera remote`, `hash=0x250 … -> OK`.
 - **The window:** `tools/gui-test/run.sh` opens Tessera in an Xvfb with its own D-Bus session, a test SoftHSM driver and a fake tray (`fake-watcher.py`, which records the icon and the menu). From there, with `. /tmp/tessera-gui/env.sh`, `xdotool` clicks and `import -window root` takes the screenshot. This is how the buttons, Restart, the switches, closing and reopening, the tray and Quit were tested. The driver `tests/fake-driver/slow-slot-list.c` (a `C_GetSlotList` that takes 12 s), compiled and placed in a folder with a `driver.toml` in `TESSERA_DRIVERS_PATH`, tests the three attempts.
 
 ## Continuous integration

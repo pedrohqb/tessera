@@ -222,7 +222,10 @@ pub fn add_module(dir: &Path) -> Result<Outcome> {
 
 #[cfg(test)]
 mod tests {
-    use super::profile_in_use;
+    use super::{
+        add_module_in_process, has_module, poppler_db_ready, profile_in_use,
+        set_up_poppler_db_in_process, Outcome,
+    };
     use std::process::{Command, Stdio};
     use std::{fs, thread, time::Duration};
 
@@ -253,5 +256,27 @@ mod tests {
         child.wait().unwrap();
         assert!(!profile_in_use(&dir));
         fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Register the client module in a new database, then take it out again
+    /// the way the Papers/Chromium set-up does. One test, because NSS keeps
+    /// global state per process. Needs the system's libnss3.so.
+    #[test]
+    fn module_is_registered_and_removed() {
+        let dir = std::env::temp_dir().join(format!("tessera-nss-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        assert!(!has_module(&dir));
+        assert_eq!(add_module_in_process(&dir).unwrap(), Outcome::Added);
+        assert!(dir.join("cert9.db").exists());
+        assert!(has_module(&dir));
+        assert!(!poppler_db_ready(&dir));
+        assert_eq!(
+            add_module_in_process(&dir).unwrap(),
+            Outcome::AlreadyPresent
+        );
+        set_up_poppler_db_in_process(&dir).unwrap();
+        assert!(!has_module(&dir));
+        assert!(poppler_db_ready(&dir));
+        let _ = fs::remove_dir_all(&dir);
     }
 }
