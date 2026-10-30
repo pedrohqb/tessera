@@ -85,6 +85,15 @@ flatpak --user install flatpark io.github.pedrohqb.Tessera
 
 Na instalação, o Flatpak baixa os drivers dos sites oficiais dos fornecedores e confere cada um pelo SHA256. As atualizações chegam com o `flatpak update`, como as dos outros aplicativos.
 
+Para instalar para todos os usuários do computador (instalação de sistema, que pede a senha de administrador), use `--system` no lugar de `--user`:
+
+```bash
+flatpak --system remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
+flatpak --system install flatpark io.github.pedrohqb.Tessera
+```
+
+Funciona do mesmo jeito: cada usuário que abrir o Tessera tem a sua própria instância, com os seus tokens, e o passo 1 de cada aplicativo continua sendo por usuário.
+
 **Observação:** quem instalou antes uma versão de teste (o repositório `tessera-test`) deve tirá-la primeiro, sem apagar as configurações: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ---
@@ -135,6 +144,8 @@ Saia do Tessera (menu ☰ → **Sair**) e rode:
 ```bash
 flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 ```
+
+Numa instalação de sistema, troque `--user` por `--system`.
 
 A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --user --reset <aplicativo>`. Esse comando também apaga outras permissões que você tenha dado ao aplicativo.
 
@@ -243,6 +254,15 @@ flatpak --user install flatpark io.github.pedrohqb.Tessera
 
 During installation, Flatpak downloads the drivers from the vendors' official sites and checks each one against its SHA256. Updates come with `flatpak update`, like any other app.
 
+To install for every user of the computer (a system-wide install, which asks for the administrator password), use `--system` instead of `--user`:
+
+```bash
+flatpak --system remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
+flatpak --system install flatpark io.github.pedrohqb.Tessera
+```
+
+It works the same way: each user who opens Tessera gets their own instance, with their own tokens, and each app's step 1 is still per user.
+
 **Note:** if you installed a test build before (the `tessera-test` remote), remove it first, keeping your settings: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ### Usage
@@ -289,6 +309,8 @@ Quit Tessera (☰ menu → **Quit**) and run:
 ```bash
 flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 ```
+
+For a system-wide install, use `--system` instead of `--user`.
 
 Each app's step 1 permission is undone with `flatpak override --user --reset <app>`. That command also removes any other permission you gave the app.
 
