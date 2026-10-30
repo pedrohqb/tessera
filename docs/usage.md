@@ -11,7 +11,18 @@
 
 Nothing else is installed on the system.
 
-## Installing the published release
+## Installing from FlatPark
+
+The standard install, with updates through `flatpak update`:
+
+```sh
+flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
+flatpak --user install flatpark io.github.pedrohqb.Tessera
+```
+
+The FlatPark package (`registry/io.github.pedrohqb.Tessera` in [flatpark/flatpark](https://github.com/flatpark/flatpark)) installs the `tessera-x86_64.tar.gz` of each GitHub release, unmodified, and the same vendor drivers with the same pins as Tessera's own manifest. Its `apply_extra.sh` is this repository's plus the unpacking of that tarball.
+
+## Installing the published release directly
 
 Each release (tag `vX.Y.Z`) publishes on [Releases](https://github.com/pedrohqb/tessera/releases) the `tessera-repo.tar.gz`, a small Flatpak repository with the `install-test-repo.sh` script:
 

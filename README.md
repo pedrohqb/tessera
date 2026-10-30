@@ -74,13 +74,18 @@ flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/fl
 
 #### 2. Instalar o Tessera
 
+[![Get it on FlatPark](https://flatpark.org/badges/get-it-on-flatpark.svg)](https://flatpark.org/apps/io.github.pedrohqb.Tessera)
+
+O Tessera é distribuído pelo [FlatPark](https://flatpark.org), um repositório de Flatpaks. Adicione o repositório (uma vez) e instale:
+
 ```bash
-mkdir -p ~/Downloads/tessera && cd ~/Downloads/tessera && \
-curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/tessera-repo.tar.gz && \
-tar -xzf tessera-repo.tar.gz && ./install-test-repo.sh
+flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
+flatpak --user install flatpark io.github.pedrohqb.Tessera
 ```
 
-Na instalação, o Flatpak baixa os drivers dos sites oficiais dos fornecedores e confere cada um pelo SHA256. Para atualizar, rode os mesmos comandos com a versão nova.
+Na instalação, o Flatpak baixa os drivers dos sites oficiais dos fornecedores e confere cada um pelo SHA256. As atualizações chegam com o `flatpak update`, como as dos outros aplicativos.
+
+**Observação:** quem instalou antes uma versão de teste (o repositório `tessera-test`) deve tirá-la primeiro, sem apagar as configurações: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ---
 
@@ -129,7 +134,6 @@ Saia do Tessera (menu ☰ → **Sair**) e rode:
 
 ```bash
 flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
-flatpak remote-delete --user tessera-test
 ```
 
 A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --user --reset <aplicativo>`. Esse comando também apaga outras permissões que você tenha dado ao aplicativo.
@@ -228,13 +232,18 @@ flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/fl
 
 #### 2. Install Tessera
 
+[![Get it on FlatPark](https://flatpark.org/badges/get-it-on-flatpark.svg)](https://flatpark.org/apps/io.github.pedrohqb.Tessera)
+
+Tessera is distributed through [FlatPark](https://flatpark.org), a Flatpak remote. Add the remote (once) and install:
+
 ```bash
-mkdir -p ~/Downloads/tessera && cd ~/Downloads/tessera && \
-curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/tessera-repo.tar.gz && \
-tar -xzf tessera-repo.tar.gz && ./install-test-repo.sh
+flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
+flatpak --user install flatpark io.github.pedrohqb.Tessera
 ```
 
-During installation, Flatpak downloads the drivers from the vendors' official sites and checks each one against its SHA256. To update, run the same commands with the new release.
+During installation, Flatpak downloads the drivers from the vendors' official sites and checks each one against its SHA256. Updates come with `flatpak update`, like any other app.
+
+**Note:** if you installed a test build before (the `tessera-test` remote), remove it first, keeping your settings: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ### Usage
 
@@ -279,7 +288,6 @@ Quit Tessera (☰ menu → **Quit**) and run:
 
 ```bash
 flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
-flatpak remote-delete --user tessera-test
 ```
 
 Each app's step 1 permission is undone with `flatpak override --user --reset <app>`. That command also removes any other permission you gave the app.
