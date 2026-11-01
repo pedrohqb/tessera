@@ -42,7 +42,11 @@ install -Dm644 data/icons/io.github.pedrohqb.Tessera-symbolic.svg \
     "$appdir/usr/share/icons/hicolor/symbolic/apps/io.github.pedrohqb.Tessera-symbolic.svg"
 
 # p11-kit's server helper and client module, used when the system lacks them.
-helper=$(ls /usr/libexec/p11-kit/p11-kit-server /usr/lib/x86_64-linux-gnu/p11-kit/p11-kit-server 2>/dev/null | head -n1)
+helper=
+for c in /usr/libexec/p11-kit/p11-kit-server /usr/lib/x86_64-linux-gnu/p11-kit/p11-kit-server; do
+    if [ -x "$c" ]; then helper=$c; break; fi
+done
+[ -n "$helper" ] || { echo "p11-kit-server not found (install p11-kit)" >&2; exit 1; }
 client=/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so
 
 export DEPLOY_GTK_VERSION=4
