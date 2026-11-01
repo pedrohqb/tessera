@@ -122,6 +122,8 @@ modules:
       - install -Dm644 data/io.github.pedrohqb.Tessera.metainfo.xml /app/share/metainfo/io.github.pedrohqb.Tessera.metainfo.xml
       - install -Dm644 data/icons/io.github.pedrohqb.Tessera.svg /app/share/icons/hicolor/scalable/apps/io.github.pedrohqb.Tessera.svg
       - install -Dm644 data/icons/io.github.pedrohqb.Tessera-symbolic.svg /app/share/icons/hicolor/symbolic/apps/io.github.pedrohqb.Tessera-symbolic.svg
+      # The window's icons for desktops whose theme lacks them (Plasma).
+      - sh flatpak/fallback-icons.sh
       - for d in safesign safenet serproid; do install -Dm644 flatpak/drivers/$d/driver.toml /app/lib/tessera/drivers/$d/driver.toml; done
       - mkdir -p /app/lib/tessera/extensions
     sources:
