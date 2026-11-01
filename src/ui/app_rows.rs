@@ -226,10 +226,12 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
     let manual = (app.setup == Setup::Firefox).then(|| {
         let manual = adw::ActionRow::builder()
             .use_markup(false)
-            .title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"))
             .subtitle(paths::CLIENT_MODULE)
             .subtitle_selectable(true)
             .build();
+        // Set after use-markup is off: in the builder the title may come
+        // first, and GTK then reads its "&" as markup.
+        manual.set_title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"));
         row.add_row(&manual);
         manual
     });
