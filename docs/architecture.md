@@ -54,7 +54,7 @@ Each driver's environment comes from the `[env]` of its `driver.toml` (for examp
 
 ## Supervision of the drivers
 
-Supervision runs in the service, with or without the window (`supervise` in `src/ui.rs`, `check_drivers` in `src/main.rs`):
+Supervision runs in the service, with or without the window (`supervise` in `src/ui/supervise.rs`, `check_drivers` in `src/main.rs`):
 
 - Every 4 s with the window open, every 16 s with it closed (and every 10 s in `tessera serve`), Tessera lists the tokens of each running driver. It does this in a separate process (`tessera list-tokens`), with a 10 s limit, so that a hung driver does not hang the window.
 - The drivers that answer are published on the system. Those that do not answer within 10 s stop being published and are restarted; those that answer with an error only stop being published. After 3 times in a row without an answer, the driver is stopped, and the reason appears in its row in the window. A hung driver published on the system would hang every app that loads p11-kit. That is what happened with SafeNet without a token in the first test in Firefox.

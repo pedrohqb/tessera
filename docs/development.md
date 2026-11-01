@@ -5,7 +5,11 @@
 ```
 src/
   main.rs       command line; check_drivers (publish, restart, stop) and Health
-  ui.rs         the window, supervision without the window, the tray and the Background portal
+  ui/
+    mod.rs      the app: Hub (the state that outlives the window), actions, Background portal
+    window.rs   the window: service, readers, tokens, drivers
+    app_rows.rs the window's Apps section: each app and its steps
+    supervise.rs  supervision with or without the window, the tray and the background status
   server.rs     one p11-kit-server per driver (process group, PDEATHSIG, restart)
   remote.rs     `tessera remote`: the process that loads the driver on each connection
   stable.rs     stable copy of the mechanism parameters (the SerproID defect)

@@ -142,13 +142,25 @@ mod tests {
     use super::PT_BR;
     use std::collections::HashSet;
 
-    /// Every string the code passes to `t(…)`, read from the sources.
-    fn ui_strings() -> Vec<(String, String)> {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let mut found = Vec::new();
+    /// The .rs files under `dir`, subfolders (src/ui/) included.
+    fn sources(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+        let mut files = Vec::new();
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
-            if path.extension().is_none_or(|e| e != "rs") || path.ends_with("i18n.rs") {
+            if path.is_dir() {
+                files.extend(sources(&path));
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                files.push(path);
+            }
+        }
+        files
+    }
+
+    /// Every string the code passes to `t(…)`, read from the sources.
+    fn ui_strings() -> Vec<(String, String)> {
+        let mut found = Vec::new();
+        for path in sources(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src")) {
+            if path.ends_with("i18n.rs") {
                 continue;
             }
             let src = std::fs::read_to_string(&path).unwrap();
