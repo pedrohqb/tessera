@@ -129,6 +129,20 @@ jobs:
             echo "::error title=A driver is missing after the first start::$msg"
             exit 1
           fi
+      - name: Serve the drivers (informative)
+        continue-on-error: true
+        run: |
+          # Each driver loaded by `tessera remote` with its own environment,
+          # as in real use; the result goes into an annotation.
+          sudo apt-get install -y pcscd >/dev/null
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          squashfs-root/AppRun serve > serve.log 2>&1 &
+          sleep 25
+          squashfs-root/AppRun status > served.txt 2>&1 || true
+          kill %1 || true
+          cat served.txt
+          msg=$(sed -n '/^Drivers:/,/^$/p' served.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::notice title=AppImage drivers::$msg"
       - uses: actions/upload-artifact@v4
         with:
           name: tessera-appimage
