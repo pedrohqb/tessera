@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::process::Command;
 use std::rc::Rc;
 
-use super::app_rows::{apps_group, AppRows};
+use super::app_rows::{apps_group, AppRows, NativeRows};
 use super::supervise::{supervise, update_status};
 use super::Hub;
 use crate::apps;
@@ -60,6 +60,7 @@ pub(super) struct Win {
     /// (driver id, its row, the row's own subtitle) for update_drivers.
     pub(super) driver_rows: RefCell<Vec<(String, adw::ActionRow, String)>>,
     pub(super) app_rows: RefCell<Vec<AppRows>>,
+    pub(super) native_rows: RefCell<Vec<NativeRows>>,
     pub(super) last: RefCell<String>,
 }
 
@@ -488,6 +489,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         drivers: Section::new(t("Drivers"), None),
         driver_rows: RefCell::new(vec![]),
         app_rows: RefCell::new(vec![]),
+        native_rows: RefCell::new(vec![]),
         last: RefCell::new(String::new()),
     });
     win.host_row

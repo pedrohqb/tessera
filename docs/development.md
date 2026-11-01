@@ -15,7 +15,8 @@ src/
   stable.rs     stable copy of the mechanism parameters (the SerproID defect)
   trace.rs      call recorder (TESSERA_REMOTE_TRACE=1)
   status.rs     readers (pcsc), token listing, probe-module, probe-sign
-  apps.rs       the apps, the tessera-*.module files, overrides
+  apps.rs       the Flatpak apps, the tessera-*.module files, overrides
+  native.rs     the native apps: where their NSS databases are, their state, Set up
   nss.rs        NSS databases: registering p11-kit-client.so, the Papers database
   drivers.rs    discovery and reading of the driver.toml files
   paths.rs      all the paths (with the development environment variables)
@@ -25,8 +26,13 @@ src/
   i18n.rs       translation table for Brazilian Portuguese
 flatpak/
   io.github.pedrohqb.Tessera.yml   the manifest (permissions, pcsc-lite, extra-data)
-  apply_extra.sh                   unpacks the drivers at installation
+  apply_extra.sh                   unpacks the drivers at installation (the AppImage uses it too)
+  fallback-icons.sh                Adwaita icons for desktops whose theme lacks them (Plasma)
   drivers/<driver>/driver.toml     the description of each driver
+appimage/
+  build.sh                         builds Tessera-x86_64.AppImage (linuxdeploy + GTK plugin)
+  AppRun                           first start: downloads, checks and unpacks the drivers
+  drivers-list.py                  the pins, from the Flatpak manifest
 data/          .desktop, metainfo, icons (normal and symbolic), screenshot
 scripts/       pin-drivers.py, install-test-repo.sh, sign-test.py
 tests/fake-driver/   fake PKCS#11 drivers: one keeps the mechanism pointer,
@@ -91,7 +97,8 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 
 1. **Build and test:** `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`. Clippy also checks that every `unsafe` block and `unsafe fn` carries its `// SAFETY:` or `# Safety` note (the `[lints.clippy]` table in `Cargo.toml`).
 2. **Flatpak bundle:** `pin-drivers.py`, `flatpak-builder` (with the last lines of the log in an annotation, if it fails), `flatpak build-update-repo`, and the artifacts `tessera-repo.tar.gz` (test repository with `install-test-repo.sh`) and `tessera-x86_64.tar.gz` (the whole `/app` tree, for anyone who wants to package it as extra-data).
-3. **With a `vX.Y.Z` tag:** creates the release on GitHub with both files.
+3. **AppImage:** `appimage/build.sh` (linuxdeploy with its GTK plugin), then a check: the AppImage is unpacked, `libpcsclite` must not be bundled, and `AppRun status` (the first start: the drivers are downloaded, checked and unpacked) must list every driver with its files. The artifact is `tessera-appimage`.
+4. **With a `vX.Y.Z` tag:** creates the release on GitHub with the Flatpak files, and adds the AppImage to it.
 
 ## Publishing a release
 

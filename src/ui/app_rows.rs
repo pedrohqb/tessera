@@ -8,6 +8,7 @@ use std::rc::Rc;
 use super::window::{copy_button, plain_row, Win};
 use crate::apps::{self, ClientApp, Setup};
 use crate::i18n::t;
+use crate::native;
 use crate::nss;
 use crate::paths;
 
@@ -168,6 +169,9 @@ pub(super) fn update_apps(win: &Win) {
     for r in win.app_rows.borrow().iter() {
         update_app(r);
     }
+    for r in win.native_rows.borrow().iter() {
+        update_native(r);
+    }
 }
 
 pub(super) fn set_up_app(win: &Rc<Win>, app: &'static ClientApp) {
@@ -242,16 +246,106 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
     rows
 }
 
+/// The rows of one native app, refreshed by update_apps.
+pub(super) struct NativeRows {
+    app: &'static native::NativeApp,
+    row: adw::ActionRow,
+    button: gtk::Button,
+}
+
+/// A native app's icon from the desktop's theme, or a generic one.
+fn native_icon(app: &native::NativeApp) -> gtk::Image {
+    let theme = gtk::gdk::Display::default().map(|d| gtk::IconTheme::for_display(&d));
+    let name = match theme {
+        Some(theme) if theme.has_icon(app.icon) => app.icon,
+        _ => app.fallback_icon,
+    };
+    let image = gtk::Image::from_icon_name(name);
+    image.set_size_request(32, 32);
+    if name == app.icon {
+        image.set_pixel_size(32);
+    }
+    image
+}
+
+fn update_native(r: &NativeRows) {
+    r.row.set_visible(native::present(r.app));
+    r.row.set_subtitle(&native::subtitle(r.app));
+    r.button.set_visible(native::can_set_up(r.app));
+}
+
+fn set_up_native(win: &Rc<Win>, app: &'static native::NativeApp) {
+    let win = win.clone();
+    glib::spawn_future_local(async move {
+        let res = gio::spawn_blocking(move || native::set_up(app)).await;
+        match res {
+            Ok(Ok(done)) => win.toast(&done),
+            Ok(Err(e)) => win.alert(t("Could not set up"), &e),
+            Err(_) => win.toast(t("Could not set up")),
+        }
+        update_apps(&win);
+    });
+}
+
+fn native_row(win: &Rc<Win>, app: &'static native::NativeApp) -> NativeRows {
+    let row = adw::ActionRow::builder()
+        .use_markup(false)
+        .title(t(app.name))
+        .build();
+    row.add_prefix(&native_icon(app));
+    let button = gtk::Button::builder()
+        .label(t("Set up"))
+        .valign(gtk::Align::Center)
+        .tooltip_text(t(
+            "Adds p11-kit-proxy.so to the app's certificate database. Close the app first",
+        ))
+        .build();
+    {
+        let w = Rc::downgrade(win);
+        button.connect_clicked(move |_| {
+            if let Some(win) = w.upgrade() {
+                set_up_native(&win, app);
+            }
+        });
+    }
+    row.add_suffix(&button);
+    let rows = NativeRows { app, row, button };
+    update_native(&rows);
+    rows
+}
+
+/// A page of the Apps section: a line about it, then the rows.
+fn apps_page(caption: &str) -> (gtk::Box, gtk::ListBox) {
+    let page = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let label = gtk::Label::builder()
+        .label(caption)
+        .wrap(true)
+        .xalign(0.0)
+        .css_classes(["dim-label"])
+        .build();
+    let list = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .css_classes(["boxed-list"])
+        .build();
+    page.append(&label);
+    page.append(&list);
+    (page, list)
+}
+
+/// The Apps section, with a tab for the Flatpak apps and one for the
+/// native ones.
 pub(super) fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
     let group = adw::PreferencesGroup::builder()
         .title(t("Apps"))
-        .description(t(
-            "Apps that use the tokens through Tessera. Each needs one or two steps, once.",
-        ))
+        .description(t("Apps that use the tokens through Tessera."))
         .build();
+
+    let (flatpak_page, flatpak_list) = apps_page(t(
+        "Each needs one or two steps, once: access to the system connection, then (for some) a certificate database.",
+    ));
     for app in apps::APPS {
         let rows = client_row(win, app);
-        group.add(&rows.row);
+        flatpak_list.append(&rows.row);
         win.app_rows.borrow_mut().push(rows);
     }
     // PJeOffice Pro (FlatPark) already has access to the host's p11-kit
@@ -266,6 +360,32 @@ pub(super) fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
         "",
     );
     pje.add_prefix(&app_icon(&apps::PJEOFFICE));
-    group.add(&pje);
+    flatpak_list.append(&pje);
+
+    let (native_page, native_list) = apps_page(t(
+        "Apps installed from the distribution reach Tessera through p11-kit-proxy.so, without the system connection: each needs it in its certificate database, once.",
+    ));
+    for app in native::APPS {
+        let rows = native_row(win, app);
+        native_list.append(&rows.row);
+        win.native_rows.borrow_mut().push(rows);
+    }
+
+    let stack = gtk::Stack::builder()
+        .transition_type(gtk::StackTransitionType::Crossfade)
+        .vhomogeneous(false)
+        .build();
+    stack.add_titled(&flatpak_page, Some("flatpak"), t("Flatpak"));
+    stack.add_titled(&native_page, Some("native"), t("Native"));
+    // As an AppImage (or a plain binary), the native apps come first.
+    if !paths::in_flatpak() {
+        stack.set_visible_child_name("native");
+    }
+    let switcher = gtk::StackSwitcher::builder()
+        .stack(&stack)
+        .valign(gtk::Align::Center)
+        .build();
+    group.set_header_suffix(Some(&switcher));
+    group.add(&stack);
     group
 }

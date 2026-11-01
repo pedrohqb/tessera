@@ -50,6 +50,15 @@ finish-args:
   - --filesystem=~/.var/app/com.google.Chrome/data/pki/nssdb
   - --filesystem=~/.var/app/com.microsoft.Edge/.pki/nssdb
   - --filesystem=~/.var/app/com.microsoft.Edge/data/pki/nssdb
+  # Native apps (installed from the distribution), which load
+  # p11-kit-proxy.so from their NSS database: the native Firefox's profiles
+  # (Firefox 147+ under ~/.config, older releases under ~/.mozilla) and the
+  # database the native Chromium-based browsers share since Chromium 146
+  # (the older ~/.pki/nssdb is above). Only pkcs11.txt changes. No :create:
+  # Tessera does not make folders for apps that are not installed.
+  - --filesystem=~/.mozilla/firefox
+  - --filesystem=xdg-config/mozilla/firefox
+  - --filesystem=xdg-data/pki/nssdb
   # Read-only: the icons Flatpak exports for the installed apps, to show each
   # app with its own icon. The exported icons are links into each app's
   # folder under app/, so those are needed too.

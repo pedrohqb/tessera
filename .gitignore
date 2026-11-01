@@ -4,3 +4,5 @@
 /.flatpak-builder
 /dist
 *.flatpak
+/Tessera-x86_64.AppImage
+/squashfs-root

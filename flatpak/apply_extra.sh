@@ -14,6 +14,10 @@ set -u
 export LC_ALL=C
 
 extra_root="${EXTRA_ROOT:-/app/extra}"
+# Where the files will be when the drivers run: /app/extra in the Flatpak.
+# The AppImage unpacks into a temporary folder and then moves it to
+# ~/.local/share/tessera/extra, so it passes that final place here.
+app_extra="${APP_EXTRA:-/app/extra}"
 cd "$extra_root" || exit 1
 mkdir -p drivers
 
@@ -48,7 +52,7 @@ if [ -f safesign.deb ]; then
     if unpack_deb safesign.deb "$d"; then
         lib=$(find "$d" -name 'libaetpkss.so*' \( -type f -o -type l \) | sort | head -n1)
         if [ -n "$lib" ]; then
-            ln -sf "/app/extra/$lib" "$d/libaetpkss.so"
+            ln -sf "$app_extra/$lib" "$d/libaetpkss.so"
         else
             log "libaetpkss.so not found in the SafeSign package"
         fi
@@ -67,9 +71,9 @@ if [ -f safesign.deb ]; then
             ta=$(find "$d/usr" -type f -name tokenadmin | head -n1)
         fi
         if [ -n "$ta" ]; then
-            write_launcher "$d/tokenadmin" "/app/extra/$ta" \
-                "/app/extra/$d/usr/lib" \
-                "/app/extra/$d/gdbm/usr/lib/x86_64-linux-gnu"
+            write_launcher "$d/tokenadmin" "$app_extra/$ta" \
+                "$app_extra/$d/usr/lib" \
+                "$app_extra/$d/gdbm/usr/lib/x86_64-linux-gnu"
         fi
     else
         log "could not unpack SafeSign"
@@ -91,7 +95,7 @@ if [ -f safenet.zip ]; then
             rm -rf "$d/etc"
             lib=$(find "$d" -name 'libeToken.so*' \( -type f -o -type l \) | sort | head -n1)
             if [ -n "$lib" ]; then
-                ln -sf "/app/extra/$lib" "$d/libeToken.so"
+                ln -sf "$app_extra/$lib" "$d/libeToken.so"
             else
                 log "libeToken.so not found in the SafeNet package"
             fi
@@ -116,12 +120,12 @@ if [ -f serproid.deb ]; then
         # (cd /usr/share/serproid-desktop; ./jre/bin/java ...). Point the text
         # files at our copy; binaries are left alone.
         grep -rlI '/usr/share/serproid-desktop' "$d/usr" 2>/dev/null | while read -r f; do
-            sed -i "s|/usr/share/serproid-desktop|/app/extra/$d/usr/share/serproid-desktop|g" "$f"
+            sed -i "s|/usr/share/serproid-desktop|$app_extra/$d/usr/share/serproid-desktop|g" "$f"
         done
         lib=$(find "$d" -name 'libserproidp11.so' \( -type f -o -type l \) | head -n1)
         if [ -n "$lib" ]; then
-            ln -sf "/app/extra/$lib" "$d/libserproidp11.so"
-            ln -sf "/app/extra/$lib" "$(dirname "$lib")/libneoidp11.so"
+            ln -sf "$app_extra/$lib" "$d/libserproidp11.so"
+            ln -sf "$app_extra/$lib" "$(dirname "$lib")/libneoidp11.so"
         else
             log "libserproidp11.so not found in the SerproID package"
         fi
@@ -131,10 +135,10 @@ if [ -f serproid.deb ]; then
             exec_line=$(sed -n 's/^Exec=//p' "$desktop" | head -n1 | sed 's/ %[fFuU]//g')
             prog=${exec_line%% *}
             case "$prog" in
-                /*) prog="/app/extra/$d$prog" ;;
-                *) prog="/app/extra/$d/usr/bin/$prog" ;;
+                /*) prog="$app_extra/$d$prog" ;;
+                *) prog="$app_extra/$d/usr/bin/$prog" ;;
             esac
-            write_launcher "$d/serproid" "$prog" "/app/extra/$d/usr/lib"
+            write_launcher "$d/serproid" "$prog" "$app_extra/$d/usr/lib"
         else
             log "SerproID desktop file not found"
         fi

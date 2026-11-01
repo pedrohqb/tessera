@@ -72,7 +72,15 @@ Okular uses the KDE runtime, which has the same freedesktop base as the GNOME ru
 
 ## Native apps
 
-An app installed on the system (not Flatpak) that uses `p11-kit-proxy.so` sees Tessera's tokens with no configuration: the proxy reads `~/.config/pkcs11/modules`.
+Apps installed from the distribution (not Flatpak) are on the window's **Native** tab. They need no system connection: `p11-kit-proxy.so` reads `~/.config/pkcs11/modules`, where Tessera writes one `remote:` file per driver, and connects straight to Tessera's servers. What an NSS app needs is `p11-kit-proxy.so` in the database it opens; **Set up** registers it there (as `library=p11-kit-proxy.so`, by name: Fedora keeps it in `/usr/lib64`, Debian in `/usr/lib/x86_64-linux-gnu`, and `dlopen` finds it in either). Close the app first.
+
+- **Firefox:** every profile listed in `profiles.ini`, under `~/.config/mozilla/firefox` (Firefox 147+) and `~/.mozilla/firefox`. A running Firefox is detected by the lock on its profile.
+- **Chromium, Google Chrome, Microsoft Edge and Brave:** they share one database, `~/.pki/nssdb` if it exists, otherwise `~/.local/share/pki/nssdb` (Chromium 146+). The browsers are found by their folders in `~/.config` (outside Flatpak; the Flatpak does not look into the browsers' folders, and lists them generically). If the Chromium **Flatpak** is installed and the database is `~/.pki/nssdb`, Set up is refused: the Flatpak reads the real `~/.pki/nssdb` too and, since it already sees the tokens through its root-certificates module, it would list each token twice.
+- **Okular, Papers and Evince:** poppler opens the most recent `*default*` Firefox profile that has a `cert9.db` (see Papers above), otherwise `~/.pki/nssdb`. Set up registers the proxy in every such profile.
+
+On Fedora, NSS's `nss-sysinit` may already load p11-kit's modules into these databases. Registering the proxy too would show each token twice, so a database that loads `libnsssysinit.so` is reported as **probably ready**: set it up only if the tokens do not appear.
+
+Snap packages (Ubuntu's Firefox and Chromium) are not supported: their profiles live under `~/snap`, and their confinement decides which modules they may load.
 
 ## For Flatpak package maintainers
 

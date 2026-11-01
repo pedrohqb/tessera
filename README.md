@@ -94,6 +94,17 @@ flatpak --system install flatpark io.github.pedrohqb.Tessera
 
 Funciona do mesmo jeito: cada usuário que abrir o Tessera tem a sua própria instância, com os seus tokens, e o passo 1 de cada aplicativo continua sendo por usuário.
 
+#### Ou como AppImage
+
+Para quem não usa Flatpak, há também um AppImage, publicado a cada versão em [Releases](https://github.com/pedrohqb/tessera/releases). Baixe o `Tessera-x86_64.AppImage`, dê permissão de execução e abra:
+
+```bash
+chmod +x Tessera-x86_64.AppImage
+./Tessera-x86_64.AppImage
+```
+
+Na primeira execução, ele baixa os drivers dos sites oficiais dos fornecedores, confere cada um pelo SHA256 e os guarda em `~/.local/share/tessera`. Precisa do `curl` (ou do `wget`) e de um sistema com glibc 2.39 ou mais nova (Ubuntu 24.04, Fedora 40, Debian 13 ou posteriores). O preparo do sistema, acima, vale do mesmo jeito.
+
 **Observação:** quem instalou antes uma versão de teste (o repositório `tessera-test`) deve tirá-la primeiro, sem apagar as configurações: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ---
@@ -119,6 +130,16 @@ Em **Aplicativos**, cada aplicativo mostra o que falta. São no máximo dois pas
 | Papers e Okular | passo 1 e passo 2 |
 
 Quando tudo estiver certo, o aplicativo aparece como **Pronto**, e a linha **Conexão com o sistema** diz quantos tokens do Tessera os aplicativos estão vendo.
+
+A seção **Aplicativos** tem duas abas: **Flatpak**, com os passos acima, e **Nativos**, para os aplicativos instalados pela própria distribuição (o Firefox em `.rpm` ou `.deb`, por exemplo). Os nativos não precisam da conexão com o sistema: eles chegam ao Tessera pelo `p11-kit-proxy.so`, e o único passo é o botão **Configurar**, que o acrescenta ao banco de certificados do aplicativo. Feche o aplicativo antes.
+
+| Aplicativo nativo | Onde o Tessera configura |
+|---|---|
+| Firefox | todos os perfis |
+| Chromium, Chrome, Edge e Brave | o banco que eles compartilham (`~/.pki/nssdb` ou `~/.local/share/pki/nssdb`) |
+| Okular, Papers e Evince | o perfil padrão do Firefox, que é o banco que eles leem ao assinar |
+
+No Fedora, o sistema pode já carregar o p11-kit nesses bancos (nss-sysinit); nesse caso a linha diz "Provavelmente pronto", e só vale configurar se os tokens não aparecerem. No AppImage, a aba Nativos é a que abre primeiro.
 
 #### Em segundo plano
 
@@ -263,6 +284,17 @@ flatpak --system install flatpark io.github.pedrohqb.Tessera
 
 It works the same way: each user who opens Tessera gets their own instance, with their own tokens, and each app's step 1 is still per user.
 
+#### Or as an AppImage
+
+If you don't use Flatpak, there is also an AppImage, published with each release on [Releases](https://github.com/pedrohqb/tessera/releases). Download `Tessera-x86_64.AppImage`, make it executable and open it:
+
+```bash
+chmod +x Tessera-x86_64.AppImage
+./Tessera-x86_64.AppImage
+```
+
+On its first start, it downloads the drivers from the vendors' official sites, checks each against its SHA256 and keeps them in `~/.local/share/tessera`. It needs `curl` (or `wget`) and a system with glibc 2.39 or newer (Ubuntu 24.04, Fedora 40, Debian 13 or later). Preparing the system, above, applies all the same.
+
 **Note:** if you installed a test build before (the `tessera-test` remote), remove it first, keeping your settings: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ### Usage
@@ -286,6 +318,16 @@ Under **Apps**, each app shows what is missing. There are at most two steps, don
 | Papers and Okular | step 1 and step 2 |
 
 When everything is right, the app shows as **Ready**, and the **System connection** row tells how many of Tessera's tokens the apps see.
+
+The **Apps** section has two tabs: **Flatpak**, with the steps above, and **Native**, for the apps installed from the distribution itself (Firefox as an `.rpm` or `.deb`, say). Native apps need no system connection: they reach Tessera through `p11-kit-proxy.so`, and the only step is the **Set up** button, which adds it to the app's certificate database. Close the app first.
+
+| Native app | Where Tessera sets it up |
+|---|---|
+| Firefox | every profile |
+| Chromium, Chrome, Edge and Brave | the database they share (`~/.pki/nssdb` or `~/.local/share/pki/nssdb`) |
+| Okular, Papers and Evince | the default Firefox profile, the database they read when signing |
+
+On Fedora, the system may already load p11-kit in those databases (nss-sysinit); the row then says "Probably ready", and setting up is only worth it if the tokens do not appear. In the AppImage, the Native tab opens first.
 
 #### In the background
 

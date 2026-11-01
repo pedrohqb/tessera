@@ -10,12 +10,13 @@
 //!   tessera probe-module MOD    load a driver directly and report each step
 //!   tessera remote ...          (internal) serve one connection for p11-kit server
 //!   tessera list-tokens         (internal) list tokens at P11_KIT_SERVER_ADDRESS
-//!   tessera nss-add-module DIR  (internal) the NSS work of nss-setup
+//!   tessera nss-add-module DIR [MODULE]  (internal) the NSS work of nss-setup
 //!   tessera nss-poppler DIR      (internal) make the NSS database for Papers and Okular
 
 mod apps;
 mod drivers;
 mod i18n;
+mod native;
 mod nss;
 mod paths;
 mod remote;
@@ -297,10 +298,11 @@ fn main() -> ExitCode {
         }
         Some("nss-add-module") => {
             let Some(dir) = args.get(2) else {
-                eprintln!("usage: tessera nss-add-module DIR");
+                eprintln!("usage: tessera nss-add-module DIR [MODULE]");
                 return ExitCode::FAILURE;
             };
-            return match nss::add_module_in_process(&PathBuf::from(dir)) {
+            let module = args.get(3).map_or(paths::CLIENT_MODULE, String::as_str);
+            return match nss::add_module_in_process(&PathBuf::from(dir), module) {
                 Ok(nss::Outcome::Added) => {
                     println!("added");
                     ExitCode::SUCCESS

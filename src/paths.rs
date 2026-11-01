@@ -29,6 +29,12 @@ pub const APP_ID: &str = "io.github.pedrohqb.Tessera";
 /// runtime, and so in the GNOME and KDE ones built on it.
 pub const CLIENT_MODULE: &str = "/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so";
 
+/// The module native apps load: p11-kit's proxy, which reads
+/// ~/.config/pkcs11/modules and so reaches Tessera's servers directly. By
+/// name, not path: Fedora keeps it in /usr/lib64, Debian in
+/// /usr/lib/x86_64-linux-gnu, and dlopen finds it in either.
+pub const PROXY_MODULE: &str = "p11-kit-proxy.so";
+
 /// Name under which Tessera registers the client module in NSS databases.
 pub const NSS_MODULE_NAME: &str = "Tessera (p11-kit)";
 
@@ -151,8 +157,13 @@ pub fn firefox_profile_roots() -> Vec<PathBuf> {
 
 /// The Firefox Flatpak's profile folders, from each root's profiles.ini.
 pub fn firefox_profiles() -> Vec<PathBuf> {
+    profiles_in(&firefox_profile_roots())
+}
+
+/// The profile folders listed in each root's profiles.ini.
+pub fn profiles_in(roots: &[PathBuf]) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    for root in firefox_profile_roots() {
+    for root in roots {
         let Ok(ini) = std::fs::read_to_string(root.join("profiles.ini")) else {
             continue;
         };
@@ -184,6 +195,37 @@ pub fn firefox_profiles() -> Vec<PathBuf> {
     out
 }
 
+/// Is Tessera running as a Flatpak (rather than as an AppImage or a plain
+/// binary on the host)?
+pub fn in_flatpak() -> bool {
+    std::path::Path::new("/.flatpak-info").exists()
+}
+
+/// One of the host's XDG folders. In a Flatpak, $XDG_CONFIG_HOME and
+/// $XDG_DATA_HOME point into the app's own folder; Flatpak passes the host's
+/// values as $HOST_XDG_CONFIG_HOME and $HOST_XDG_DATA_HOME when they are set.
+fn host_xdg(var: &str, fallback: &str) -> PathBuf {
+    let name = if in_flatpak() {
+        format!("HOST_{var}")
+    } else {
+        var.to_string()
+    };
+    match env::var_os(name) {
+        Some(v) if !v.is_empty() => PathBuf::from(v),
+        _ => home().join(fallback),
+    }
+}
+
+/// The host's ~/.config.
+pub fn host_config_home() -> PathBuf {
+    host_xdg("XDG_CONFIG_HOME", ".config")
+}
+
+/// The host's ~/.local/share.
+pub fn host_data_home() -> PathBuf {
+    host_xdg("XDG_DATA_HOME", ".local/share")
+}
+
 /// The host's p11-kit server socket, as `--filesystem=xdg-run/p11-kit/pkcs11`
 /// shows it inside a sandbox.
 pub fn host_p11kit_socket() -> PathBuf {
@@ -193,4 +235,46 @@ pub fn host_p11kit_socket() -> PathBuf {
 /// `flatpak override --user` file for an app.
 pub fn user_override(app_id: &str) -> PathBuf {
     home().join(".local/share/flatpak/overrides").join(app_id)
+}
+
+/// The app icon (for the tray's pixmaps): next to the executable, as in
+/// /app/bin and /app/share (Flatpak) or usr/bin and usr/share (AppImage).
+pub fn app_icon_file() -> PathBuf {
+    let rel = format!("share/icons/hicolor/scalable/apps/{APP_ID}.svg");
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent()?.parent().map(|p| p.join(&rel)))
+        .filter(|p| p.exists())
+        .unwrap_or_else(|| PathBuf::from("/app").join(rel))
+}
+
+/// The command that starts Tessera in the background: the AppImage file
+/// itself when running from one ($APPIMAGE), otherwise this executable.
+fn background_command() -> String {
+    let exe = env::var_os("APPIMAGE")
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_exe().ok())
+        .unwrap_or_else(|| PathBuf::from("tessera"));
+    format!("\"{}\" --background", exe.display())
+}
+
+/// Outside Flatpak: start at login through ~/.config/autostart.
+pub fn set_host_autostart(on: bool) -> std::io::Result<()> {
+    let file = host_config_home()
+        .join("autostart")
+        .join(format!("{APP_ID}.desktop"));
+    if !on {
+        return match std::fs::remove_file(&file) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+            _ => Ok(()),
+        };
+    }
+    std::fs::create_dir_all(file.parent().unwrap_or(&file))?;
+    std::fs::write(
+        &file,
+        format!(
+            "[Desktop Entry]\nType=Application\nName=Tessera\nExec={}\nIcon={APP_ID}\nX-GNOME-Autostart-enabled=true\n",
+            background_command()
+        ),
+    )
 }

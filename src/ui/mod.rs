@@ -124,15 +124,24 @@ fn present(app: &adw::Application, hub: &Rc<Hub>) {
     }
 }
 
-async fn request_background(autostart: bool) -> ashpd::Result<bool> {
+/// Start at login or not: through the Background portal in a Flatpak, and
+/// with a file in ~/.config/autostart otherwise (an AppImage has no app ID
+/// the portal knows).
+async fn request_background(autostart: bool) -> Result<bool, String> {
+    if !paths::in_flatpak() {
+        return paths::set_host_autostart(autostart)
+            .map(|()| autostart)
+            .map_err(|e| e.to_string());
+    }
     let response = ashpd::desktop::background::Background::request()
         .reason("Keep the token service running so other apps can use your tokens")
         .auto_start(autostart)
         .command(["tessera", "--background"])
         .dbus_activatable(false)
         .send()
-        .await?
-        .response()?;
+        .await
+        .and_then(|r| r.response())
+        .map_err(|e| e.to_string())?;
     Ok(response.auto_start())
 }
 
@@ -162,7 +171,7 @@ fn setup_actions(app: &adw::Application, hub: &Rc<Hub>) {
                         eprintln!("tessera: background portal: {e}");
                         let win = hub.win.borrow().clone();
                         if let Some(win) = win {
-                            win.alert(t("Could not turn on starting at login"), &format!("{e}"));
+                            win.alert(t("Could not turn on starting at login"), &e);
                         }
                     }
                 }

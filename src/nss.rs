@@ -28,14 +28,36 @@ pub enum Outcome {
     AlreadyPresent,
 }
 
-/// Is the client module already listed in this database's pkcs11.txt?
-pub fn has_module(dir: &Path) -> bool {
+/// The libraries listed in this database's pkcs11.txt.
+fn libraries(dir: &Path) -> Vec<String> {
     fs::read_to_string(dir.join("pkcs11.txt"))
         .map(|t| {
             t.lines()
-                .any(|l| l.trim() == format!("library={}", paths::CLIENT_MODULE))
+                .filter_map(|l| l.trim().strip_prefix("library="))
+                .map(|l| l.trim().to_string())
+                .collect()
         })
-        .unwrap_or(false)
+        .unwrap_or_default()
+}
+
+/// Is `module` listed in this database's pkcs11.txt? A bare file name
+/// (p11-kit-proxy.so) also matches a full path that ends in it.
+pub fn has_library(dir: &Path, module: &str) -> bool {
+    libraries(dir)
+        .iter()
+        .any(|l| l == module || (!module.contains('/') && l.ends_with(&format!("/{module}"))))
+}
+
+/// Is the client module already listed in this database's pkcs11.txt?
+pub fn has_module(dir: &Path) -> bool {
+    has_library(dir, paths::CLIENT_MODULE)
+}
+
+/// Does this database load NSS's system module (nss-sysinit)? On Fedora
+/// that module brings in p11-kit's modules too, so a native app may already
+/// see the tokens without anything registered.
+pub fn uses_sysinit(dir: &Path) -> bool {
+    has_library(dir, "libnsssysinit.so")
 }
 
 /// Firefox holds its profile locked while running; adding a module then would
@@ -152,9 +174,10 @@ pub fn set_up_poppler_db(dir: &Path) -> Result<Outcome> {
     Err(anyhow!("{}", String::from_utf8_lossy(&out.stderr).trim()))
 }
 
-/// Runs in the child process.
-pub fn add_module_in_process(dir: &Path) -> Result<Outcome> {
-    if has_module(dir) {
+/// Runs in the child process: register `module` (p11-kit-client.so for a
+/// Flatpak app, p11-kit-proxy.so for a native one).
+pub fn add_module_in_process(dir: &Path, module: &str) -> Result<Outcome> {
+    if has_library(dir, module) {
         return Ok(Outcome::AlreadyPresent);
     }
     fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
@@ -186,7 +209,7 @@ pub fn add_module_in_process(dir: &Path) -> Result<Outcome> {
             bail!("NSS_Initialize failed (NSS error {})", err());
         }
         let name = CString::new(paths::NSS_MODULE_NAME)?;
-        let module = CString::new(paths::CLIENT_MODULE)?;
+        let module = CString::new(module)?;
         let rv = add(name.as_ptr(), module.as_ptr(), 0, 0);
         let code = err();
         shutdown();
@@ -199,13 +222,19 @@ pub fn add_module_in_process(dir: &Path) -> Result<Outcome> {
 
 /// Called from the GUI: runs `tessera nss-add-module <dir>`.
 pub fn add_module(dir: &Path) -> Result<Outcome> {
-    if has_module(dir) {
+    add_library(dir, paths::CLIENT_MODULE)
+}
+
+/// Called from the GUI: runs `tessera nss-add-module <dir> <module>`.
+pub fn add_library(dir: &Path, module: &str) -> Result<Outcome> {
+    if has_library(dir, module) {
         return Ok(Outcome::AlreadyPresent);
     }
     let exe = std::env::current_exe().context("finding our own executable")?;
     let out = Command::new(exe)
         .arg("nss-add-module")
         .arg(dir)
+        .arg(module)
         .output()
         .context("running nss-add-module")?;
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -223,9 +252,10 @@ pub fn add_module(dir: &Path) -> Result<Outcome> {
 #[cfg(test)]
 mod tests {
     use super::{
-        add_module_in_process, has_module, poppler_db_ready, profile_in_use,
+        add_module_in_process, has_library, has_module, poppler_db_ready, profile_in_use,
         set_up_poppler_db_in_process, Outcome,
     };
+    use crate::paths;
     use std::process::{Command, Stdio};
     use std::{fs, thread, time::Duration};
 
@@ -266,17 +296,29 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("tessera-nss-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         assert!(!has_module(&dir));
-        assert_eq!(add_module_in_process(&dir).unwrap(), Outcome::Added);
+        assert_eq!(
+            add_module_in_process(&dir, paths::CLIENT_MODULE).unwrap(),
+            Outcome::Added
+        );
         assert!(dir.join("cert9.db").exists());
         assert!(has_module(&dir));
         assert!(!poppler_db_ready(&dir));
         assert_eq!(
-            add_module_in_process(&dir).unwrap(),
+            add_module_in_process(&dir, paths::CLIENT_MODULE).unwrap(),
             Outcome::AlreadyPresent
         );
         set_up_poppler_db_in_process(&dir).unwrap();
         assert!(!has_module(&dir));
         assert!(poppler_db_ready(&dir));
+        // A native app's set-up: p11-kit-proxy.so, by name (NSS writes it
+        // as given; dlopen finds it in the system's library folders).
+        assert!(!has_library(&dir, paths::PROXY_MODULE));
+        assert_eq!(
+            add_module_in_process(&dir, paths::PROXY_MODULE).unwrap(),
+            Outcome::Added
+        );
+        assert!(has_library(&dir, paths::PROXY_MODULE));
+        assert!(!has_module(&dir));
         let _ = fs::remove_dir_all(&dir);
     }
 }
