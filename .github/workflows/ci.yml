@@ -143,6 +143,22 @@ jobs:
           cat served.txt
           msg=$(sed -n '/^Drivers:/,/^$/p' served.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::notice title=AppImage drivers::$msg"
+      - name: Open the window
+        run: |
+          # The bundled GTK and libadwaita must open the window on a plain
+          # X server; GTK's warnings go into an annotation.
+          sudo apt-get install -y xvfb xdotool >/dev/null
+          export XDG_RUNTIME_DIR=$(mktemp -d) DISPLAY=:99 GDK_BACKEND=x11
+          Xvfb :99 -screen 0 1100x1300x24 >/dev/null 2>&1 &
+          sleep 2
+          dbus-run-session -- sh -c 'squashfs-root/AppRun > gui.log 2>&1 & sleep 15; xdotool search --name "^Tessera$" > window.txt; true'
+          warnings=$(grep -iE "critical|error|warning|failed" gui.log | grep -v "accessibility bus" | head -n 20 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          [ -n "$warnings" ] && echo "::notice title=AppImage window log::$warnings"
+          if [ ! -s window.txt ]; then
+            msg=$(tail -n 40 gui.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=The AppImage window did not open::$msg"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: tessera-appimage
