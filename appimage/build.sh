@@ -22,7 +22,9 @@ if [ ! -x "$tools/linuxdeploy" ]; then
         https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
     curl -fsSL -o "$tools/linuxdeploy-plugin-gtk.sh" \
         https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh
-    chmod +x "$tools/linuxdeploy" "$tools/linuxdeploy-plugin-gtk.sh"
+    curl -fsSL -o "$tools/appimagetool" \
+        https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+    chmod +x "$tools/linuxdeploy" "$tools/linuxdeploy-plugin-gtk.sh" "$tools/appimagetool"
 fi
 
 cargo build --release --locked
@@ -63,7 +65,10 @@ cd "$work"
     --icon-file "$repo/data/icons/io.github.pedrohqb.Tessera.svg" \
     --custom-apprun "$repo/appimage/AppRun" \
     --exclude-library 'libpcsclite*' \
-    --plugin gtk \
-    --output appimage
-mv -f Tessera*-x86_64.AppImage "$repo/Tessera-x86_64.AppImage"
+    --plugin gtk
+# The GTK plugin runs linuxdeploy again for its modules, and that run copies
+# every missing dependency, libpcsclite included: take it out again, then
+# pack the AppDir.
+rm -f "$appdir"/usr/lib/libpcsclite*
+ARCH=x86_64 "$tools/appimagetool" --no-appstream "$appdir" "$repo/Tessera-x86_64.AppImage"
 echo "Built $repo/Tessera-x86_64.AppImage"
