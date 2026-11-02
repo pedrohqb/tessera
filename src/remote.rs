@@ -226,12 +226,20 @@ pub fn private_dir() -> std::io::Result<PathBuf> {
 /// the desktop outside the sandbox cannot open: the notification showed a
 /// broken picture. This drops the icon and image hints and shows Tessera's
 /// icon.
+///
+/// It also adds the time to the text. From the sandbox, notify-send goes
+/// through Flatpak's notification portal, as Tessera's notification, and
+/// Plasma does not show a notification identical to the previous one (it
+/// only goes to the history): signing twice in a row, the second "approve
+/// on your phone" never appeared. With the time, each one differs.
 const NOTIFY_SEND: &str = r#"#!/bin/sh
-# Written by Tessera: notify-send for the drivers, with Tessera's icon.
-hint=0 skip=0
+# Written by Tessera: notify-send for the drivers, with Tessera's icon and
+# the time added to the text.
+hint=0 skip=0 value=0 n=0 p1= p2=
 for a do
     shift
     if [ $skip = 1 ]; then skip=0; continue; fi
+    if [ $value = 1 ]; then value=0; set -- "$@" "$a"; continue; fi
     if [ $hint = 1 ]; then
         hint=0
         case $a in *image-path*|*image_path*|*image-data*|*image_data*|*icon_data*) continue ;; esac
@@ -243,9 +251,95 @@ for a do
         -i*|--icon=*) continue ;;
         -h|--hint) hint=1; continue ;;
         --hint=*image-path*|--hint=*image_path*|--hint=*image-data*|--hint=*image_data*|--hint=*icon_data*) continue ;;
+        -u|-t|-a|-c|-r|-A|--urgency|--expire-time|--app-name|--category|--replace-id|--action)
+            value=1; set -- "$@" "$a"; continue ;;
+        -*) set -- "$@" "$a"; continue ;;
     esac
-    set -- "$@" "$a"
+    # The summary, then the body.
+    n=$((n + 1))
+    if [ $n = 1 ]; then p1=$a; elif [ $n = 2 ]; then p2=$a; else set -- "$@" "$a"; fi
 done
+now=$(date +%H:%M:%S)
+if [ $n -ge 2 ]; then
+    set -- "$@" "$p1" "$p2 ($now)"
+elif [ $n = 1 ]; then
+    set -- "$@" "$p1 ($now)"
+fi
 real=$(PATH=${PATH#*:} command -v notify-send) || exit 0
 exec "$real" --icon=io.github.pedrohqb.Tessera "$@"
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::NOTIFY_SEND;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::process::Command;
+
+    /// The drivers' notify-send: Tessera's icon instead of the driver's
+    /// image, and the time added to the text (Plasma does not show a
+    /// notification identical to the previous one).
+    #[test]
+    fn notify_send_adds_the_time_and_tesseras_icon() {
+        let dir = std::env::temp_dir().join(format!("tessera-notify-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let (ours, real) = (dir.join("ours"), dir.join("real"));
+        fs::create_dir_all(&ours).unwrap();
+        fs::create_dir_all(&real).unwrap();
+        let script = ours.join("notify-send");
+        fs::write(&script, NOTIFY_SEND).unwrap();
+        // The real notify-send, here one that prints its arguments.
+        let fake = real.join("notify-send");
+        fs::write(&fake, "#!/bin/sh\nfor a do printf '%s\\n' \"$a\"; done\n").unwrap();
+        for f in [&script, &fake] {
+            fs::set_permissions(f, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let run = |args: &[&str]| -> Vec<String> {
+            let out = Command::new(&script)
+                .args(args)
+                .env(
+                    "PATH",
+                    format!("{}:{}:/usr/bin:/bin", ours.display(), real.display()),
+                )
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .map(str::to_string)
+                .collect()
+        };
+        let is_time = |s: &str| {
+            let t = s.trim_start_matches('(').trim_end_matches(')');
+            t.len() == 8 && t.chars().filter(|c| *c == ':').count() == 2
+        };
+
+        // As SerproID calls it: an image, an urgency, a summary and a body.
+        let args = run(&[
+            "-i",
+            "/usr/share/serproid-desktop/icon.png",
+            "-u",
+            "normal",
+            "SerproID",
+            "Autorize no celular",
+        ]);
+        assert_eq!(args[0], "--icon=io.github.pedrohqb.Tessera");
+        assert!(!args.iter().any(|a| a.contains("serproid-desktop")));
+        assert_eq!(&args[1..4], ["-u", "normal", "SerproID"]);
+        let body = &args[4];
+        assert!(body.starts_with("Autorize no celular ("), "{body}");
+        assert!(is_time(body.rsplit(' ').next().unwrap()), "{body}");
+
+        // A summary alone gets the time; image hints are dropped.
+        let args = run(&[
+            "--hint=string:image-path:/x.png",
+            "-h",
+            "int:x:1",
+            "Assinatura",
+        ]);
+        assert_eq!(args[1], "--hint=int:x:1");
+        assert!(args[2].starts_with("Assinatura ("), "{:?}", args);
+        assert_eq!(args.len(), 3);
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
