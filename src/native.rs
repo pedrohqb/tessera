@@ -172,10 +172,12 @@ pub fn host_p11kit_library() -> &'static str {
     p11kit_library_for(&host_os_release())
 }
 
-/// The host's os-release (in a Flatpak, /run/host/os-release).
+/// The host's os-release (in a Flatpak, /run/host/os-release;
+/// TESSERA_OS_RELEASE, another file, for the tests).
 fn host_os_release() -> String {
-    ["/run/host/os-release", "/etc/os-release"]
-        .iter()
+    let test = std::env::var_os("TESSERA_OS_RELEASE").map(PathBuf::from);
+    test.into_iter()
+        .chain(["/run/host/os-release", "/etc/os-release"].map(PathBuf::from))
         .find_map(|f| std::fs::read_to_string(f).ok())
         .unwrap_or_default()
 }
@@ -206,44 +208,28 @@ fn p11kit_library_for(os_release: &str) -> &'static str {
     }
 }
 
-/// Fedora's crypto-policies file for NSS, which NSS reads whenever it opens
-/// a database.
+/// Fedora's crypto-policies file for NSS (reported by the CI test).
+#[cfg(test)]
 const NSS_POLICY: &str = "/etc/crypto-policies/back-ends/nss.config";
 
 /// Does the system's NSS load p11-kit for every program that uses it?
 /// Fedora and its family do: their crypto-policies register p11-kit-proxy.so
-/// in NSS_POLICY, so the native Firefox, Chromium, Okular and Papers see the
-/// tokens with nothing registered in their databases (and would see each
-/// token twice with Tessera's module too). Outside a Flatpak the file
-/// itself is read; a Flatpak cannot see the host's /etc, so the
-/// distribution decides. CI checks the two agree on Fedora, Debian, Ubuntu,
-/// Arch and openSUSE (detection_matches_this_system).
+/// for NSS, and their NSS reads that whenever it opens a database, so the
+/// native Firefox, Chromium, Okular and Papers see the tokens with nothing
+/// registered in their databases (and would see each token twice with
+/// Tessera's module too). openSUSE ships the same crypto-policies file, but
+/// its NSS does not load it. Decided by the distribution, which is all a
+/// Flatpak can see of the host; CI checks it against what NSS actually loads
+/// on Fedora, Debian, Ubuntu, Arch and openSUSE
+/// (detection_matches_this_system).
 pub fn system_nss_loads_p11kit() -> bool {
-    if paths::in_flatpak() {
-        policy_by_release(&host_os_release())
-    } else {
-        policy_file_loads_p11kit()
-    }
+    policy_by_release(&host_os_release())
 }
 
 fn policy_by_release(os_release: &str) -> bool {
     let ids = release_ids(os_release);
     ids.iter()
         .any(|i| ["fedora", "rhel", "centos"].contains(&i.as_str()))
-}
-
-fn policy_file_loads_p11kit() -> bool {
-    // TESSERA_NSS_POLICY: another file, for the tests.
-    let file = std::env::var_os("TESSERA_NSS_POLICY")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(NSS_POLICY));
-    std::fs::read_to_string(file)
-        .map(|t| {
-            t.lines()
-                .filter_map(|l| l.trim().strip_prefix("library="))
-                .any(|l| l.contains("p11-kit") && !l.contains("trust"))
-        })
-        .unwrap_or(false)
 }
 
 /// Is this list.a3 entry p11-kit (the proxy, or libp11-kit.so, which is the
@@ -460,10 +446,12 @@ mod tests {
         std::env::set_var("HOME", &home);
         std::env::set_var("XDG_CONFIG_HOME", home.join(".config"));
         std::env::set_var("XDG_DATA_HOME", home.join(".local/share"));
-        // As on a system whose NSS does not load p11-kit by itself (the
-        // Fedora case comes at the end).
-        let policy = home.join("nss.config");
-        std::env::set_var("TESSERA_NSS_POLICY", &policy);
+        // As on a distribution whose NSS does not load p11-kit by itself
+        // (the Fedora case comes at the end).
+        fs::create_dir_all(&home).unwrap();
+        let release = home.join("os-release");
+        fs::write(&release, "ID=debian\n").unwrap();
+        std::env::set_var("TESSERA_OS_RELEASE", &release);
 
         // Nothing installed: no database anywhere.
         assert!(matches!(state(&PDF_VIEWERS), State::NoDatabase));
@@ -568,14 +556,10 @@ mod tests {
             .unwrap()
             .ends_with(&format!("list.a3={}\n", host_p11kit_library())));
 
-        // Fedora: crypto-policies load p11-kit in every NSS database.
+        // Fedora and its family: their NSS loads p11-kit in every database.
         // Native Firefox (its profiles have Tessera's module from above)
         // then shows each token twice, and offers to remove the module.
-        fs::write(
-            &policy,
-            "library=\nname=Policy\n\nlibrary=p11-kit-proxy.so\nname=p11-kit-proxy\n",
-        )
-        .unwrap();
+        fs::write(&release, "ID=bluefin\nID_LIKE=\"fedora\"\n").unwrap();
         assert!(system_nss_loads_p11kit());
         assert!(matches!(state(&FIREFOX), State::Twice));
         assert!(can_set_up(&FIREFOX));
@@ -595,7 +579,7 @@ mod tests {
         }
         assert!(matches!(state(&FIREFOX), State::BySystem));
         assert!(!can_set_up(&FIREFOX));
-        std::env::remove_var("TESSERA_NSS_POLICY");
+        std::env::remove_var("TESSERA_OS_RELEASE");
 
         let _ = fs::remove_dir_all(&home);
     }
@@ -646,10 +630,9 @@ mod tests {
     /// - The path written into PJeOffice's list.a3, chosen from os-release,
     ///   exists.
     /// - A fresh NSS database, made the way a browser makes its own: Tessera
-    ///   calls it ready without Set up (crypto-policies, nss-sysinit, or
+    ///   calls it ready without Set up (by the distribution, nss-sysinit, or
     ///   p11-kit already there) exactly when NSS, opening it, loads a p11-kit
-    ///   module; and os-release (all a Flatpak sees) agrees with the
-    ///   crypto-policies file.
+    ///   module.
     ///
     /// Needs certutil and modutil (NSS's tools) and p11-kit.
     #[test]
@@ -688,20 +671,15 @@ mod tests {
             let l = l.to_lowercase();
             l.contains("library name:") && l.contains("p11-kit") && !l.contains("trust")
         });
-        let by_policy = policy_file_loads_p11kit();
+        let policy_file = fs::read_to_string(NSS_POLICY)
+            .map(|t| t.contains("p11-kit-proxy"))
+            .unwrap_or(false);
         let tessera_says_ready =
             system_nss_loads_p11kit() || nss::has_p11kit(&dir) || nss::uses_sysinit(&dir);
         println!(
-            "REPORT: {distro}: fresh NSS database: crypto-policies={by_policy} sysinit={} p11-kit registered={} NSS loads p11-kit={nss_loads_p11kit} Tessera says ready={tessera_says_ready}",
+            "REPORT: {distro}: fresh NSS database: crypto-policies file lists p11-kit={policy_file} sysinit={} p11-kit registered={} NSS loads p11-kit={nss_loads_p11kit} Tessera says ready={tessera_says_ready}",
             nss::uses_sysinit(&dir),
             nss::has_p11kit(&dir),
-        );
-        // In a Flatpak only os-release is visible: it must say the same as
-        // the crypto-policies file.
-        assert_eq!(
-            policy_by_release(&release),
-            by_policy,
-            "on {distro}, os-release and {NSS_POLICY} disagree"
         );
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(
