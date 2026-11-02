@@ -49,6 +49,17 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.2.0" date="2026-11-02">
+      <description>
+        <p>Native apps: a new tab sets up the Firefox, Chromium-based browsers, Okular, Papers and PJeOffice Pro installed from the distribution, and leaves alone the ones the system already gives p11-kit (Fedora and its family).</p>
+        <ul>
+          <li>Every app shows its own icon, installed or not, and the window keeps its icons on KDE Plasma; the tray icon follows the panel's colors.</li>
+          <li>SerproID's "approve on your phone" notification shows for every signature on KDE Plasma.</li>
+          <li>Fewer permissions: no access to the other apps' folders.</li>
+          <li>Tests of the window and of the detection on Fedora, Debian, Ubuntu, Arch and openSUSE run on every change.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-29">
       <description>
         <p>First release: one p11-kit server per driver (SafeSign IC, SafeNet Authentication Client, SerproID), published through the host p11-kit server; readers, tokens and certificates; set-up for Firefox, Chromium, Google Chrome, Microsoft Edge, Brave, Papers and Okular; tray icon and start at login.</p>

@@ -89,8 +89,9 @@ pub(super) fn plain_row(title: &str, subtitle: &str, icon: &str) -> adw::ActionR
     row
 }
 
-/// Let the icon theme find the host's own icon themes, where Flatpak shows
-/// them, for the native apps' icons. The Flatpak apps' icons come from
+/// Let the icon theme find Tessera's own icons wherever it is unpacked, and
+/// the host's own icon themes, where Flatpak shows them, for the native
+/// apps' icons. The Flatpak apps' icons come from
 /// Flatpak's AppStream data (see app_rows.rs), which needs no access to the
 /// apps' own folders.
 pub(super) fn add_host_icons() {
@@ -98,8 +99,16 @@ pub(super) fn add_host_icons() {
         return;
     };
     let theme = gtk::IconTheme::for_display(&display);
-    for dir in ["/run/host/share/icons", "/run/host/user-share/icons"] {
-        let dir = std::path::Path::new(dir);
+    // Tessera's own icons next to its executable: in FlatPark's package the
+    // release tree is unpacked under /app/extra/tessera, outside /app/share,
+    // where the theme would not look (in Tessera's own Flatpak this is
+    // /app/share/icons, which the theme already has).
+    let own = std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.parent()?.join("share/icons")));
+    let host =
+        ["/run/host/share/icons", "/run/host/user-share/icons"].map(std::path::PathBuf::from);
+    for dir in own.into_iter().chain(host) {
         if dir.is_dir() {
             theme.add_search_path(dir);
         }
