@@ -33,6 +33,7 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | KDE Plasma | a real token (type not recorded) | Native Okular and Papers, through the native Firefox's database | Sign PDFs |
 | Not recorded (a user's report) | SafeNet | Not recorded | Works |
 | openSUSE Tumbleweed | a real token (type not recorded) | Tessera from FlatPark, with `p11-kit-server` and its socket | Works |
+| openSUSE Tumbleweed | a real token (type not recorded) | Native Firefox | Shows **Set up** (openSUSE's NSS does not load p11-kit on its own, as the CI check found); sees the token after Set up |
 | Ubuntu 24.04 | — | The host's p11-kit server as a user service (Ubuntu ships no `p11-kit-server.socket`; see [usage](usage.md)) | Works |
 | KDE Plasma (CachyOS) | a real token (type not recorded) | Web PKI and WebSigner, vendors' official packages, native browsers | Work with p11-kit's library (`/lib/libp11-kit.so`, the same module as `p11-kit-proxy.so` there) added by hand under the plugin's custom options |
 
