@@ -11,7 +11,7 @@
 | What the host sees | `p11-kit list-modules` (on the host) |
 | What an app sees | `flatpak run --command=sh <app> -c 'p11-kit list-modules'` |
 | The host server | `systemctl --user status p11-kit-server.socket p11-kit-server.service`; the log in `journalctl --user -u p11-kit-server.service` |
-| "Unit p11-kit-server.socket does not exist" | Debian, Ubuntu or Mint: their p11-kit has no systemd units | The user service in [usage](usage.md) (the window's copy button gives it) |
+| "Unit p11-kit-server.socket does not exist" | The Debian family (Ubuntu 26.04, say): its p11-kit has no systemd units | The user service in [usage](usage.md) (the window's copy button gives it) |
 | An app's permissions | `flatpak info --show-permissions <app>` and `~/.local/share/flatpak/overrides/<app>` |
 
 ## Common problems
@@ -24,7 +24,7 @@
 | Driver "Stopped: No answer 3 times in a row" | the driver hangs (for example, with no token) | **Restart**, or switch the driver off if it is not used |
 | Duplicate certificates in Papers | `p11-kit-client.so` registered in Papers' database | **Set up** again (the current version removes the registration) |
 | SerproID: phone asks, approving gives "Ops!", and the request repeats | corrupted mechanism parameters (versions before the fix) | Update Tessera |
-| `SSL_ERROR_HANDSHAKE_FAILED` on Debian, Ubuntu or Mint after the PIN; `CKR 0x63` or `0x71` at once from `sign-test.py` through the system's p11-kit | The system's p11-kit is 0.25.5 or older (`dpkg -l libp11-kit0`), which sends the signing parameters in the format before 0.25.6 ([History](history.md) item 38) | Not supported: use [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) |
+| `SSL_ERROR_HANDSHAKE_FAILED` after the PIN (Debian 12 or 13, LMDE, Ubuntu 24.04, Linux Mint 22); `CKR 0x63` or `0x71` at once from `sign-test.py` through the system's p11-kit | The system's p11-kit is 0.25.5 or older (`dpkg -l libp11-kit0`), which sends the signing parameters in the format before 0.25.6 ([History](history.md) item 38) | Not supported: use [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) |
 | `SSL_ERROR_DECRYPT_ERROR_ALERT` in Firefox with SerproID | PKCS#1 v1.5 signature instead of PSS | Update Tessera (the test build that did the size query had this effect) |
 | "Não foi possível adicionar módulo" in Firefox | a hung driver published on the host | Switch the driver off in the window; current supervision already prevents this |
 | Firefox Set up does nothing | Firefox was open | Close Firefox and try again |

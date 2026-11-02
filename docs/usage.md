@@ -9,7 +9,7 @@
   ```
   On Fedora-based systems, the unit comes in the `p11-kit-server` package, which the atomic images already ship; on openSUSE, in `p11-kit-server` too; on Arch, in `p11-kit` itself.
 
-  **Debian, Ubuntu, Linux Mint and their derivatives** ship the server (`p11-kit server`, package `p11-kit`) but no systemd units for it, and build it without socket activation (no libsystemd), so the unit above does not exist there. A plain user service takes its place: it starts at login and creates the socket itself, at the same path (`%t/p11-kit/pkcs11`). The README has it as a file; the window's copy button gives the same as one line. Its content:
+  **Ubuntu 26.04 and the rest of the Debian family** ship the server (`p11-kit server`, package `p11-kit`) but no systemd units for it, and build it without socket activation (no libsystemd), so the unit above does not exist there (and from p11-kit 0.25.6 on the server could take the socket, but the unit is still not shipped). Only systems with p11-kit 0.25.6 or newer are supported: Debian 12 and 13, LMDE 6 and 7, Ubuntu 24.04 and Linux Mint 22 have older versions, with which signing fails ([History](history.md) item 38). A plain user service takes its place: it starts at login and creates the socket itself, at the same path (`%t/p11-kit/pkcs11`). The README has it as a file; the window's copy button gives the same as one line. Its content:
   ```ini
   [Unit]
   Description=p11-kit server
