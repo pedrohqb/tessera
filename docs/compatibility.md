@@ -35,10 +35,10 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | openSUSE Tumbleweed | a real token (type not recorded) | Tessera from FlatPark, with `p11-kit-server` and its socket | Works |
 | openSUSE Tumbleweed | a real token (type not recorded) | Native Firefox | Shows **Set up** (openSUSE's NSS does not load p11-kit on its own, as the CI check found); sees the token after Set up |
 | Ubuntu 24.04 | — | The host's p11-kit server as a user service (Ubuntu ships no `p11-kit-server.socket`; see [usage](usage.md)) | Works (the connection only). Signing fails there as on MX Linux below, by p11-kit version (0.25.3): Ubuntu 24.04 is not supported |
+| Ubuntu 26.04 | a real token (type not recorded) | p11-kit 0.26.2, with the server as a user service (no `p11-kit-server.socket`) | Works |
 | MX Linux (Debian 13), systemd | SafeSign and SerproID | Native Firefox, Brave (Flatpak) | **Signing fails** (`SSL_ERROR_HANDSHAKE_FAILED`; `sign-test.py` through the system's p11-kit gives `CKR 0x71` with SafeSign and `CKR 0x63` with SerproID, at once). The tokens show and the PIN is asked. Cause: the system's p11-kit 0.25.5 ([History](history.md) item 38). Not supported; [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) instead |
 | KDE Plasma (CachyOS) | a real token (type not recorded) | Web PKI and WebSigner, vendors' official packages, native browsers | Work with p11-kit's library (`/lib/libp11-kit.so`, the same module as `p11-kit-proxy.so` there) added by hand under the plugin's custom options |
 
 Not yet confirmed by hand:
 
 - **Snap** packages (Ubuntu's Firefox and Chromium): not supported.
-- **Ubuntu 26.04** (p11-kit 0.26.2, no `p11-kit-server.socket`, so the user service): supported by p11-kit version, not yet tested by hand.
