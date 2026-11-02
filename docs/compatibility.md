@@ -25,6 +25,7 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | Bluefin (GNOME) | SafeSign (GD Burti) | Okular and Papers (Flatpak) | Signs PDFs |
 | Bluefin (GNOME) | SafeSign (GD Burti) | PJeOffice Pro (FlatPark) | Signs, with no steps |
 | Bluefin (GNOME) | SerproID | Firefox (Flatpak), TLS 1.3 sites | Works since the fix in `stable.rs` (see [Drivers](drivers.md)) |
+| Fedora 44 (VM) | SerproID | Native Firefox (RPM), nothing set up | Token visible through the system's own p11-kit (crypto-policies); Tessera shows it as ready, with no button |
 | KDE Plasma | — | Window, icons and tray icon on a dark panel | Works |
 | KDE Plasma | a real token (type not recorded) | Native Firefox and Chromium-based browsers | Works after Set up |
 | KDE Plasma | a real token (type not recorded) | Native PJeOffice Pro (`list.a3` with p11-kit) | Works |
@@ -33,5 +34,4 @@ Not yet confirmed by hand:
 
 - **SafeNet eToken 5100/5110** with a real token. Its download is checked every week, but no test with the token itself is recorded yet.
 - **Native Okular and Papers** signing through Firefox's database.
-- **Fedora's native apps** with nothing set up (crypto-policies): confirmed by CI on a fresh database, not yet in the browsers themselves.
 - **Snap** packages (Ubuntu's Firefox and Chromium): not supported.
