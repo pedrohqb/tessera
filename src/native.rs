@@ -317,9 +317,15 @@ pub fn state(app: &NativeApp) -> State {
         };
     }
     let dbs = databases(app);
+    // Okular and Papers cannot be detected (no folder of their own); with
+    // the system's NSS loading p11-kit they work whatever the database. The
+    // browsers only count once they have one: an app that is not there is
+    // not "ready" (on Bluefin the browsers are Flatpaks).
+    if app.kind != Kind::Poppler && dbs.is_empty() {
+        return State::NoDatabase;
+    }
     if system_nss_loads_p11kit() {
-        // Okular and Papers follow Firefox: a duplicate there is the
-        // Firefox row's to remove.
+        // A duplicate in Firefox's profiles is the Firefox row's to remove.
         if app.kind != Kind::Poppler && dbs.iter().any(|d| nss::has_tessera_module(d)) {
             return State::Twice;
         }
@@ -450,8 +456,14 @@ mod tests {
         // (the Fedora case comes at the end).
         fs::create_dir_all(&home).unwrap();
         let release = home.join("os-release");
-        fs::write(&release, "ID=debian\n").unwrap();
+        // Fedora's family with no native browser (Bluefin): the browsers are
+        // not "ready", since they are not there.
+        fs::write(&release, "ID=bluefin\nID_LIKE=\"fedora\"\n").unwrap();
         std::env::set_var("TESSERA_OS_RELEASE", &release);
+        assert!(matches!(state(&FIREFOX), State::NoDatabase));
+        assert!(matches!(state(&CHROMIUM_BROWSERS), State::NoDatabase));
+        assert!(!can_set_up(&FIREFOX));
+        fs::write(&release, "ID=debian\n").unwrap();
 
         // Nothing installed: no database anywhere.
         assert!(matches!(state(&PDF_VIEWERS), State::NoDatabase));
