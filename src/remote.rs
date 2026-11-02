@@ -224,22 +224,27 @@ pub fn private_dir() -> std::io::Result<PathBuf> {
 /// Put first in the drivers' PATH (see server.rs). SerproID announces each
 /// request with `notify-send`, naming an image from its own folder, which
 /// the desktop outside the sandbox cannot open: the notification showed a
-/// broken picture. This drops the icon and image hints and shows Tessera's
-/// icon.
+/// broken picture.
 ///
-/// It also adds the time to the text. From the sandbox, notify-send goes
-/// through Flatpak's notification portal, as Tessera's notification, and
-/// Plasma does not show a notification identical to the previous one (it
-/// only goes to the history): signing twice in a row, the second "approve
-/// on your phone" never appeared. With the time, each one differs.
+/// From the sandbox, libnotify's notify-send goes through Flatpak's
+/// notification portal, and names every notification after a counter that
+/// starts at 1 in each process: every call is notification "1" of Tessera,
+/// which replaces the previous one. GNOME shows the replacement again;
+/// Plasma only updates it in the history, so the second "approve on your
+/// phone" in a row never showed. This sends the notification to the portal
+/// itself (gdbus, in the runtime), with an ID of its own each time and
+/// Tessera's icon, still through the portal, with no other permission; if
+/// that fails, it falls back to notify-send without the driver's image.
 const NOTIFY_SEND: &str = r#"#!/bin/sh
-# Written by Tessera: notify-send for the drivers, with Tessera's icon and
-# the time added to the text.
-hint=0 skip=0 value=0 n=0 p1= p2=
+# Written by Tessera: notify-send for the drivers (see remote.rs).
+hint=0 skip=0 value= n=0 p1= p2= urgency=
 for a do
     shift
     if [ $skip = 1 ]; then skip=0; continue; fi
-    if [ $value = 1 ]; then value=0; set -- "$@" "$a"; continue; fi
+    if [ -n "$value" ]; then
+        [ "$value" = u ] && urgency=$a
+        value=; set -- "$@" "$a"; continue
+    fi
     if [ $hint = 1 ]; then
         hint=0
         case $a in *image-path*|*image_path*|*image-data*|*image_data*|*icon_data*) continue ;; esac
@@ -251,21 +256,30 @@ for a do
         -i*|--icon=*) continue ;;
         -h|--hint) hint=1; continue ;;
         --hint=*image-path*|--hint=*image_path*|--hint=*image-data*|--hint=*image_data*|--hint=*icon_data*) continue ;;
-        -u|-t|-a|-c|-r|-A|--urgency|--expire-time|--app-name|--category|--replace-id|--action)
-            value=1; set -- "$@" "$a"; continue ;;
+        -u|--urgency) value=u; set -- "$@" "$a"; continue ;;
+        --urgency=*) urgency=${a#--urgency=}; set -- "$@" "$a"; continue ;;
+        -t|-a|-c|-r|-A|--expire-time|--app-name|--category|--replace-id|--action)
+            value=x; set -- "$@" "$a"; continue ;;
         -*) set -- "$@" "$a"; continue ;;
     esac
     # The summary, then the body.
     n=$((n + 1))
-    if [ $n = 1 ]; then p1=$a; elif [ $n = 2 ]; then p2=$a; else set -- "$@" "$a"; fi
+    if [ $n = 1 ]; then p1=$a; elif [ $n = 2 ]; then p2=$a; fi
 done
-now=$(date +%H:%M:%S)
-if [ $n -ge 2 ]; then
-    set -- "$@" "$p1" "$p2 ($now)"
-elif [ $n = 1 ]; then
-    set -- "$@" "$p1 ($now)"
+# A GVariant string: backslashes and quotes escaped.
+esc() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e "s/'/\\\\'/g"; }
+case $urgency in low) prio=low ;; critical) prio=urgent ;; *) prio=normal ;; esac
+id="tessera-$(date +%s%N)-$$"
+if gdbus call --session --dest org.freedesktop.portal.Desktop \
+    --object-path /org/freedesktop/portal/desktop \
+    --method org.freedesktop.portal.Notification.AddNotification "$id" \
+    "{'title': <'$(esc "$p1")'>, 'body': <'$(esc "$p2")'>, 'priority': <'$prio'>}" >/dev/null 2>&1
+then
+    exit 0
 fi
 real=$(PATH=${PATH#*:} command -v notify-send) || exit 0
+[ $n -ge 1 ] && set -- "$@" "$p1"
+[ $n -ge 2 ] && set -- "$@" "$p2"
 exec "$real" --icon=io.github.pedrohqb.Tessera "$@"
 "#;
 
@@ -274,71 +288,107 @@ mod tests {
     use super::NOTIFY_SEND;
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
+    use std::path::Path;
     use std::process::Command;
 
-    /// The drivers' notify-send: Tessera's icon instead of the driver's
-    /// image, and the time added to the text (Plasma does not show a
-    /// notification identical to the previous one).
+    fn executable(path: &Path, body: &str) {
+        fs::write(path, body).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    /// The drivers' notify-send: the notification goes to the portal with
+    /// an ID of its own each time (Plasma only updates a notification that
+    /// reuses an ID), with the driver's text and urgency; if the portal call
+    /// fails, notify-send runs with Tessera's icon instead of the driver's
+    /// image.
     #[test]
-    fn notify_send_adds_the_time_and_tesseras_icon() {
+    fn notify_send_uses_a_new_portal_id_each_time() {
         let dir = std::env::temp_dir().join(format!("tessera-notify-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
-        let (ours, real) = (dir.join("ours"), dir.join("real"));
+        let (ours, tools) = (dir.join("ours"), dir.join("tools"));
         fs::create_dir_all(&ours).unwrap();
-        fs::create_dir_all(&real).unwrap();
+        fs::create_dir_all(&tools).unwrap();
         let script = ours.join("notify-send");
-        fs::write(&script, NOTIFY_SEND).unwrap();
-        // The real notify-send, here one that prints its arguments.
-        let fake = real.join("notify-send");
-        fs::write(&fake, "#!/bin/sh\nfor a do printf '%s\\n' \"$a\"; done\n").unwrap();
-        for f in [&script, &fake] {
-            fs::set_permissions(f, fs::Permissions::from_mode(0o755)).unwrap();
-        }
+        executable(&script, NOTIFY_SEND);
+        // gdbus and notify-send that record their arguments, one per line.
+        let log = dir.join("calls");
+        let record = |name: &str, code: i32| {
+            executable(
+                &tools.join(name),
+                &format!(
+                    "#!/bin/sh\necho {name} >> {log}\nfor a do printf '%s\\n' \"$a\" >> {log}; done\nexit {code}\n",
+                    log = log.display()
+                ),
+            );
+        };
         let run = |args: &[&str]| -> Vec<String> {
-            let out = Command::new(&script)
+            let _ = fs::remove_file(&log);
+            Command::new(&script)
                 .args(args)
                 .env(
                     "PATH",
-                    format!("{}:{}:/usr/bin:/bin", ours.display(), real.display()),
+                    format!("{}:{}:/usr/bin:/bin", ours.display(), tools.display()),
                 )
-                .output()
+                .status()
                 .unwrap();
-            String::from_utf8_lossy(&out.stdout)
+            fs::read_to_string(&log)
+                .unwrap_or_default()
                 .lines()
                 .map(str::to_string)
                 .collect()
         };
-        let is_time = |s: &str| {
-            let t = s.trim_start_matches('(').trim_end_matches(')');
-            t.len() == 8 && t.chars().filter(|c| *c == ':').count() == 2
-        };
-
-        // As SerproID calls it: an image, an urgency, a summary and a body.
-        let args = run(&[
+        let serpro = [
             "-i",
             "/usr/share/serproid-desktop/icon.png",
             "-u",
-            "normal",
+            "critical",
             "SerproID",
-            "Autorize no celular",
-        ]);
-        assert_eq!(args[0], "--icon=io.github.pedrohqb.Tessera");
-        assert!(!args.iter().any(|a| a.contains("serproid-desktop")));
-        assert_eq!(&args[1..4], ["-u", "normal", "SerproID"]);
-        let body = &args[4];
-        assert!(body.starts_with("Autorize no celular ("), "{body}");
-        assert!(is_time(body.rsplit(' ').next().unwrap()), "{body}");
+            "Foi enviado um pedido de PIN para o seu dispositivo.",
+        ];
 
-        // A summary alone gets the time; image hints are dropped.
-        let args = run(&[
-            "--hint=string:image-path:/x.png",
-            "-h",
-            "int:x:1",
-            "Assinatura",
-        ]);
-        assert_eq!(args[1], "--hint=int:x:1");
-        assert!(args[2].starts_with("Assinatura ("), "{:?}", args);
-        assert_eq!(args.len(), 3);
+        // The portal answers: one gdbus call, a new ID each time.
+        record("gdbus", 0);
+        record("notify-send", 0);
+        let first = run(&serpro);
+        assert_eq!(first[0], "gdbus", "{first:?}");
+        assert!(first.contains(&"org.freedesktop.portal.Notification.AddNotification".into()));
+        let vardict = first.last().unwrap();
+        assert!(vardict.contains("'title': <'SerproID'>"), "{vardict}");
+        assert!(
+            vardict.contains("'body': <'Foi enviado um pedido de PIN para o seu dispositivo.'>")
+        );
+        assert!(vardict.contains("'priority': <'urgent'>"), "{vardict}");
+        assert!(!first.iter().any(|a| a.contains("serproid-desktop")));
+        let id = |calls: &[String]| {
+            calls
+                .iter()
+                .find(|a| a.starts_with("tessera-"))
+                .cloned()
+                .unwrap()
+        };
+        let second = run(&serpro);
+        assert_ne!(id(&first), id(&second));
+        // Quotes in the text are escaped for GVariant.
+        let quoted = run(&["Título", "it's \"ok\""]);
+        assert!(
+            quoted.last().unwrap().contains("'body': <'it\\'s \"ok\"'>"),
+            "{quoted:?}"
+        );
+
+        // No portal: notify-send, with Tessera's icon and not the image.
+        record("gdbus", 1);
+        let calls = run(&serpro);
+        let at = calls.iter().position(|a| a == "notify-send").unwrap();
+        assert_eq!(
+            &calls[at + 1..],
+            [
+                "--icon=io.github.pedrohqb.Tessera",
+                "-u",
+                "critical",
+                "SerproID",
+                "Foi enviado um pedido de PIN para o seu dispositivo."
+            ]
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
