@@ -46,6 +46,8 @@ Debian, Ubuntu, Linux Mint e derivados:
 sudo apt install flatpak pcscd libccid p11-kit
 ```
 
+**Atenção:** em sistemas com p11-kit 0.25.5 ou anterior, o Tessera mostra os tokens e o PIN é pedido, mas **a assinatura falha** (no navegador, `SSL_ERROR_HANDSHAKE_FAILED`). Isso foi confirmado no Debian 13 (MX Linux). Pela versão do pacote, o mesmo vale para o Debian 12, o Ubuntu 24.04 e o Linux Mint 22, ainda sem teste. A versão instalada aparece em `dpkg -l libp11-kit0`. O p11-kit mudou, na 0.25.6, a forma de transmitir os parâmetros da assinatura, e as versões anteriores não se entendem com o Tessera nesse ponto. Nesses sistemas, use o [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br).
+
 Arch Linux, Manjaro, EndeavourOS e CachyOS:
 
 ```bash
@@ -249,6 +251,8 @@ Debian, Ubuntu, Linux Mint and derivatives:
 ```bash
 sudo apt install flatpak pcscd libccid p11-kit
 ```
+
+**Warning:** on systems with p11-kit 0.25.5 or older, Tessera shows the tokens and the PIN is asked, but **signing fails** (in the browser, `SSL_ERROR_HANDSHAKE_FAILED`). This was confirmed on Debian 13 (MX Linux). By package version, the same applies to Debian 12, Ubuntu 24.04 and Linux Mint 22, not yet tested. `dpkg -l libp11-kit0` shows the installed version. In 0.25.6, p11-kit changed how it sends the signing parameters, and older versions do not understand Tessera on that point. On those systems, use [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br).
 
 Arch Linux, Manjaro, EndeavourOS and CachyOS:
 
