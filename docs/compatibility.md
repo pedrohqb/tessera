@@ -27,6 +27,7 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | Bluefin (GNOME) | SerproID | Firefox (Flatpak), TLS 1.3 sites | Works since the fix in `stable.rs` (see [Drivers](drivers.md)) |
 | Fedora 44 (VM) | SerproID | Native Firefox (RPM), nothing set up | Token visible through the system's own p11-kit (crypto-policies); Tessera shows it as ready, with no button |
 | KDE Plasma | — | Window, icons and tray icon on a dark panel | Works |
+| KDE Plasma | SerproID | Flatpak apps, several signatures in a row | Each "approve on your phone" notification shows (since the portal notification gets a new ID each time, [History](history.md) item 36) |
 | KDE Plasma | a real token (type not recorded) | Native Firefox and Chromium-based browsers | Works after Set up |
 | KDE Plasma | a real token (type not recorded) | Native PJeOffice Pro (`list.a3` with p11-kit) | Works |
 
