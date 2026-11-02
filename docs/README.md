@@ -10,6 +10,7 @@ This documentation records how Tessera works, why it is the way it is, and every
 | [Drivers](drivers.md) | Each driver: origin, verification, "clean" unpacking, dependencies and the quirks found (above all in SerproID) |
 | [Apps](apps.md) | PJeOffice Pro, Firefox, Chromium, Chrome, Edge, Brave, Papers and Okular: what each one needs and why |
 | [Installation and usage](usage.md) | Preparing the system, installing, the window, the tray, automatic start and the command line |
+| [Compatibility](compatibility.md) | What has been checked automatically on each push, and what has been tested by hand with real tokens |
 | [Troubleshooting](troubleshooting.md) | Where the logs are, the test tools and the path for investigating a problem |
 | [History](history.md) | The sequence of problems found in the tests of October 28 and 29, 2026 and how each one was solved |
 | [Development](development.md) | Code structure, building, tests, continuous integration, releases and how to add a driver |

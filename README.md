@@ -129,7 +129,7 @@ A seção **Aplicativos** tem duas abas: **Flatpak**, com os passos acima, e **N
 | Okular e Papers | nenhum botão próprio: eles usam o banco do perfil padrão do Firefox, então ficam prontos quando o Firefox estiver configurado |
 | PJeOffice Pro | a lista de bibliotecas A3 (`list.a3`) em `~/.pjeoffice-pro/pjeoffice-pro.config`, com o caminho do p11-kit da sua distribuição |
 
-Antes de oferecer o botão, o Tessera confere se o p11-kit já está no banco do aplicativo, posto pela própria distribuição (como no Fedora, pelo nss-sysinit) ou por outro meio. Nesse caso a linha já aparece como **Pronto**, sem botão, porque configurar de novo faria cada token aparecer duas vezes.
+Antes de oferecer o botão, o Tessera confere se o aplicativo já recebe o p11-kit sem ele. No **Fedora e derivados** (Bluefin, Aurora, Bazzite), o próprio sistema já carrega o p11-kit em todo aplicativo que usa NSS: Firefox, Chrome, Chromium, Okular e Papers nativos aparecem como **Pronto**, sem botão. Se o módulo do Tessera tiver sido acrescentado antes, cada token aparece duas vezes, e o botão vira **Retirar**, que tira só o do Tessera. Nas outras distribuições, um banco que já tenha o p11-kit, posto por quem for, também aparece como **Pronto**. O PJeOffice Pro não usa NSS e sempre precisa do seu **Configurar**.
 
 #### Em segundo plano
 
@@ -170,6 +170,7 @@ A documentação técnica, em inglês, está em [docs/](docs/README.md):
 - **[Drivers](docs/drivers.md):** origem e verificação de cada driver, e o que foi preciso ajustar, sobretudo no SerproID.
 - **[Apps](docs/apps.md):** o que cada aplicativo precisa e por quê.
 - **[Installation and usage](docs/usage.md):** a janela, a bandeja e a linha de comando.
+- **[Compatibility](docs/compatibility.md):** o que é conferido automaticamente a cada mudança e o que já foi testado à mão com tokens reais. Para acrescentar o seu teste, abra uma issue com o modelo "Compatibility report".
 - **[Troubleshooting](docs/troubleshooting.md):** logs, ferramentas de teste e como investigar um problema.
 - **[History](docs/history.md):** os problemas encontrados nos testes com tokens reais e como cada um foi resolvido.
 - **[Development](docs/development.md):** compilação, testes, versões e como acrescentar um driver.
@@ -307,7 +308,7 @@ The **Apps** section has two tabs: **Flatpak**, with the steps above, and **Nati
 | Okular and Papers | no button of their own: they use the default Firefox profile's database, so they are ready once Firefox is set up |
 | PJeOffice Pro | the list of A3 libraries (`list.a3`) in `~/.pjeoffice-pro/pjeoffice-pro.config`, with p11-kit's path on your distribution |
 
-Before offering the button, Tessera checks whether p11-kit is already in the app's database, put there by the distribution itself (as on Fedora, through nss-sysinit) or otherwise. The row then shows as **Ready**, with no button, since setting it up again would show each token twice.
+Before offering the button, Tessera checks whether the app already gets p11-kit without it. On **Fedora and its derivatives** (Bluefin, Aurora, Bazzite), the system itself loads p11-kit in every app that uses NSS: the native Firefox, Chrome, Chromium, Okular and Papers show as **Ready**, with no button. If Tessera's module was added earlier, each token shows twice, and the button becomes **Remove**, which takes out only Tessera's. On other distributions, a database that already has p11-kit, put there by anyone, also shows as **Ready**. PJeOffice Pro does not use NSS and always needs its own **Set up**.
 
 #### In the background
 
@@ -344,6 +345,7 @@ The technical documentation is in [docs/](docs/README.md):
 - **[Drivers](docs/drivers.md):** where each driver comes from, how it is checked, and what had to be adjusted, above all for SerproID.
 - **[Apps](docs/apps.md):** what each app needs, and why.
 - **[Installation and usage](docs/usage.md):** the window, the tray and the command line.
+- **[Compatibility](docs/compatibility.md):** what is checked automatically on every change, and what has been tested by hand with real tokens. To add your test, open an issue with the "Compatibility report" template.
 - **[Troubleshooting](docs/troubleshooting.md):** logs, test tools and how to investigate a problem.
 - **[History](docs/history.md):** the problems found while testing with real tokens, and how each was solved.
 - **[Development](docs/development.md):** building, tests, releases and how to add a driver.

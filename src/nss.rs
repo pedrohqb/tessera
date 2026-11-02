@@ -59,6 +59,17 @@ pub fn has_p11kit(dir: &Path) -> bool {
     })
 }
 
+/// Is a module Tessera registered (by its name, whatever the library) in
+/// this database?
+pub fn has_tessera_module(dir: &Path) -> bool {
+    fs::read_to_string(dir.join("pkcs11.txt"))
+        .map(|t| {
+            t.lines()
+                .any(|l| l.trim() == format!("name={}", paths::NSS_MODULE_NAME))
+        })
+        .unwrap_or(false)
+}
+
 /// Is the client module already listed in this database's pkcs11.txt?
 pub fn has_module(dir: &Path) -> bool {
     has_library(dir, paths::CLIENT_MODULE)
@@ -185,6 +196,65 @@ pub fn set_up_poppler_db(dir: &Path) -> Result<Outcome> {
     Err(anyhow!("{}", String::from_utf8_lossy(&out.stderr).trim()))
 }
 
+/// Runs in the child process: remove the module Tessera registered (by its
+/// name). Modules others registered are left alone.
+pub fn remove_tessera_module_in_process(dir: &Path) -> Result<()> {
+    if !has_tessera_module(dir) {
+        return Ok(());
+    }
+    // SAFETY: as in add_module_in_process (nss.h, secmod.h): the symbols are
+    // called with their declared signatures, the CStrings outlive the calls
+    // that take their pointers, and NSS is shut down on every path after a
+    // successful NSS_Initialize. This runs in a child process of its own
+    // (`tessera nss-remove-module`), so NSS's global state is not shared.
+    unsafe {
+        let lib = Library::new("libnss3.so").context("loading libnss3.so")?;
+        let init: Symbol<NssInitialize> = lib.get(b"NSS_Initialize\0")?;
+        let shutdown: Symbol<NssShutdown> = lib.get(b"NSS_Shutdown\0")?;
+        let delete: Symbol<DeleteModule> = lib.get(b"SECMOD_DeleteModule\0")?;
+        let err: Symbol<PortGetError> = lib.get(b"PORT_GetError\0")?;
+        let config = CString::new(format!("sql:{}", dir.display()))?;
+        let empty = CString::new("")?;
+        let secmod = CString::new("secmod.db")?;
+        if init(
+            config.as_ptr(),
+            empty.as_ptr(),
+            empty.as_ptr(),
+            secmod.as_ptr(),
+            0,
+        ) != 0
+        {
+            bail!("NSS_Initialize failed (NSS error {})", err());
+        }
+        let name = CString::new(paths::NSS_MODULE_NAME)?;
+        let mut kind: c_int = 0;
+        let rv = delete(name.as_ptr(), &mut kind);
+        let code = err();
+        shutdown();
+        if rv != 0 {
+            bail!("SECMOD_DeleteModule failed (NSS error {code})");
+        }
+    }
+    Ok(())
+}
+
+/// Called from the GUI: runs `tessera nss-remove-module <dir>`.
+pub fn remove_tessera_module(dir: &Path) -> Result<()> {
+    if !has_tessera_module(dir) {
+        return Ok(());
+    }
+    let exe = std::env::current_exe().context("finding our own executable")?;
+    let out = Command::new(exe)
+        .arg("nss-remove-module")
+        .arg(dir)
+        .output()
+        .context("running nss-remove-module")?;
+    if out.status.success() {
+        return Ok(());
+    }
+    Err(anyhow!("{}", String::from_utf8_lossy(&out.stderr).trim()))
+}
+
 /// Runs in the child process: register `module` (p11-kit-client.so for a
 /// Flatpak app, p11-kit-proxy.so for a native one).
 pub fn add_module_in_process(dir: &Path, module: &str) -> Result<Outcome> {
@@ -263,8 +333,8 @@ pub fn add_library(dir: &Path, module: &str) -> Result<Outcome> {
 #[cfg(test)]
 mod tests {
     use super::{
-        add_module_in_process, has_library, has_module, poppler_db_ready, profile_in_use,
-        set_up_poppler_db_in_process, Outcome,
+        add_module_in_process, has_library, has_module, has_tessera_module, poppler_db_ready,
+        profile_in_use, remove_tessera_module_in_process, set_up_poppler_db_in_process, Outcome,
     };
     use crate::paths;
     use std::process::{Command, Stdio};
@@ -330,6 +400,11 @@ mod tests {
         );
         assert!(has_library(&dir, paths::PROXY_MODULE));
         assert!(!has_module(&dir));
+        // And taken out again by its name (a duplicate on Fedora).
+        assert!(has_tessera_module(&dir));
+        remove_tessera_module_in_process(&dir).unwrap();
+        assert!(!has_tessera_module(&dir));
+        assert!(!has_library(&dir, paths::PROXY_MODULE));
         let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -68,7 +68,7 @@ In one test, resetting Papers' permissions in Flatseal wiped the `override`, and
 1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.kde.okular`. The package has `--filesystem=host`, but that does not include the p11-kit socket.
 2. **Set up** creates the empty NSS database in `~/.var/app/org.kde.okular/config/mozilla/firefox/tessera.default`, the first place poppler looks (Okular's `$XDG_CONFIG_HOME` in Flatpak). In Settings → Configure Okular → Digital Signatures, the certificate database should be left at the default.
 
-Okular uses the KDE runtime, which has the same freedesktop base as the GNOME runtime and the same p11-kit `libnssckbi.so`. It has not yet been tested with a real token.
+Okular uses the KDE runtime, which has the same freedesktop base as the GNOME runtime and the same p11-kit `libnssckbi.so`. It was tested with a real token ([History](history.md) item 35).
 
 ## Native apps
 
@@ -80,7 +80,12 @@ Apps installed from the distribution (not Flatpak) are on the window's **Native*
 
 - **PJeOffice Pro:** a Java program with its own list of PKCS#11 libraries, `list.a3=` in `~/.pjeoffice-pro/pjeoffice-pro.config` (written when PJeOffice closes; entries separated by `|`). Set up adds `p11-kit-proxy.so` there by full path, replacing any other p11-kit entry and keeping the other libraries. The path depends on the distribution, and a Flatpak cannot look into the host's `/usr`, so it comes from the host's `os-release`: `/usr/lib64` (Fedora, RHEL, openSUSE), `/usr/lib/x86_64-linux-gnu` (Debian, Ubuntu), `/usr/lib` (Arch and the rest). Only one path: PJeOffice skips paths that do not exist, but on Arch `/usr/lib64` is a link to `/usr/lib`, and both would load the module twice. PJeOffice (signer4j's `ConfigPersister`) also skips names that do not end in a known extension, such as `libp11-kit.so.0`; `/lib/libp11-kit.so`, set by hand, counts as done. Close PJeOffice first: it rewrites the file when it closes.
 
-Before offering **Set up**, Tessera checks whether the database already loads p11-kit: any module whose library is p11-kit's (the proxy, `libp11-kit.so`, the client module; not the trust module), whoever registered it, or NSS's `nss-sysinit` (`libnsssysinit.so`), through which Fedora brings in `/etc/pki/nssdb`, where p11-kit's proxy is registered. Either way the row shows as **Ready**, with no button: registering the proxy again would show each token twice.
+Before offering **Set up**, Tessera checks whether the app already gets p11-kit without it:
+
+- **Fedora and its family (Bluefin, Aurora, Bazzite, RHEL…)** load p11-kit in every NSS database through crypto-policies: `/etc/crypto-policies/back-ends/nss.config` registers `p11-kit-proxy.so`, and NSS reads it whenever it opens a database. A fresh database lists nothing, yet NSS loads the proxy (CI found this; see [Development](development.md#tests)). A Flatpak cannot see the host's `/etc`, so Tessera goes by the distribution in `os-release`; CI checks on each distribution that the two agree. The native Firefox, Chromium-based browsers, Okular and Papers then show as **Ready** with no button. If Tessera's module was registered there earlier, each token shows twice, and the button becomes **Remove**, which takes out only Tessera's module (by its name, `Tessera (p11-kit)`).
+- **Elsewhere,** a database that already lists a p11-kit module (the proxy, `libp11-kit.so`, the client module; not the trust module), whoever registered it, or that loads NSS's `nss-sysinit`, also shows as **Ready** with no button.
+
+PJeOffice Pro does not use NSS, so it always needs its own Set up.
 
 Snap packages (Ubuntu's Firefox and Chromium) are not supported: their profiles live under `~/snap`, and their confinement decides which modules they may load.
 

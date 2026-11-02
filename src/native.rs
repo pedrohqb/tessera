@@ -21,11 +21,12 @@
 //!   distribution. PJeOffice skips paths that do not exist and takes only
 //!   names ending in a known extension (.so, not .so.0).
 //!
-//! Some distributions already load p11-kit in these databases: Fedora
-//! through nss-sysinit (which brings in /etc/pki/nssdb, where p11-kit's proxy
-//! is registered), others by registering it themselves. Registering it
-//! again would show each token twice, so such a database counts as ready
-//! and gets no button.
+//! Some systems already load p11-kit in every NSS database: Fedora and its
+//! family through crypto-policies (see system_nss_loads_p11kit), others
+//! through nss-sysinit or by registering it in the database. Registering it
+//! again would show each token twice, so such an app counts as ready and
+//! gets no button; if Tessera's module is there as well, the button removes
+//! it.
 
 use std::path::PathBuf;
 
@@ -168,15 +169,20 @@ pub fn pjeoffice_config() -> PathBuf {
 /// link to /usr/lib, and two paths to the same module would show each token
 /// twice.
 pub fn host_p11kit_library() -> &'static str {
-    let release = ["/run/host/os-release", "/etc/os-release"]
-        .iter()
-        .find_map(|f| std::fs::read_to_string(f).ok())
-        .unwrap_or_default();
-    p11kit_library_for(&release)
+    p11kit_library_for(&host_os_release())
 }
 
-fn p11kit_library_for(os_release: &str) -> &'static str {
-    let ids: Vec<String> = os_release
+/// The host's os-release (in a Flatpak, /run/host/os-release).
+fn host_os_release() -> String {
+    ["/run/host/os-release", "/etc/os-release"]
+        .iter()
+        .find_map(|f| std::fs::read_to_string(f).ok())
+        .unwrap_or_default()
+}
+
+/// The distribution and the ones it derives from (ID and ID_LIKE).
+fn release_ids(os_release: &str) -> Vec<String> {
+    os_release
         .lines()
         .filter_map(|l| l.strip_prefix("ID=").or_else(|| l.strip_prefix("ID_LIKE=")))
         .flat_map(|v| {
@@ -185,7 +191,11 @@ fn p11kit_library_for(os_release: &str) -> &'static str {
                 .map(str::to_lowercase)
                 .collect::<Vec<_>>()
         })
-        .collect();
+        .collect()
+}
+
+fn p11kit_library_for(os_release: &str) -> &'static str {
+    let ids = release_ids(os_release);
     let any = |names: &[&str]| ids.iter().any(|i| names.contains(&i.as_str()));
     if any(&["debian", "ubuntu"]) {
         "/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so"
@@ -194,6 +204,46 @@ fn p11kit_library_for(os_release: &str) -> &'static str {
     } else {
         "/usr/lib/p11-kit-proxy.so"
     }
+}
+
+/// Fedora's crypto-policies file for NSS, which NSS reads whenever it opens
+/// a database.
+const NSS_POLICY: &str = "/etc/crypto-policies/back-ends/nss.config";
+
+/// Does the system's NSS load p11-kit for every program that uses it?
+/// Fedora and its family do: their crypto-policies register p11-kit-proxy.so
+/// in NSS_POLICY, so the native Firefox, Chromium, Okular and Papers see the
+/// tokens with nothing registered in their databases (and would see each
+/// token twice with Tessera's module too). Outside a Flatpak the file
+/// itself is read; a Flatpak cannot see the host's /etc, so the
+/// distribution decides. CI checks the two agree on Fedora, Debian, Ubuntu,
+/// Arch and openSUSE (detection_matches_this_system).
+pub fn system_nss_loads_p11kit() -> bool {
+    if paths::in_flatpak() {
+        policy_by_release(&host_os_release())
+    } else {
+        policy_file_loads_p11kit()
+    }
+}
+
+fn policy_by_release(os_release: &str) -> bool {
+    let ids = release_ids(os_release);
+    ids.iter()
+        .any(|i| ["fedora", "rhel", "centos"].contains(&i.as_str()))
+}
+
+fn policy_file_loads_p11kit() -> bool {
+    // TESSERA_NSS_POLICY: another file, for the tests.
+    let file = std::env::var_os("TESSERA_NSS_POLICY")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(NSS_POLICY));
+    std::fs::read_to_string(file)
+        .map(|t| {
+            t.lines()
+                .filter_map(|l| l.trim().strip_prefix("library="))
+                .any(|l| l.contains("p11-kit") && !l.contains("trust"))
+        })
+        .unwrap_or(false)
 }
 
 /// Is this list.a3 entry p11-kit (the proxy, or libp11-kit.so, which is the
@@ -257,8 +307,12 @@ fn databases(app: &NativeApp) -> Vec<PathBuf> {
 
 pub enum State {
     Ready,
-    /// The system already loads p11-kit there (nss-sysinit).
+    /// The system already loads p11-kit there (crypto-policies on Fedora,
+    /// or nss-sysinit).
     BySystem,
+    /// The system loads p11-kit and Tessera's module is there too: each
+    /// token shows twice. "Remove" takes Tessera's module out.
+    Twice,
     ToDo,
     /// No database yet: the app has to be opened once.
     NoDatabase,
@@ -277,6 +331,14 @@ pub fn state(app: &NativeApp) -> State {
         };
     }
     let dbs = databases(app);
+    if system_nss_loads_p11kit() {
+        // Okular and Papers follow Firefox: a duplicate there is the
+        // Firefox row's to remove.
+        if app.kind != Kind::Poppler && dbs.iter().any(|d| nss::has_tessera_module(d)) {
+            return State::Twice;
+        }
+        return State::BySystem;
+    }
     if dbs.is_empty() {
         return State::NoDatabase;
     }
@@ -314,7 +376,8 @@ pub fn subtitle(app: &NativeApp) -> String {
     };
     let state = match state(app) {
         State::Ready => t("Ready"),
-        State::BySystem => t("Ready: the system already loads p11-kit (nss-sysinit)"),
+        State::BySystem => t("Ready: the system's NSS already loads p11-kit"),
+        State::Twice => t("Each token shows twice: the system's NSS already loads p11-kit, and Tessera's module is there too. Remove Tessera's"),
         State::ToDo => t("Set-up missing"),
         State::NeedsFirefox => t("Set up Firefox first"),
         State::NoDatabase => match app.kind {
@@ -331,7 +394,15 @@ pub fn subtitle(app: &NativeApp) -> String {
 /// Tessera, by the distribution or through nss-sysinit), and never for
 /// Okular and Papers, which follow Firefox.
 pub fn can_set_up(app: &NativeApp) -> bool {
-    matches!(state(app), State::ToDo)
+    matches!(state(app), State::ToDo | State::Twice)
+}
+
+/// The button's label: "Remove" when Tessera's module is a duplicate.
+pub fn button_label(app: &NativeApp) -> &'static str {
+    match state(app) {
+        State::Twice => t("Remove"),
+        _ => t("Set up"),
+    }
 }
 
 /// Register p11-kit-proxy.so where the app looks (in a child process, see
@@ -350,14 +421,24 @@ pub fn set_up(app: &NativeApp) -> Result<String, String> {
         ));
     }
     let dbs = databases(app);
+    if dbs.iter().any(|d| nss::profile_in_use(d)) {
+        return Err(t("Close Firefox first, then try again").into());
+    }
+    if matches!(state(app), State::Twice) {
+        for d in dbs.iter().filter(|d| nss::has_tessera_module(d)) {
+            nss::remove_tessera_module(d).map_err(|e| format!("{}: {e:#}", d.display()))?;
+        }
+        return Ok(format!(
+            "{}: {}",
+            t(app.name),
+            t("Tessera's duplicate module removed; restart the app")
+        ));
+    }
     if dbs.is_empty() {
         return Err(subtitle(app));
     }
     if dbs.iter().any(|d| shared_with_chromium_flatpak(d)) {
         return Err(subtitle(app));
-    }
-    if dbs.iter().any(|d| nss::profile_in_use(d)) {
-        return Err(t("Close Firefox first, then try again").into());
     }
     for d in &dbs {
         nss::add_library(d, paths::PROXY_MODULE).map_err(|e| format!("{}: {e:#}", d.display()))?;
@@ -379,6 +460,10 @@ mod tests {
         std::env::set_var("HOME", &home);
         std::env::set_var("XDG_CONFIG_HOME", home.join(".config"));
         std::env::set_var("XDG_DATA_HOME", home.join(".local/share"));
+        // As on a system whose NSS does not load p11-kit by itself (the
+        // Fedora case comes at the end).
+        let policy = home.join("nss.config");
+        std::env::set_var("TESSERA_NSS_POLICY", &policy);
 
         // Nothing installed: no database anywhere.
         assert!(matches!(state(&PDF_VIEWERS), State::NoDatabase));
@@ -483,7 +568,50 @@ mod tests {
             .unwrap()
             .ends_with(&format!("list.a3={}\n", host_p11kit_library())));
 
+        // Fedora: crypto-policies load p11-kit in every NSS database.
+        // Native Firefox (its profiles have Tessera's module from above)
+        // then shows each token twice, and offers to remove the module.
+        fs::write(
+            &policy,
+            "library=\nname=Policy\n\nlibrary=p11-kit-proxy.so\nname=p11-kit-proxy\n",
+        )
+        .unwrap();
+        assert!(system_nss_loads_p11kit());
+        assert!(matches!(state(&FIREFOX), State::Twice));
+        assert!(can_set_up(&FIREFOX));
+        assert_eq!(button_label(&FIREFOX), "Remove");
+        // The others need nothing.
+        for app in [&CHROMIUM_BROWSERS, &PDF_VIEWERS] {
+            assert!(matches!(state(app), State::BySystem));
+            assert!(!can_set_up(app));
+        }
+        // Without Tessera's module, Firefox needs nothing either.
+        for p in ["abc.default", "xyz.default-release"] {
+            fs::write(
+                ff.join(p).join("pkcs11.txt"),
+                "library=\nname=NSS Internal PKCS #11 Module\n",
+            )
+            .unwrap();
+        }
+        assert!(matches!(state(&FIREFOX), State::BySystem));
+        assert!(!can_set_up(&FIREFOX));
+        std::env::remove_var("TESSERA_NSS_POLICY");
+
         let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn nss_policy_by_distribution() {
+        assert!(policy_by_release("ID=fedora\n"));
+        assert!(policy_by_release("ID=aurora\nID_LIKE=\"fedora\"\n"));
+        assert!(policy_by_release(
+            "ID=rocky\nID_LIKE=\"rhel centos fedora\"\n"
+        ));
+        assert!(!policy_by_release("ID=debian\n"));
+        assert!(!policy_by_release(
+            "ID=opensuse-tumbleweed\nID_LIKE=\"opensuse suse\"\n"
+        ));
+        assert!(!policy_by_release("ID=arch\n"));
     }
 
     #[test]
@@ -518,8 +646,10 @@ mod tests {
     /// - The path written into PJeOffice's list.a3, chosen from os-release,
     ///   exists.
     /// - A fresh NSS database, made the way a browser makes its own: Tessera
-    ///   calls it ready without Set up (p11-kit already there, or
-    ///   nss-sysinit) exactly when NSS, opening it, loads a p11-kit module.
+    ///   calls it ready without Set up (crypto-policies, nss-sysinit, or
+    ///   p11-kit already there) exactly when NSS, opening it, loads a p11-kit
+    ///   module; and os-release (all a Flatpak sees) agrees with the
+    ///   crypto-policies file.
     ///
     /// Needs certutil and modutil (NSS's tools) and p11-kit.
     #[test]
@@ -558,11 +688,20 @@ mod tests {
             let l = l.to_lowercase();
             l.contains("library name:") && l.contains("p11-kit") && !l.contains("trust")
         });
-        let tessera_says_ready = nss::has_p11kit(&dir) || nss::uses_sysinit(&dir);
+        let by_policy = policy_file_loads_p11kit();
+        let tessera_says_ready =
+            system_nss_loads_p11kit() || nss::has_p11kit(&dir) || nss::uses_sysinit(&dir);
         println!(
-            "REPORT: {distro}: fresh NSS database: sysinit={} p11-kit registered={} NSS loads p11-kit={nss_loads_p11kit} Tessera says ready={tessera_says_ready}",
+            "REPORT: {distro}: fresh NSS database: crypto-policies={by_policy} sysinit={} p11-kit registered={} NSS loads p11-kit={nss_loads_p11kit} Tessera says ready={tessera_says_ready}",
             nss::uses_sysinit(&dir),
             nss::has_p11kit(&dir),
+        );
+        // In a Flatpak only os-release is visible: it must say the same as
+        // the crypto-policies file.
+        assert_eq!(
+            policy_by_release(&release),
+            by_policy,
+            "on {distro}, os-release and {NSS_POLICY} disagree"
         );
         let _ = fs::remove_dir_all(&dir);
         assert_eq!(

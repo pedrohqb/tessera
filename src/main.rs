@@ -12,6 +12,7 @@
 //!   tessera list-tokens         (internal) list tokens at P11_KIT_SERVER_ADDRESS
 //!   tessera nss-add-module DIR [MODULE]  (internal) the NSS work of nss-setup
 //!   tessera nss-poppler DIR      (internal) make the NSS database for Papers and Okular
+//!   tessera nss-remove-module DIR  (internal) remove the module Tessera registered
 
 mod apps;
 mod drivers;
@@ -279,6 +280,19 @@ fn main() -> ExitCode {
                 }
                 Err(e) => {
                     eprintln!("tessera: {e:#}");
+                    ExitCode::FAILURE
+                }
+            };
+        }
+        Some("nss-remove-module") => {
+            let Some(dir) = args.get(2) else {
+                eprintln!("usage: tessera nss-remove-module DIR");
+                return ExitCode::FAILURE;
+            };
+            return match nss::remove_tessera_module_in_process(&PathBuf::from(dir)) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("{e:#}");
                     ExitCode::FAILURE
                 }
             };

@@ -292,6 +292,7 @@ fn themed_icon(names: &[&str], fallback: &str) -> gtk::Image {
 
 fn update_native(r: &NativeRows) {
     r.row.set_subtitle(&native::subtitle(r.app));
+    r.button.set_label(native::button_label(r.app));
     r.button.set_visible(native::can_set_up(r.app));
 }
 
