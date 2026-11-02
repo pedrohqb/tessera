@@ -49,6 +49,15 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.2.1" date="2026-11-02">
+      <description>
+        <p>Debian, Ubuntu and their derivatives.</p>
+        <ul>
+          <li>Where the system's p11-kit is too old for signing (Debian 12 and 13, LMDE, Ubuntu 24.04, Linux Mint 22 and the like), a banner says so and links to the documentation.</li>
+          <li>On the Debian family, which ships no p11-kit-server.socket, the window offers the command that sets up the p11-kit server as a user service.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-02">
       <description>
         <p>Native apps: a new tab sets up the Firefox, Chromium-based browsers, Okular, Papers and PJeOffice Pro installed from the distribution, and leaves alone the ones the system already gives p11-kit (Fedora and its family).</p>

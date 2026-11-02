@@ -1,6 +1,6 @@
 [package]
 name = "tessera"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 rust-version = "1.80"
 description = "A PKCS#11 token hub for Flatpak: runs the token drivers in one sandbox and shares them with other apps through p11-kit"
