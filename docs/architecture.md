@@ -79,10 +79,12 @@ Supervision runs in the service, with or without the window (`supervise` in `src
 | `--filesystem=xdg-config/pkcs11:create` | Writing the `tessera-*.module` files; no other file is touched |
 | `--filesystem=xdg-run/p11-kit/pkcs11` | Checking whether the apps see Tessera's tokens through the system server (see [Apps](apps.md)) |
 | `--filesystem=xdg-data/flatpak/overrides:ro` | Showing whether step 1 of each app has already been done |
-| `--filesystem=xdg-data/flatpak/exports/share/icons:ro`, `xdg-data/flatpak/app:ro` and the same under `/var/lib/flatpak` | Showing each app with its own icon. The exported icons are links to each app's folder in `app/`, so that folder is needed too, read-only |
+| `--filesystem=xdg-data/flatpak/appstream:ro` and `/var/lib/flatpak/appstream:ro` | Showing each app with its own icon, installed or not: the AppStream data Flatpak keeps for each remote (Flathub, FlatPark) has the icons of every app in it |
 | `--filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create`, `~/.var/app/org.kde.okular/config/mozilla:create` | The own NSS database of Papers and of Okular |
 | `--filesystem=~/.var/app/org.mozilla.firefox/config/mozilla/firefox` and `.../.mozilla/firefox` | Registering the module in the Firefox profiles |
 | `--filesystem=~/.pki/nssdb` and, for Chromium, Brave, Chrome and Edge, `~/.var/app/<browser>/data/pki/nssdb` and `~/.var/app/<browser>/.pki/nssdb` | Registering the module in the NSS database of the Chromium-based browsers (the new one, since Chromium 146, and the old one) |
+| `--filesystem=~/.mozilla/firefox`, `xdg-config/mozilla/firefox` and `xdg-data/pki/nssdb` | The native apps (see [Apps](apps.md#native-apps)): the native Firefox's profiles and the database the native Chromium-based browsers share since Chromium 146 |
+| `--filesystem=~/.pjeoffice-pro` | The native PJeOffice Pro's list of A3 libraries (`list.a3`) |
 | `--talk-name=org.kde.StatusNotifierWatcher` | The tray icon |
 | `--persist=.config/serproid` | SerproID's certificate folder and log stay in Tessera's own data |
 

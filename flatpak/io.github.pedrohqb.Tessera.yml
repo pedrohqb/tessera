@@ -62,15 +62,9 @@ finish-args:
   # The native PJeOffice Pro's settings, where "Set up" points its list of
   # A3 libraries (list.a3) at p11-kit's library. Only that line changes.
   - --filesystem=~/.pjeoffice-pro
-  # Read-only: the icons Flatpak exports for the installed apps, to show each
-  # app with its own icon. The exported icons are links into each app's
-  # folder under app/, so those are needed too.
-  - --filesystem=xdg-data/flatpak/exports/share/icons:ro
-  - --filesystem=xdg-data/flatpak/app:ro
-  - --filesystem=/var/lib/flatpak/exports/share/icons:ro
-  - --filesystem=/var/lib/flatpak/app:ro
   # Read-only: the AppStream data Flatpak keeps for each remote, with the
-  # icons of the apps that are not installed.
+  # icons of every app in it, installed or not: each app's row shows its
+  # own icon without access to the apps' folders.
   - --filesystem=xdg-data/flatpak/appstream:ro
   - --filesystem=/var/lib/flatpak/appstream:ro
   # Read-only: whether `flatpak override --user` already gave an app the

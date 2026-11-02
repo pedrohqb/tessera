@@ -245,13 +245,34 @@ pub(super) struct NativeRows {
     button: gtk::Button,
 }
 
+/// Does the theme have this icon, in a file Tessera can read? An icon the
+/// host exports may be a link into a folder the sandbox cannot see.
+fn readable_icon(theme: &gtk::IconTheme, name: &str) -> bool {
+    if !theme.has_icon(name) {
+        return false;
+    }
+    let icon = theme.lookup_icon(
+        name,
+        &[],
+        32,
+        1,
+        gtk::TextDirection::None,
+        gtk::IconLookupFlags::empty(),
+    );
+    match icon.file().and_then(|f| f.path()) {
+        Some(path) => std::fs::File::open(path).is_ok(),
+        // In a resource, not a file.
+        None => true,
+    }
+}
+
 /// An app's icon, at 32 px: for each of `names` in turn, the icon theme's
-/// (the desktop's, an installed Flatpak's, or Tessera's own copy) or the
-/// one in Flatpak's AppStream data (apps not installed); else `fallback`.
+/// (the desktop's or Tessera's own copy) or the one in Flatpak's AppStream
+/// data (every app of each remote, installed or not); else `fallback`.
 fn themed_icon(names: &[&str], fallback: &str) -> gtk::Image {
     let theme = gtk::gdk::Display::default().map(|d| gtk::IconTheme::for_display(&d));
     let found = names.iter().find_map(|n| {
-        if theme.as_ref().is_some_and(|t| t.has_icon(n)) {
+        if theme.as_ref().is_some_and(|t| readable_icon(t, n)) {
             Some(gtk::Image::from_icon_name(n))
         } else {
             paths::appstream_icon(n).map(gtk::Image::from_file)

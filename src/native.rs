@@ -510,4 +510,64 @@ mod tests {
         );
         assert_eq!(p11kit_library_for(""), "/usr/lib/p11-kit-proxy.so");
     }
+
+    /// Run in CI on several distributions (Fedora, Debian, Ubuntu, Arch,
+    /// openSUSE), each in its own container with its default packages:
+    /// what Tessera deduces must match the system.
+    ///
+    /// - The path written into PJeOffice's list.a3, chosen from os-release,
+    ///   exists.
+    /// - A fresh NSS database, made the way a browser makes its own: Tessera
+    ///   calls it ready without Set up (p11-kit already there, or
+    ///   nss-sysinit) exactly when NSS, opening it, loads a p11-kit module.
+    ///
+    /// Needs certutil and modutil (NSS's tools) and p11-kit.
+    #[test]
+    #[ignore = "run in CI, in a container of each distribution"]
+    fn detection_matches_this_system() {
+        use std::process::Command;
+        let release = fs::read_to_string("/etc/os-release").unwrap_or_default();
+        let distro = release
+            .lines()
+            .find_map(|l| l.strip_prefix("PRETTY_NAME="))
+            .unwrap_or("?")
+            .trim_matches('"')
+            .to_string();
+
+        let library = host_p11kit_library();
+        let exists = std::path::Path::new(library).is_file();
+        println!("REPORT: {distro}: PJeOffice list.a3 path {library}: exists={exists}");
+        assert!(exists, "{library} does not exist on {distro}");
+
+        let dir = std::env::temp_dir().join(format!("tessera-distro-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let db = format!("sql:{}", dir.display());
+        let made = Command::new("certutil")
+            .args(["-N", "-d", &db, "--empty-password"])
+            .status()
+            .expect("certutil (NSS's tools) is needed");
+        assert!(made.success(), "certutil -N failed");
+        let listing = Command::new("modutil")
+            .args(["-list", "-dbdir", &db])
+            .stdin(std::process::Stdio::null())
+            .output()
+            .expect("modutil (NSS's tools) is needed");
+        let listing = String::from_utf8_lossy(&listing.stdout);
+        let nss_loads_p11kit = listing.lines().any(|l| {
+            let l = l.to_lowercase();
+            l.contains("library name:") && l.contains("p11-kit") && !l.contains("trust")
+        });
+        let tessera_says_ready = nss::has_p11kit(&dir) || nss::uses_sysinit(&dir);
+        println!(
+            "REPORT: {distro}: fresh NSS database: sysinit={} p11-kit registered={} NSS loads p11-kit={nss_loads_p11kit} Tessera says ready={tessera_says_ready}",
+            nss::uses_sysinit(&dir),
+            nss::has_p11kit(&dir),
+        );
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(
+            tessera_says_ready, nss_loads_p11kit,
+            "on {distro}, Tessera's verdict differs from what NSS loads:\n{listing}"
+        );
+    }
 }

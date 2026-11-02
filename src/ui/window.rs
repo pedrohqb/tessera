@@ -89,20 +89,17 @@ pub(super) fn plain_row(title: &str, subtitle: &str, icon: &str) -> adw::ActionR
     row
 }
 
-/// Let the icon theme find the icons of the installed Flatpak apps.
-pub(super) fn add_exported_icons() {
+/// Let the icon theme find the host's own icon themes, where Flatpak shows
+/// them, for the native apps' icons. The Flatpak apps' icons come from
+/// Flatpak's AppStream data (see app_rows.rs), which needs no access to the
+/// apps' own folders.
+pub(super) fn add_host_icons() {
     let Some(display) = gtk::gdk::Display::default() else {
         return;
     };
     let theme = gtk::IconTheme::for_display(&display);
-    for dir in [
-        paths::home().join(".local/share/flatpak/exports/share/icons"),
-        std::path::PathBuf::from("/var/lib/flatpak/exports/share/icons"),
-        // The host's own icon themes, where Flatpak shows them, for the
-        // native apps' icons.
-        std::path::PathBuf::from("/run/host/share/icons"),
-        std::path::PathBuf::from("/run/host/user-share/icons"),
-    ] {
+    for dir in ["/run/host/share/icons", "/run/host/user-share/icons"] {
+        let dir = std::path::Path::new(dir);
         if dir.is_dir() {
             theme.add_search_path(dir);
         }
@@ -433,7 +430,7 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
 }
 
 pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
-    add_exported_icons();
+    add_host_icons();
     let header = adw::HeaderBar::new();
     let menu = gio::Menu::new();
     menu.append(

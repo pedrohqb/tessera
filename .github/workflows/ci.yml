@@ -30,6 +30,75 @@ jobs:
         env:
           # A test whose tools are missing fails here instead of skipping.
           TESSERA_TEST_REQUIRE: "1"
+      - name: Window test (tests/gui, through the accessibility tree)
+        run: |
+          sudo apt-get install -y at-spi2-core python3-pyatspi xvfb xdotool libnss3-tools >/dev/null
+          cargo build --locked
+          set +e
+          xvfb-run -a -s "-screen 0 1100x1300x24" dbus-run-session -- \
+            python3 tests/gui/test_window.py > gui.log 2>&1
+          status=$?
+          set -e
+          grep -vE "dbus-daemon|SpiRegistry|dbind" gui.log
+          if [ $status -ne 0 ]; then
+            msg=$(grep -vE "dbus-daemon|SpiRegistry|dbind" gui.log | tail -n 80 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Window test failed::$msg"
+            exit $status
+          fi
+        env:
+          TESSERA_GUI_DUMP: "1"
+
+  distros:
+    # What Tessera deduces from the system (the p11-kit path for PJeOffice,
+    # whether NSS already loads p11-kit) checked against each distribution
+    # itself, with its default packages (src/native.rs,
+    # detection_matches_this_system).
+    name: Detection on ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Fedora
+            image: fedora:latest
+            install: dnf install -y gcc pkgconf-pkg-config gtk4-devel libadwaita-devel pcsc-lite-devel nss-tools p11-kit git tar
+          - name: Debian
+            image: debian:stable
+            install: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpcsclite-dev libnss3-tools p11-kit p11-kit-modules curl ca-certificates git
+          - name: Ubuntu
+            image: ubuntu:24.04
+            install: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential pkg-config libgtk-4-dev libadwaita-1-dev libpcsclite-dev libnss3-tools p11-kit p11-kit-modules curl ca-certificates git
+          - name: Arch Linux
+            image: archlinux:latest
+            install: pacman -Syu --noconfirm base-devel gtk4 libadwaita pcsclite nss p11-kit git
+          - name: openSUSE Tumbleweed
+            image: opensuse/tumbleweed
+            install: zypper -n install gcc pkgconf gtk4-devel libadwaita-devel pcsc-lite-devel mozilla-nss-tools p11-kit libp11-kit0 curl git tar gzip
+    steps:
+      - name: Install the distribution's packages
+        run: ${{ matrix.install }}
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+      - name: Detection matches this system
+        run: |
+          . "$HOME/.cargo/env"
+          set +e
+          cargo test --locked --bin tessera -- --ignored --nocapture detection_matches_this_system > test.log 2>&1
+          status=$?
+          set -e
+          tail -n 40 test.log
+          report=$(grep "^REPORT:" test.log | sed 's/^REPORT: //' | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          [ -n "$report" ] && echo "::notice title=${{ matrix.name }}::$report"
+          if [ $status -ne 0 ]; then
+            msg=$(tail -n 40 test.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=Detection on ${{ matrix.name }}::$msg"
+            exit $status
+          fi
 
   flatpak:
     name: Flatpak bundle
