@@ -34,7 +34,7 @@ Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pe
 | Distribuição | Situação |
 |---|---|
 | Fedora, Bluefin, Aurora, Bazzite, Silverblue e Kinoite | funciona |
-| Arch Linux, Manjaro, EndeavourOS e CachyOS | funciona |
+| Arch Linux, Manjaro, BigLinux, EndeavourOS e CachyOS | funciona |
 | openSUSE Tumbleweed | funciona |
 | Ubuntu 26.04 ou mais novo | funciona |
 | **Debian 12 e 13, LMDE 6 e 7, Ubuntu 24.04, Linux Mint 22** | **não funciona:** use o [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) |
@@ -58,7 +58,7 @@ systemctl --user enable --now p11-kit-server.socket
 
 Se algum pacote tiver sido removido, reinstale-o com `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
 
-**Arch Linux, Manjaro, EndeavourOS e CachyOS:**
+**Arch Linux, Manjaro, BigLinux, EndeavourOS e CachyOS:**
 
 ```bash
 sudo pacman -S flatpak pcsclite ccid
@@ -266,7 +266,7 @@ The tokens are available to these apps, as Flatpaks or installed from the distri
 | Distribution | Status |
 |---|---|
 | Fedora, Bluefin, Aurora, Bazzite, Silverblue and Kinoite | works |
-| Arch Linux, Manjaro, EndeavourOS and CachyOS | works |
+| Arch Linux, Manjaro, BigLinux, EndeavourOS and CachyOS | works |
 | openSUSE Tumbleweed | works |
 | Ubuntu 26.04 or newer | works |
 | **Debian 12 and 13, LMDE 6 and 7, Ubuntu 24.04, Linux Mint 22** | **does not work:** use [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) |
@@ -288,7 +288,7 @@ systemctl --user enable --now p11-kit-server.socket
 
 If a package was removed, reinstall it with `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
 
-**Arch Linux, Manjaro, EndeavourOS and CachyOS:**
+**Arch Linux, Manjaro, BigLinux, EndeavourOS and CachyOS:**
 
 ```bash
 sudo pacman -S flatpak pcsclite ccid
