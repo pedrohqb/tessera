@@ -201,6 +201,35 @@ pub fn host_is_debian_family() -> bool {
     debian_family(&host_os_release())
 }
 
+/// Releases of the Debian family whose p11-kit is older than 0.25.6
+/// (Debian 11 to 13, Ubuntu 20.04 to 24.04, and what is built on them: MX,
+/// LMDE, Linux Mint, Pop!_OS…). From 0.25.6 on, p11-kit sends a mechanism's
+/// parameters in another layout, not tied to the protocol version, so an
+/// older system p11-kit and Tessera's disagree: tokens and the PIN work,
+/// every signature with parameters (RSA-PSS, TLS 1.3) fails (history.md
+/// item 38). By codename, which derivatives keep in UBUNTU_CODENAME or
+/// DEBIAN_CODENAME: a Flatpak cannot ask the host's p11-kit its version.
+const OLD_P11KIT_CODENAMES: [&str; 6] =
+    ["bullseye", "bookworm", "trixie", "focal", "jammy", "noble"];
+
+/// Is the host's p11-kit too old for signing through Tessera?
+pub fn host_has_old_p11kit() -> bool {
+    old_p11kit_by_release(&host_os_release())
+}
+
+fn old_p11kit_by_release(os_release: &str) -> bool {
+    debian_family(os_release)
+        && os_release
+            .lines()
+            .filter_map(|l| {
+                ["VERSION_CODENAME=", "UBUNTU_CODENAME=", "DEBIAN_CODENAME="]
+                    .iter()
+                    .find_map(|k| l.trim().strip_prefix(k))
+            })
+            .map(|v| v.trim().trim_matches('"').to_lowercase())
+            .any(|c| OLD_P11KIT_CODENAMES.contains(&c.as_str()))
+}
+
 fn debian_family(os_release: &str) -> bool {
     release_ids(os_release)
         .iter()
@@ -632,6 +661,37 @@ mod tests {
             "ID=opensuse-tumbleweed\nID_LIKE=\"opensuse suse\"\n"
         ));
         assert!(!debian_family(""));
+    }
+
+    #[test]
+    fn old_p11kit_by_distribution() {
+        let old = [
+            "ID=debian\nVERSION_ID=\"13\"\nVERSION_CODENAME=trixie\n",
+            "ID=debian\nVERSION_ID=\"12\"\nVERSION_CODENAME=bookworm\n",
+            // MX keeps Debian's os-release.
+            "PRETTY_NAME=\"MX 25\"\nID=debian\nVERSION_CODENAME=trixie\n",
+            "ID=linuxmint\nID_LIKE=debian\nVERSION_CODENAME=gigi\nDEBIAN_CODENAME=trixie\n",
+            "ID=linuxmint\nID_LIKE=debian\nVERSION_CODENAME=faye\nDEBIAN_CODENAME=bookworm\n",
+            "ID=ubuntu\nID_LIKE=debian\nVERSION_ID=\"24.04\"\nVERSION_CODENAME=noble\nUBUNTU_CODENAME=noble\n",
+            "ID=ubuntu\nID_LIKE=debian\nVERSION_CODENAME=jammy\nUBUNTU_CODENAME=jammy\n",
+            "ID=linuxmint\nID_LIKE=\"ubuntu debian\"\nVERSION_CODENAME=wilma\nUBUNTU_CODENAME=noble\n",
+            "ID=pop\nID_LIKE=\"ubuntu debian\"\nVERSION_CODENAME=noble\nUBUNTU_CODENAME=noble\n",
+        ];
+        for r in old {
+            assert!(old_p11kit_by_release(r), "{r}");
+        }
+        let fine = [
+            "ID=ubuntu\nID_LIKE=debian\nVERSION_ID=\"26.04\"\nVERSION_CODENAME=resolute\nUBUNTU_CODENAME=resolute\n",
+            "ID=ubuntu\nID_LIKE=debian\nVERSION_CODENAME=questing\nUBUNTU_CODENAME=questing\n",
+            "ID=debian\nVERSION_CODENAME=forky\n",
+            "ID=fedora\nVERSION_ID=44\n",
+            "ID=cachyos\nID_LIKE=arch\n",
+            "ID=opensuse-tumbleweed\nID_LIKE=\"opensuse suse\"\n",
+            "",
+        ];
+        for r in fine {
+            assert!(!old_p11kit_by_release(r), "{r}");
+        }
     }
 
     #[test]

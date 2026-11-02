@@ -192,6 +192,24 @@ def expected_pjeoffice_library():
     return "/usr/lib/p11-kit-proxy.so"
 
 
+OLD_P11KIT_BANNER = "On this system signing does not work (old p11-kit); see the project's documentation"
+
+
+def old_p11kit_host():
+    """The same rule as native.rs (old_p11kit_by_release), on this host."""
+    text = Path("/etc/os-release").read_text()
+    ids, codenames = [], []
+    for line in text.splitlines():
+        key, _, value = line.partition("=")
+        value = value.strip('"').lower()
+        if key in ("ID", "ID_LIKE"):
+            ids += value.split()
+        if key in ("VERSION_CODENAME", "UBUNTU_CODENAME", "DEBIAN_CODENAME"):
+            codenames.append(value)
+    old = {"bullseye", "bookworm", "trixie", "focal", "jammy", "noble"}
+    return bool({"debian", "ubuntu"} & set(ids)) and bool(old & set(codenames))
+
+
 def main():
     if not TESSERA.exists():
         fail(f"{TESSERA} not found (cargo build first)")
@@ -230,6 +248,16 @@ def main():
         global APP
         APP = app
         ok("window on the accessibility bus")
+
+        # --- The banner for systems whose p11-kit is too old ---------------
+        if old_p11kit_host():
+            wait("the old p11-kit banner", lambda: find(app, role="label", name=OLD_P11KIT_BANNER))
+            ok("old p11-kit banner shown on this host")
+        else:
+            time.sleep(1)
+            if find(app, role="label", name=OLD_P11KIT_BANNER):
+                fail("old p11-kit banner shown on a host that does not need it")
+            ok("no old p11-kit banner on this host")
 
         # --- Native tab ----------------------------------------------------
         press(wait("the Native tab", lambda: find(app, role="page tab", name="Native")))

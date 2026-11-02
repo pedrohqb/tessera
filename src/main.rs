@@ -118,6 +118,11 @@ fn print_status() -> ExitCode {
         "\nSystem p11-kit server ({}): {view}",
         paths::host_p11kit_socket().display()
     );
+    if native::host_has_old_p11kit() {
+        println!(
+            "WARNING: on this system signing does not work (old p11-kit); see the project's documentation: https://github.com/pedrohqb/tessera#distributions"
+        );
+    }
     ExitCode::SUCCESS
 }
 

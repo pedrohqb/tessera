@@ -138,6 +138,26 @@ pub(super) fn copy_button(win: &Rc<Win>, text: String) -> gtk::Button {
     b
 }
 
+/// On systems whose p11-kit is too old for signing (native.rs), a banner
+/// that says so, with a button to the README's list of distributions.
+fn old_p11kit_banner(win: &Rc<Win>) -> adw::Banner {
+    let banner = adw::Banner::new(t(
+        "On this system signing does not work (old p11-kit); see the project's documentation",
+    ));
+    banner.set_button_label(Some(t("Documentation")));
+    banner.set_revealed(crate::native::host_has_old_p11kit());
+    let w = Rc::downgrade(win);
+    banner.connect_button_clicked(move |_| {
+        let parent = w.upgrade().map(|win| win.window.clone());
+        gtk::UriLauncher::new(t("https://github.com/pedrohqb/tessera#distributions")).launch(
+            parent.as_ref(),
+            gio::Cancellable::NONE,
+            |_| {},
+        );
+    });
+    banner
+}
+
 /// What to tell the user to run for the host's p11-kit server: the command
 /// itself, or, where it is long (Debian, Ubuntu), the copy button.
 fn run_once(lead: &'static str, copy: &'static str) -> String {
@@ -519,6 +539,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
 
     let view = adw::ToolbarView::new();
     view.add_top_bar(&header);
+    view.add_top_bar(&old_p11kit_banner(&win));
     view.set_content(Some(&page));
     win.toasts.set_child(Some(&view));
     win.window.set_content(Some(&win.toasts));

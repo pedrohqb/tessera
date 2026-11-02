@@ -39,7 +39,7 @@ Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pe
 | Ubuntu 26.04 ou mais novo | funciona |
 | **Debian 12 e 13, LMDE 6 e 7, Ubuntu 24.04, Linux Mint 22** | **não funciona:** use o [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) |
 
-O que decide é a versão do p11-kit do sistema. Com a 0.25.5 ou anterior, o Tessera mostra os tokens e o PIN é pedido, mas **a assinatura falha** (no navegador, `SSL_ERROR_HANDSHAKE_FAILED`): na 0.25.6, o p11-kit mudou a forma de transmitir os parâmetros da assinatura, e as versões anteriores não se entendem com o Tessera nesse ponto. Na família Debian, a versão aparece em `dpkg -l libp11-kit0`.
+O que decide é a versão do p11-kit do sistema. Com a 0.25.5 ou anterior, o Tessera mostra os tokens e o PIN é pedido, mas **a assinatura falha** (no navegador, `SSL_ERROR_HANDSHAKE_FAILED`): na 0.25.6, o p11-kit mudou a forma de transmitir os parâmetros da assinatura, e as versões anteriores não se entendem com o Tessera nesse ponto. Na família Debian, a versão aparece em `dpkg -l libp11-kit0`. Nos sistemas da tabela que não funcionam, a janela do Tessera mostra um aviso no topo.
 
 ---
 
@@ -271,7 +271,7 @@ The tokens are available to these apps, as Flatpaks or installed from the distri
 | Ubuntu 26.04 or newer | works |
 | **Debian 12 and 13, LMDE 6 and 7, Ubuntu 24.04, Linux Mint 22** | **does not work:** use [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) |
 
-What decides it is the system's p11-kit version. With 0.25.5 or older, Tessera shows the tokens and the PIN is asked, but **signing fails** (in the browser, `SSL_ERROR_HANDSHAKE_FAILED`): in 0.25.6, p11-kit changed how it sends the signing parameters, and older versions do not understand Tessera on that point. On the Debian family, `dpkg -l libp11-kit0` shows the version.
+What decides it is the system's p11-kit version. With 0.25.5 or older, Tessera shows the tokens and the PIN is asked, but **signing fails** (in the browser, `SSL_ERROR_HANDSHAKE_FAILED`): in 0.25.6, p11-kit changed how it sends the signing parameters, and older versions do not understand Tessera on that point. On the Debian family, `dpkg -l libp11-kit0` shows the version. On the systems in the table that do not work, Tessera's window shows a warning at the top.
 
 ### Installation
 
