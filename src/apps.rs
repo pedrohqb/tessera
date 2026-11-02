@@ -5,7 +5,7 @@
 //!     remote: unix:path=/run/user/<uid>/tessera/<driver>
 //!
 //! makes the host's p11-kit (its proxy, and its server behind
-//! `p11-kit-server.socket`) serve Tessera's tokens next to the host's own
+//! `p11-kit-server.socket`, or on Debian a plain user service) serve Tessera's tokens next to the host's own
 //! modules. Native apps that use p11-kit-proxy.so see them directly.
 //!
 //! Sandboxed apps: `flatpak override --user
@@ -109,7 +109,42 @@ pub const APPS: [&ClientApp; 7] = [
 ];
 
 /// The one-time host command that starts the host's p11-kit server.
-pub const HOST_SERVER_COMMAND: &str = "systemctl --user enable --now p11-kit-server.socket";
+const SOCKET_COMMAND: &str = "systemctl --user enable --now p11-kit-server.socket";
+
+/// The same on Debian and its derivatives (Ubuntu, Mint), which ship the
+/// server (`p11-kit server`) but no systemd units for it, and build it
+/// without socket activation: a plain user service, started at login, that
+/// creates the socket itself where the other distributions' socket unit
+/// puts it. Written by printf, one argument per line, so that systemd's `%t`
+/// (the runtime folder) reaches the file as it is.
+const DEBIAN_COMMAND: &str = concat!(
+    "mkdir -p ~/.config/systemd/user && printf '%s\\n' ",
+    "'[Unit]' 'Description=p11-kit server' 'Documentation=man:p11-kit(8)' ",
+    "'[Service]' 'ExecStartPre=/bin/mkdir -p -m 700 %t/p11-kit' ",
+    "'ExecStart=/usr/bin/p11-kit server -f -n %t/p11-kit/pkcs11 pkcs11:' ",
+    "'Restart=on-failure' '[Install]' 'WantedBy=default.target' ",
+    "> ~/.config/systemd/user/p11-kit-server.service && ",
+    "systemctl --user daemon-reload && ",
+    "systemctl --user enable --now p11-kit-server.service"
+);
+
+/// The command for this host (see SOCKET_COMMAND and DEBIAN_COMMAND).
+pub fn host_server_command() -> &'static str {
+    server_command_for(crate::native::host_is_debian_family())
+}
+
+fn server_command_for(debian: bool) -> &'static str {
+    if debian {
+        DEBIAN_COMMAND
+    } else {
+        SOCKET_COMMAND
+    }
+}
+
+/// Is the command too long to show in the window (it is copied instead)?
+pub fn host_server_command_is_long() -> bool {
+    crate::native::host_is_debian_family()
+}
 
 /// The command that lets a sandboxed app reach the host's p11-kit server.
 pub fn override_command(app: &ClientApp) -> String {
@@ -189,4 +224,43 @@ pub fn write_host_modules(drivers: &[Driver], running: &[String]) -> Result<usiz
         }
     }
     Ok(wanted.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn server_command_by_distribution() {
+        assert_eq!(server_command_for(false), SOCKET_COMMAND);
+        assert_eq!(server_command_for(true), DEBIAN_COMMAND);
+    }
+
+    /// The Debian command writes the unit systemd expects, with `%t` intact
+    /// (the systemctl part is left out: there is no user systemd here).
+    #[test]
+    fn debian_command_writes_the_service() {
+        let home = std::env::temp_dir().join(format!("tessera-unit-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&home);
+        fs::create_dir_all(&home).unwrap();
+        let write = DEBIAN_COMMAND.split(" && systemctl").next().unwrap();
+        let ok = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(write)
+            .env("HOME", &home)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok);
+        let unit =
+            fs::read_to_string(home.join(".config/systemd/user/p11-kit-server.service")).unwrap();
+        assert_eq!(
+            unit,
+            "[Unit]\nDescription=p11-kit server\nDocumentation=man:p11-kit(8)\n\
+             [Service]\nExecStartPre=/bin/mkdir -p -m 700 %t/p11-kit\n\
+             ExecStart=/usr/bin/p11-kit server -f -n %t/p11-kit/pkcs11 pkcs11:\n\
+             Restart=on-failure\n[Install]\nWantedBy=default.target\n"
+        );
+        let _ = fs::remove_dir_all(&home);
+    }
 }

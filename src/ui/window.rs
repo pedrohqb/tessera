@@ -138,6 +138,16 @@ pub(super) fn copy_button(win: &Rc<Win>, text: String) -> gtk::Button {
     b
 }
 
+/// What to tell the user to run for the host's p11-kit server: the command
+/// itself, or, where it is long (Debian, Ubuntu), the copy button.
+fn run_once(lead: &'static str, copy: &'static str) -> String {
+    if apps::host_server_command_is_long() {
+        t(copy).to_string()
+    } else {
+        format!("{} {}", t(lead), apps::host_server_command())
+    }
+}
+
 pub(super) fn update_service(hub: &Hub, win: &Win) {
     let state = hub.server.borrow_mut().poll();
     let dir = paths::socket_dir();
@@ -155,10 +165,9 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
     } else {
         win.service_row.remove_css_class("error");
     }
-    let off = format!(
-        "{} {}",
-        t("Off: the apps cannot see the tokens. Run once in a terminal:"),
-        apps::HOST_SERVER_COMMAND
+    let off = run_once(
+        "Off: the apps cannot see the tokens. Run once in a terminal:",
+        "Off: the apps cannot see the tokens. Copy the command with the button on the right and run it once in a terminal.",
     );
     let (text, bad) = match (&*hub.host.borrow(), &*hub.host_view.borrow()) {
         (Err(e), _) => (format!("{}: {e}", t("Could not write the host module files")), true),
@@ -171,10 +180,9 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
             false,
         ),
         (Ok(_), Some(status::HostView::WithoutTessera)) => (
-            format!(
-                "{} {}",
-                t("The apps do not see Tessera's tokens: the system's p11-kit server is off. Run once in a terminal:"),
-                apps::HOST_SERVER_COMMAND
+            run_once(
+                "The apps do not see Tessera's tokens: the system's p11-kit server is off. Run once in a terminal:",
+                "The apps do not see Tessera's tokens: the system's p11-kit server is off. Copy the command with the button on the right and run it once in a terminal.",
             ),
             true,
         ),
@@ -503,7 +511,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         last: RefCell::new(String::new()),
     });
     win.host_row
-        .add_suffix(&copy_button(&win, apps::HOST_SERVER_COMMAND.to_string()));
+        .add_suffix(&copy_button(&win, apps::host_server_command().to_string()));
     page.add(&win.readers.group);
     page.add(&win.tokens.group);
     page.add(&win.drivers.group);

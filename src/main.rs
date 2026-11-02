@@ -101,10 +101,10 @@ fn print_status() -> ExitCode {
         .map(|t| (t.label.clone(), t.serial.clone()))
         .collect();
     let view = match status::host_view(&ours) {
-        status::HostView::Off => {
-            "OFF: nothing answers; run `systemctl --user enable --now p11-kit-server.socket`"
-                .to_string()
-        }
+        status::HostView::Off => format!(
+            "OFF: nothing answers; run once: {}",
+            apps::host_server_command()
+        ),
         status::HostView::WithoutTessera => {
             "apps do NOT see Tessera's tokens (server off)".to_string()
         }

@@ -37,3 +37,5 @@ Not yet confirmed by hand:
 
 - **SafeNet eToken 5100/5110** with a real token. Its download is checked every week, but no test with the token itself is recorded yet.
 - **Snap** packages (Ubuntu's Firefox and Chromium): not supported.
+- **Debian and Ubuntu's p11-kit server as a user service** (they ship no `p11-kit-server.socket`; see [usage](usage.md)): the unit is checked by a unit test, and its command was run by hand in an Ubuntu 24.04 container without systemd (a client listed the tokens through the socket), but not yet as a service on a real Debian or Ubuntu desktop with Tessera.
+- **openSUSE** with Tessera, by hand: only the CI detection check so far.

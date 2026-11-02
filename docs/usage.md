@@ -7,7 +7,23 @@
   ```sh
   systemctl --user enable --now p11-kit-server.socket
   ```
-  On Fedora-based systems, the unit comes in the `p11-kit-server` package, which the atomic images already ship.
+  On Fedora-based systems, the unit comes in the `p11-kit-server` package, which the atomic images already ship; on openSUSE, in `p11-kit-server` too; on Arch, in `p11-kit` itself.
+
+  **Debian, Ubuntu, Linux Mint and their derivatives** ship the server (`p11-kit server`, package `p11-kit`) but no systemd units for it, and build it without socket activation (no libsystemd), so the unit above does not exist there. A plain user service takes its place: it starts at login and creates the socket itself, at the same path (`%t/p11-kit/pkcs11`). The README has it as a file; the window's copy button gives the same as one line. Its content:
+  ```ini
+  [Unit]
+  Description=p11-kit server
+  Documentation=man:p11-kit(8)
+
+  [Service]
+  ExecStartPre=/bin/mkdir -p -m 700 %t/p11-kit
+  ExecStart=/usr/bin/p11-kit server -f -n %t/p11-kit/pkcs11 pkcs11:
+  Restart=on-failure
+
+  [Install]
+  WantedBy=default.target
+  ```
+  in `~/.config/systemd/user/p11-kit-server.service`, then `systemctl --user daemon-reload && systemctl --user enable --now p11-kit-server.service`. To try it without systemd, `mkdir -p -m 700 "$XDG_RUNTIME_DIR/p11-kit" && p11-kit server -f -n "$XDG_RUNTIME_DIR/p11-kit/pkcs11" pkcs11:` serves the tokens while the terminal stays open.
 
 Nothing else is installed on the system.
 
@@ -52,7 +68,7 @@ After updating, quit Tessera (menu → **Quit**) and open it again.
 
 ## The window
 
-- **Service:** the state of the driver servers, with **Start** or **Restart**. Right below, **System connection**, which checks end to end whether the apps see Tessera's tokens through `p11-kit-server.socket`, with the activation command to copy. Last, **Smart card service (pcscd)**.
+- **Service:** the state of the driver servers, with **Start** or **Restart**. Right below, **System connection**, which checks end to end whether the apps see Tessera's tokens through the host's p11-kit server, with the activation command to copy (on Debian and Ubuntu, the one that writes the user service, too long to show). Last, **Smart card service (pcscd)**.
 - **Readers:** the readers that `pcscd` sees and whether there is a card.
 - **Tokens:** each token with its driver and certificates (holder, issuer, validity). An expired certificate is highlighted.
 - **Drivers:** each driver with its on/off switch and its state: "Published: the apps can use it", "Starting…", "No answer; trying again (1 of 3)", "Stopped: …" or "Switched off". The buttons for the vendor tools (Token Administration, SerproID) are here.

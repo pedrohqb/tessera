@@ -11,13 +11,14 @@
 | What the host sees | `p11-kit list-modules` (on the host) |
 | What an app sees | `flatpak run --command=sh <app> -c 'p11-kit list-modules'` |
 | The host server | `systemctl --user status p11-kit-server.socket p11-kit-server.service`; the log in `journalctl --user -u p11-kit-server.service` |
+| "Unit p11-kit-server.socket does not exist" | Debian, Ubuntu or Mint: their p11-kit has no systemd units | The user service in [usage](usage.md) (the window's copy button gives it) |
 | An app's permissions | `flatpak info --show-permissions <app>` and `~/.local/share/flatpak/overrides/<app>` |
 
 ## Common problems
 
 | Symptom | Likely cause | What to do |
 |---|---|---|
-| "System connection" red | `p11-kit-server.socket` off | `systemctl --user enable --now p11-kit-server.socket`; the row recovers on its own within 15 s, without restarting Tessera; `tessera status` shows the same result |
+| "System connection" red | `p11-kit-server.socket` off | `systemctl --user enable --now p11-kit-server.socket` (on Debian and Ubuntu, the user service in [usage](usage.md); the window's copy button gives it); the row recovers on its own within 15 s, without restarting Tessera; `tessera status` shows the same result |
 | The app sees no token at all | step 1 is missing, or the app was opened before step 1 or before the driver was published | Step 1, then close and reopen the app |
 | Tessera sees the token, the app does not | the driver has not responded yet (not published) or the app was started before publication | Check the driver's state in the window; reopen the app |
 | Driver "Stopped: No answer 3 times in a row" | the driver hangs (for example, with no token) | **Restart**, or switch the driver off if it is not used |

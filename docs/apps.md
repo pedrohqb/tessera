@@ -7,7 +7,7 @@ In the window, each app has up to two steps, with the same names for all of them
 
 A completed step appears with ✓ and no button. Each app's summary says "Ready", "Step 1 missing", "Step 2 missing" or "Steps 1 and 2 missing".
 
-First of all, the system server must be turned on, once per user: `systemctl --user enable --now p11-kit-server.socket`. The window's "System connection" row checks this end to end: through the system socket, Tessera lists the tokens an app would see and looks for its own (by name and serial number). It turns red if nobody answers or if Tessera's tokens are not there. Just seeing the socket is not enough: with the system server off, Flatpak's own trust server answers on the same path, and that is what fooled the first version of this row. The check repeats every 15 s while the window is open and whenever the token list changes; `tessera status` shows the same result in the terminal.
+First of all, the system server must be turned on, once per user: `systemctl --user enable --now p11-kit-server.socket` (on Debian and Ubuntu, which ship no such unit, a plain user service: see [usage](usage.md)). The window's "System connection" row checks this end to end: through the system socket, Tessera lists the tokens an app would see and looks for its own (by name and serial number). It turns red if nobody answers or if Tessera's tokens are not there. Just seeing the socket is not enough: with the system server off, Flatpak's own trust server answers on the same path, and that is what fooled the first version of this row. The check repeats every 15 s while the window is open and whenever the token list changes; `tessera status` shows the same result in the terminal.
 
 ## PJeOffice Pro (FlatPark)
 

@@ -196,10 +196,21 @@ fn release_ids(os_release: &str) -> Vec<String> {
         .collect()
 }
 
+/// Is the host Debian or one of its derivatives (Ubuntu, Mint…)?
+pub fn host_is_debian_family() -> bool {
+    debian_family(&host_os_release())
+}
+
+fn debian_family(os_release: &str) -> bool {
+    release_ids(os_release)
+        .iter()
+        .any(|i| ["debian", "ubuntu"].contains(&i.as_str()))
+}
+
 fn p11kit_library_for(os_release: &str) -> &'static str {
     let ids = release_ids(os_release);
     let any = |names: &[&str]| ids.iter().any(|i| names.contains(&i.as_str()));
-    if any(&["debian", "ubuntu"]) {
+    if debian_family(os_release) {
         "/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so"
     } else if any(&["fedora", "rhel", "centos", "suse", "opensuse", "mageia"]) {
         "/usr/lib64/p11-kit-proxy.so"
@@ -608,6 +619,19 @@ mod tests {
             "ID=opensuse-tumbleweed\nID_LIKE=\"opensuse suse\"\n"
         ));
         assert!(!policy_by_release("ID=arch\n"));
+    }
+
+    #[test]
+    fn debian_family_by_distribution() {
+        assert!(debian_family("ID=debian\n"));
+        assert!(debian_family("ID=ubuntu\nID_LIKE=debian\n"));
+        assert!(debian_family("ID=linuxmint\nID_LIKE=\"ubuntu debian\"\n"));
+        assert!(!debian_family("ID=fedora\n"));
+        assert!(!debian_family("ID=cachyos\nID_LIKE=arch\n"));
+        assert!(!debian_family(
+            "ID=opensuse-tumbleweed\nID_LIKE=\"opensuse suse\"\n"
+        ));
+        assert!(!debian_family(""));
     }
 
     #[test]

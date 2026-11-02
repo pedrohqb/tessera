@@ -27,7 +27,7 @@ USB token ──► pcscd (system)
 
 1. Tessera starts one p11-kit server for each enabled driver, each with its own socket in `$XDG_RUNTIME_DIR/tessera/<driver>`.
 2. For each driver that answers, it writes the file `~/.config/pkcs11/modules/tessera-<driver>.module` on the system, with a single meaningful line: `remote: unix:path=/run/user/<uid>/tessera/<driver>`. This way the system's p11-kit starts including these tokens among its modules.
-3. The system's own p11-kit server (`p11-kit-server.socket`, activated once by the user) serves all of this at `$XDG_RUNTIME_DIR/p11-kit/pkcs11`: the system trust, the system modules and Tessera's drivers.
+3. The system's own p11-kit server (`p11-kit-server.socket`, activated once by the user; on Debian and Ubuntu, which ship no units for it, a plain user service at the same path) serves all of this at `$XDG_RUNTIME_DIR/p11-kit/pkcs11`: the system trust, the system modules and Tessera's drivers.
 4. A Flatpak app that is given `--filesystem=xdg-run/p11-kit/pkcs11` finds that socket in the same place and uses it through the runtime's `p11-kit-client.so`. Native apps see it through `p11-kit-proxy.so`.
 
 No vendor package is installed on the system. The only things Tessera writes outside its own sandbox are the `tessera-*.module` files and, in the apps, the module's registration in the NSS database (see [Apps](apps.md)).

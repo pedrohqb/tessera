@@ -43,7 +43,7 @@ O sistema precisa de três coisas: o Flatpak com o Flathub, o serviço de cartõ
 Debian, Ubuntu, Linux Mint e derivados:
 
 ```bash
-sudo apt install flatpak pcscd libccid
+sudo apt install flatpak pcscd libccid p11-kit
 ```
 
 Arch Linux, Manjaro, EndeavourOS e CachyOS:
@@ -55,17 +55,39 @@ sudo pacman -S flatpak pcsclite ccid
 openSUSE Tumbleweed:
 
 ```bash
-sudo zypper in flatpak pcsc-ccid
+sudo zypper in flatpak pcsc-ccid p11-kit-server
 ```
 
-Depois, em qualquer distribuição, ligue o serviço de cartões e o servidor p11-kit do usuário:
+Depois, ligue o serviço de cartões e o servidor p11-kit do usuário. No Fedora, no Arch, no openSUSE e nos seus derivados:
 
 ```bash
 sudo systemctl enable --now pcscd.socket
 systemctl --user enable --now p11-kit-server.socket
 ```
 
-O segundo comando é o que deixa os aplicativos verem os tokens do Tessera. A janela do Tessera também o mostra, com um botão de copiar.
+No Debian, no Ubuntu, no Linux Mint e nos seus derivados, o pacote do p11-kit traz o servidor, mas não o `p11-kit-server.socket`, e o servidor não aceita ser ativado por socket. Ele entra como um serviço comum do usuário, que sobe no login:
+
+```bash
+sudo systemctl enable --now pcscd.socket
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/p11-kit-server.service <<'EOF'
+[Unit]
+Description=p11-kit server
+Documentation=man:p11-kit(8)
+
+[Service]
+ExecStartPre=/bin/mkdir -p -m 700 %t/p11-kit
+ExecStart=/usr/bin/p11-kit server -f -n %t/p11-kit/pkcs11 pkcs11:
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+systemctl --user daemon-reload
+systemctl --user enable --now p11-kit-server.service
+```
+
+O comando do servidor p11-kit é o que deixa os aplicativos verem os tokens do Tessera. A janela do Tessera também o oferece, com um botão de copiar (no Debian e no Ubuntu, numa linha só, que faz o mesmo).
 
 **Observação:** num Fedora em que algum desses pacotes tenha sido removido, reinstale-os com `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
 
@@ -227,7 +249,7 @@ The system needs three things: Flatpak with Flathub, the smart card service (`pc
 Debian, Ubuntu, Linux Mint and derivatives:
 
 ```bash
-sudo apt install flatpak pcscd libccid
+sudo apt install flatpak pcscd libccid p11-kit
 ```
 
 Arch Linux, Manjaro, EndeavourOS and CachyOS:
@@ -239,17 +261,39 @@ sudo pacman -S flatpak pcsclite ccid
 openSUSE Tumbleweed:
 
 ```bash
-sudo zypper in flatpak pcsc-ccid
+sudo zypper in flatpak pcsc-ccid p11-kit-server
 ```
 
-Then, on any distribution, turn on the smart card service and the user's p11-kit server:
+Then turn on the smart card service and the user's p11-kit server. On Fedora, Arch, openSUSE and their derivatives:
 
 ```bash
 sudo systemctl enable --now pcscd.socket
 systemctl --user enable --now p11-kit-server.socket
 ```
 
-The second command is what lets apps see Tessera's tokens. Tessera's window shows it too, with a copy button.
+On Debian, Ubuntu, Linux Mint and their derivatives, the p11-kit package ships the server but not `p11-kit-server.socket`, and the server cannot be socket-activated. It goes in as a plain user service, started at login:
+
+```bash
+sudo systemctl enable --now pcscd.socket
+mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/p11-kit-server.service <<'EOF'
+[Unit]
+Description=p11-kit server
+Documentation=man:p11-kit(8)
+
+[Service]
+ExecStartPre=/bin/mkdir -p -m 700 %t/p11-kit
+ExecStart=/usr/bin/p11-kit server -f -n %t/p11-kit/pkcs11 pkcs11:
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+systemctl --user daemon-reload
+systemctl --user enable --now p11-kit-server.service
+```
+
+The p11-kit server command is what lets apps see Tessera's tokens. Tessera's window offers it too, with a copy button (on Debian and Ubuntu, as a single line that does the same).
 
 **Note:** on a Fedora system where one of these packages was removed, reinstall them with `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
 
