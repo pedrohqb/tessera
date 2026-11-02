@@ -9,10 +9,11 @@
 //!   Firefox 147+, and ~/.mozilla/firefox).
 //! - Chromium, Chrome, Edge and Brave share one database: ~/.pki/nssdb if
 //!   it exists, otherwise (Chromium 146+) $XDG_DATA_HOME/pki/nssdb.
-//! - Okular, Papers and Evince sign through poppler, which opens the most
-//!   recent *default* Firefox profile that has a cert9.db, first under
-//!   $XDG_CONFIG_HOME/mozilla/firefox, then ~/.mozilla/firefox, and
-//!   otherwise ~/.pki/nssdb.
+//! - Okular and Papers sign through poppler, which opens the most recent
+//!   *default* Firefox profile that has a cert9.db, first under
+//!   $XDG_CONFIG_HOME/mozilla/firefox, then ~/.mozilla/firefox. They depend
+//!   on Firefox: their row has no button of its own, and is ready only when
+//!   those profiles are.
 //!
 //! - PJeOffice Pro is Java and keeps its own list of PKCS#11 libraries in
 //!   ~/.pjeoffice-pro/pjeoffice-pro.config (`list.a3=`, separated by `|`):
@@ -20,9 +21,11 @@
 //!   distribution. PJeOffice skips paths that do not exist and takes only
 //!   names ending in a known extension (.so, not .so.0).
 //!
-//! On Fedora, nss-sysinit may already load p11-kit's modules; registering
-//! the proxy there too would show each token twice, so a database that uses
-//! sysinit is reported as "probably ready".
+//! Some distributions already load p11-kit in these databases: Fedora
+//! through nss-sysinit (which brings in /etc/pki/nssdb, where p11-kit's proxy
+//! is registered), others by registering it themselves. Registering it
+//! again would show each token twice, so such a database counts as ready
+//! and gets no button.
 
 use std::path::PathBuf;
 
@@ -63,7 +66,7 @@ pub const CHROMIUM_BROWSERS: NativeApp = NativeApp {
     kind: Kind::Chromium,
 };
 pub const PDF_VIEWERS: NativeApp = NativeApp {
-    name: "PDF viewers (Okular, Papers, Evince)",
+    name: "Okular and Papers",
     icons: &["org.kde.okular", "okular", "tessera-app-okular"],
     fallback_icon: "x-office-document-symbolic",
     kind: Kind::Poppler,
@@ -130,7 +133,7 @@ fn shared_with_chromium_flatpak(db: &std::path::Path) -> bool {
 }
 
 /// The databases poppler may open: every *default* Firefox profile with a
-/// cert9.db (poppler takes the most recent one), or else ~/.pki/nssdb.
+/// cert9.db (poppler takes the most recent one).
 pub fn poppler_dbs() -> Vec<PathBuf> {
     let mut out = Vec::new();
     for root in firefox_roots() {
@@ -148,12 +151,6 @@ pub fn poppler_dbs() -> Vec<PathBuf> {
             .collect();
         dirs.sort();
         out.extend(dirs);
-    }
-    if out.is_empty() {
-        let pki = paths::home().join(".pki/nssdb");
-        if pki.is_dir() {
-            out.push(pki);
-        }
     }
     out
 }
@@ -260,11 +257,13 @@ fn databases(app: &NativeApp) -> Vec<PathBuf> {
 
 pub enum State {
     Ready,
-    /// nss-sysinit may already bring in p11-kit's modules.
-    ProbablyReady,
+    /// The system already loads p11-kit there (nss-sysinit).
+    BySystem,
     ToDo,
     /// No database yet: the app has to be opened once.
     NoDatabase,
+    /// Okular and Papers: Firefox's profiles are not set up yet.
+    NeedsFirefox,
     /// The database is the Chromium Flatpak's too.
     SharedWithFlatpak,
 }
@@ -281,14 +280,20 @@ pub fn state(app: &NativeApp) -> State {
     if dbs.is_empty() {
         return State::NoDatabase;
     }
-    if dbs.iter().all(|d| nss::has_library(d, paths::PROXY_MODULE)) {
+    if dbs.iter().all(|d| nss::has_p11kit(d)) {
         return State::Ready;
+    }
+    if dbs
+        .iter()
+        .all(|d| nss::has_p11kit(d) || nss::uses_sysinit(d))
+    {
+        return State::BySystem;
+    }
+    if app.kind == Kind::Poppler {
+        return State::NeedsFirefox;
     }
     if dbs.iter().any(|d| shared_with_chromium_flatpak(d)) {
         return State::SharedWithFlatpak;
-    }
-    if dbs.iter().all(|d| nss::uses_sysinit(d)) {
-        return State::ProbablyReady;
     }
     State::ToDo
 }
@@ -304,17 +309,17 @@ pub fn subtitle(app: &NativeApp) -> String {
                 names.join(", ")
             }
         }
+        Kind::Poppler => t("Native apps; they use Firefox's certificate database").to_string(),
         _ => t("Native app").to_string(),
     };
     let state = match state(app) {
         State::Ready => t("Ready"),
-        State::ProbablyReady => {
-            t("Probably ready: the system's NSS loads p11-kit (nss-sysinit). Set up only if the tokens do not appear")
-        }
+        State::BySystem => t("Ready: the system already loads p11-kit (nss-sysinit)"),
         State::ToDo => t("Set-up missing"),
+        State::NeedsFirefox => t("Set up Firefox first"),
         State::NoDatabase => match app.kind {
             Kind::PjeOffice => t("Open PJeOffice Pro once (it writes ~/.pjeoffice-pro/pjeoffice-pro.config when it closes), then come back"),
-            Kind::Poppler => t("No certificate database yet: these viewers read the default Firefox profile's, or else ~/.pki/nssdb. Open Firefox or a Chromium-based browser once"),
+            Kind::Poppler => t("Needs Firefox: install it, open it once and set it up"),
             _ => t("Open the app once, then come back"),
         },
         State::SharedWithFlatpak => t("Not available: the Chromium Flatpak uses the same certificate database (~/.pki/nssdb) and would see each token twice"),
@@ -322,9 +327,11 @@ pub fn subtitle(app: &NativeApp) -> String {
     format!("{what} · {state}")
 }
 
-/// Does the row offer "Set up"?
+/// Does the row offer "Set up"? Not when p11-kit is already there (by
+/// Tessera, by the distribution or through nss-sysinit), and never for
+/// Okular and Papers, which follow Firefox.
 pub fn can_set_up(app: &NativeApp) -> bool {
-    matches!(state(app), State::ToDo | State::ProbablyReady)
+    matches!(state(app), State::ToDo)
 }
 
 /// Register p11-kit-proxy.so where the app looks (in a child process, see
@@ -375,6 +382,7 @@ mod tests {
 
         // Nothing installed: no database anywhere.
         assert!(matches!(state(&PDF_VIEWERS), State::NoDatabase));
+        assert!(!can_set_up(&PDF_VIEWERS));
 
         // Firefox with two profiles; poppler may open either *default* one.
         let ff = home.join(".mozilla/firefox");
@@ -395,6 +403,9 @@ mod tests {
         assert_eq!(poppler_dbs().len(), 2);
         assert!(matches!(state(&FIREFOX), State::ToDo));
         assert!(can_set_up(&FIREFOX));
+        // Okular and Papers wait for Firefox, with no button of their own.
+        assert!(matches!(state(&PDF_VIEWERS), State::NeedsFirefox));
+        assert!(!can_set_up(&PDF_VIEWERS));
         let proxy = "\nlibrary=/usr/lib64/p11-kit-proxy.so\nname=Tessera (p11-kit)\n";
         fs::write(ff.join("abc.default/pkcs11.txt"), proxy).unwrap();
         assert!(matches!(state(&FIREFOX), State::ToDo));
@@ -411,7 +422,22 @@ mod tests {
         fs::create_dir_all(&db).unwrap();
         assert_eq!(chromium_nssdb(), Some(db.clone()));
         fs::write(db.join("pkcs11.txt"), "library=libnsssysinit.so\n").unwrap();
-        assert!(matches!(state(&CHROMIUM_BROWSERS), State::ProbablyReady));
+        assert!(matches!(state(&CHROMIUM_BROWSERS), State::BySystem));
+        assert!(!can_set_up(&CHROMIUM_BROWSERS));
+        // Registered by the distribution, under another name or path.
+        fs::write(
+            db.join("pkcs11.txt"),
+            "library=/usr/lib64/libp11-kit.so.0\n",
+        )
+        .unwrap();
+        assert!(matches!(state(&CHROMIUM_BROWSERS), State::Ready));
+        // p11-kit's trust module alone does not count.
+        fs::write(
+            db.join("pkcs11.txt"),
+            "library=/usr/lib64/pkcs11/p11-kit-trust.so\n",
+        )
+        .unwrap();
+        assert!(matches!(state(&CHROMIUM_BROWSERS), State::ToDo));
         // The older ~/.pki/nssdb wins, and the Chromium Flatpak reads it too.
         fs::create_dir_all(home.join(".pki/nssdb")).unwrap();
         fs::create_dir_all(home.join(".var/app/org.chromium.Chromium")).unwrap();

@@ -48,6 +48,17 @@ pub fn has_library(dir: &Path, module: &str) -> bool {
         .any(|l| l == module || (!module.contains('/') && l.ends_with(&format!("/{module}"))))
 }
 
+/// Does this database already load p11-kit (its proxy, libp11-kit.so, or
+/// the client module), whoever registered it? Some distributions do it for
+/// their own packages; registering it again would show each token twice.
+/// p11-kit's trust module (root certificates only) does not count.
+pub fn has_p11kit(dir: &Path) -> bool {
+    libraries(dir).iter().any(|l| {
+        let name = l.rsplit('/').next().unwrap_or(l);
+        name.contains("p11-kit") && !name.contains("trust")
+    })
+}
+
 /// Is the client module already listed in this database's pkcs11.txt?
 pub fn has_module(dir: &Path) -> bool {
     has_library(dir, paths::CLIENT_MODULE)

@@ -126,10 +126,10 @@ A seção **Aplicativos** tem duas abas: **Flatpak**, com os passos acima, e **N
 |---|---|
 | Firefox | todos os perfis |
 | Chromium, Chrome, Edge e Brave | o banco que eles compartilham (`~/.pki/nssdb` ou `~/.local/share/pki/nssdb`) |
-| Okular, Papers e Evince | o perfil padrão do Firefox, que é o banco que eles leem ao assinar |
+| Okular e Papers | nenhum botão próprio: eles usam o banco do perfil padrão do Firefox, então ficam prontos quando o Firefox estiver configurado |
 | PJeOffice Pro | a lista de bibliotecas A3 (`list.a3`) em `~/.pjeoffice-pro/pjeoffice-pro.config`, com o caminho do p11-kit da sua distribuição |
 
-No Fedora, o sistema pode já carregar o p11-kit nesses bancos (nss-sysinit); nesse caso a linha diz "Provavelmente pronto", e só vale configurar se os tokens não aparecerem.
+Antes de oferecer o botão, o Tessera confere se o p11-kit já está no banco do aplicativo, posto pela própria distribuição (como no Fedora, pelo nss-sysinit) ou por outro meio. Nesse caso a linha já aparece como **Pronto**, sem botão, porque configurar de novo faria cada token aparecer duas vezes.
 
 #### Em segundo plano
 
@@ -304,10 +304,10 @@ The **Apps** section has two tabs: **Flatpak**, with the steps above, and **Nati
 |---|---|
 | Firefox | every profile |
 | Chromium, Chrome, Edge and Brave | the database they share (`~/.pki/nssdb` or `~/.local/share/pki/nssdb`) |
-| Okular, Papers and Evince | the default Firefox profile, the database they read when signing |
+| Okular and Papers | no button of their own: they use the default Firefox profile's database, so they are ready once Firefox is set up |
 | PJeOffice Pro | the list of A3 libraries (`list.a3`) in `~/.pjeoffice-pro/pjeoffice-pro.config`, with p11-kit's path on your distribution |
 
-On Fedora, the system may already load p11-kit in those databases (nss-sysinit); the row then says "Probably ready", and setting up is only worth it if the tokens do not appear.
+Before offering the button, Tessera checks whether p11-kit is already in the app's database, put there by the distribution itself (as on Fedora, through nss-sysinit) or otherwise. The row then shows as **Ready**, with no button, since setting it up again would show each token twice.
 
 #### In the background
 
