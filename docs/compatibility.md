@@ -30,9 +30,9 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | KDE Plasma | SerproID | Flatpak apps, several signatures in a row | Each "approve on your phone" notification shows (since the portal notification gets a new ID each time, [History](history.md) item 36) |
 | KDE Plasma | a real token (type not recorded) | Native Firefox and Chromium-based browsers | Works after Set up |
 | KDE Plasma | a real token (type not recorded) | Native PJeOffice Pro (`list.a3` with p11-kit) | Works |
+| KDE Plasma | a real token (type not recorded) | Native Okular and Papers, through the native Firefox's database | Sign PDFs |
 
 Not yet confirmed by hand:
 
 - **SafeNet eToken 5100/5110** with a real token. Its download is checked every week, but no test with the token itself is recorded yet.
-- **Native Okular and Papers** signing through Firefox's database.
 - **Snap** packages (Ubuntu's Firefox and Chromium): not supported.
