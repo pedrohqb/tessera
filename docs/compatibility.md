@@ -31,11 +31,12 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | KDE Plasma | a real token (type not recorded) | Native Firefox and Chromium-based browsers | Works after Set up |
 | KDE Plasma | a real token (type not recorded) | Native PJeOffice Pro (`list.a3` with p11-kit) | Works |
 | KDE Plasma | a real token (type not recorded) | Native Okular and Papers, through the native Firefox's database | Sign PDFs |
+| Ubuntu 24.04 | — | The host's p11-kit server as a user service (Ubuntu ships no `p11-kit-server.socket`; see [usage](usage.md)) | Works |
 | KDE Plasma (CachyOS) | a real token (type not recorded) | Web PKI and WebSigner, vendors' official packages, native browsers | Work with p11-kit's library (`/lib/libp11-kit.so`, the same module as `p11-kit-proxy.so` there) added by hand under the plugin's custom options |
 
 Not yet confirmed by hand:
 
 - **SafeNet eToken 5100/5110** with a real token. Its download is checked every week, but no test with the token itself is recorded yet.
 - **Snap** packages (Ubuntu's Firefox and Chromium): not supported.
-- **Debian and Ubuntu's p11-kit server as a user service** (they ship no `p11-kit-server.socket`; see [usage](usage.md)): the unit is checked by a unit test, and its command was run by hand in an Ubuntu 24.04 container without systemd (a client listed the tokens through the socket), but not yet as a service on a real Debian or Ubuntu desktop with Tessera.
+- **Debian's p11-kit server as a user service**: the same as on Ubuntu 24.04 (above), where it works, and Debian's package is the one Ubuntu's comes from, but no one has run it on Debian yet.
 - **openSUSE** with Tessera, by hand: only the CI detection check so far.
