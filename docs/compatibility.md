@@ -31,6 +31,7 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | KDE Plasma | a real token (type not recorded) | Native Firefox and Chromium-based browsers | Works after Set up |
 | KDE Plasma | a real token (type not recorded) | Native PJeOffice Pro (`list.a3` with p11-kit) | Works |
 | KDE Plasma | a real token (type not recorded) | Native Okular and Papers, through the native Firefox's database | Sign PDFs |
+| KDE Plasma (CachyOS) | a real token (type not recorded) | Web PKI and WebSigner, vendors' official packages, native browsers | Work with p11-kit's library (`/lib/libp11-kit.so`, the same module as `p11-kit-proxy.so` there) added by hand under the plugin's custom options |
 
 Not yet confirmed by hand:
 
