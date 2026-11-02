@@ -26,14 +26,11 @@ src/
   i18n.rs       translation table for Brazilian Portuguese
 flatpak/
   io.github.pedrohqb.Tessera.yml   the manifest (permissions, pcsc-lite, extra-data)
-  apply_extra.sh                   unpacks the drivers at installation (the AppImage uses it too)
+  apply_extra.sh                   unpacks the drivers at installation
   fallback-icons.sh                Adwaita icons for desktops whose theme lacks them (Plasma)
   drivers/<driver>/driver.toml     the description of each driver
-appimage/
-  build.sh                         builds Tessera-x86_64.AppImage (linuxdeploy + GTK plugin)
-  AppRun                           first start: downloads, checks and unpacks the drivers
-  drivers-list.py                  the pins, from the Flatpak manifest
-data/          .desktop, metainfo, icons (normal and symbolic), screenshot
+data/          .desktop, metainfo, icons (normal and symbolic), screenshot;
+               app-icons/: the free-software icons of some apps, for when they are not installed
 scripts/       pin-drivers.py, install-test-repo.sh, sign-test.py
 tests/fake-driver/   fake PKCS#11 drivers: one keeps the mechanism pointer,
                      another (slow-slot-list.c) never answers in time
@@ -97,8 +94,7 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 
 1. **Build and test:** `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`. Clippy also checks that every `unsafe` block and `unsafe fn` carries its `// SAFETY:` or `# Safety` note (the `[lints.clippy]` table in `Cargo.toml`).
 2. **Flatpak bundle:** `pin-drivers.py`, `flatpak-builder` (with the last lines of the log in an annotation, if it fails), `flatpak build-update-repo`, and the artifacts `tessera-repo.tar.gz` (test repository with `install-test-repo.sh`) and `tessera-x86_64.tar.gz` (the whole `/app` tree, for anyone who wants to package it as extra-data).
-3. **AppImage:** `appimage/build.sh` (linuxdeploy with its GTK plugin), then a check: the AppImage is unpacked, `libpcsclite` must not be bundled, and `AppRun status` (the first start: the drivers are downloaded, checked and unpacked) must list every driver with its files. The artifact is `tessera-appimage`.
-4. **With a `vX.Y.Z` tag:** creates the release on GitHub with the Flatpak files, and adds the AppImage to it.
+3. **With a `vX.Y.Z` tag:** creates the release on GitHub with both files.
 
 ## Publishing a release
 

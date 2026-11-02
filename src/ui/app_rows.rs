@@ -12,21 +12,11 @@ use crate::native;
 use crate::nss;
 use crate::paths;
 
-/// The app's own icon, from the icons Flatpak exports to the desktop (see
-/// the manifest), or a generic one when the app is not installed.
+/// The app's own icon (see themed_icon), else Tessera's copy of it, else a
+/// generic one.
 pub(super) fn app_icon(app: &ClientApp) -> gtk::Image {
-    let theme = gtk::gdk::Display::default().map(|d| gtk::IconTheme::for_display(&d));
-    let name = match theme {
-        Some(theme) if theme.has_icon(app.id) => app.id,
-        _ => app.icon,
-    };
-    let image = gtk::Image::from_icon_name(name);
-    // The same width either way, so the titles line up.
-    image.set_size_request(32, 32);
-    if name == app.id {
-        image.set_pixel_size(32);
-    }
-    image
+    let names: Vec<&str> = std::iter::once(app.id).chain(app.bundled_icon).collect();
+    themed_icon(&names, app.icon)
 }
 
 /// Is this app ready: (has the p11-kit socket, step 2 is done or not needed).
@@ -255,23 +245,31 @@ pub(super) struct NativeRows {
     button: gtk::Button,
 }
 
-/// A native app's icon from the desktop's theme, or a generic one.
-fn native_icon(app: &native::NativeApp) -> gtk::Image {
+/// An app's icon, at 32 px: for each of `names` in turn, the icon theme's
+/// (the desktop's, an installed Flatpak's, or Tessera's own copy) or the
+/// one in Flatpak's AppStream data (apps not installed); else `fallback`.
+fn themed_icon(names: &[&str], fallback: &str) -> gtk::Image {
     let theme = gtk::gdk::Display::default().map(|d| gtk::IconTheme::for_display(&d));
-    let name = match theme {
-        Some(theme) if theme.has_icon(app.icon) => app.icon,
-        _ => app.fallback_icon,
+    let found = names.iter().find_map(|n| {
+        if theme.as_ref().is_some_and(|t| t.has_icon(n)) {
+            Some(gtk::Image::from_icon_name(n))
+        } else {
+            paths::appstream_icon(n).map(gtk::Image::from_file)
+        }
+    });
+    let image = match found {
+        Some(image) => {
+            image.set_pixel_size(32);
+            image
+        }
+        None => gtk::Image::from_icon_name(fallback),
     };
-    let image = gtk::Image::from_icon_name(name);
+    // The same width either way, so the titles line up.
     image.set_size_request(32, 32);
-    if name == app.icon {
-        image.set_pixel_size(32);
-    }
     image
 }
 
 fn update_native(r: &NativeRows) {
-    r.row.set_visible(native::present(r.app));
     r.row.set_subtitle(&native::subtitle(r.app));
     r.button.set_visible(native::can_set_up(r.app));
 }
@@ -294,13 +292,15 @@ fn native_row(win: &Rc<Win>, app: &'static native::NativeApp) -> NativeRows {
         .use_markup(false)
         .title(t(app.name))
         .build();
-    row.add_prefix(&native_icon(app));
+    row.add_prefix(&themed_icon(app.icons, app.fallback_icon));
     let button = gtk::Button::builder()
         .label(t("Set up"))
         .valign(gtk::Align::Center)
-        .tooltip_text(t(
-            "Adds p11-kit-proxy.so to the app's certificate database. Close the app first",
-        ))
+        .tooltip_text(if app.kind == native::Kind::PjeOffice {
+            t("Points PJeOffice Pro's list of A3 libraries (list.a3) at p11-kit's library. Close PJeOffice Pro first")
+        } else {
+            t("Adds p11-kit-proxy.so to the app's certificate database. Close the app first")
+        })
         .build();
     {
         let w = Rc::downgrade(win);
@@ -379,10 +379,6 @@ pub(super) fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
         .build();
     stack.add_titled(&flatpak_page, Some("flatpak"), t("Flatpak"));
     stack.add_titled(&native_page, Some("native"), t("Native"));
-    // As an AppImage (or a plain binary), the native apps come first.
-    if !paths::in_flatpak() {
-        stack.set_visible_child_name("native");
-    }
     let switcher = gtk::StackSwitcher::builder()
         .stack(&stack)
         .valign(gtk::Align::Center)

@@ -124,15 +124,7 @@ fn present(app: &adw::Application, hub: &Rc<Hub>) {
     }
 }
 
-/// Start at login or not: through the Background portal in a Flatpak, and
-/// with a file in ~/.config/autostart otherwise (an AppImage has no app ID
-/// the portal knows).
 async fn request_background(autostart: bool) -> Result<bool, String> {
-    if !paths::in_flatpak() {
-        return paths::set_host_autostart(autostart)
-            .map(|()| autostart)
-            .map_err(|e| e.to_string());
-    }
     let response = ashpd::desktop::background::Background::request()
         .reason("Keep the token service running so other apps can use your tokens")
         .auto_start(autostart)

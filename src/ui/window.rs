@@ -98,6 +98,10 @@ pub(super) fn add_exported_icons() {
     for dir in [
         paths::home().join(".local/share/flatpak/exports/share/icons"),
         std::path::PathBuf::from("/var/lib/flatpak/exports/share/icons"),
+        // The host's own icon themes, where Flatpak shows them, for the
+        // native apps' icons.
+        std::path::PathBuf::from("/run/host/share/icons"),
+        std::path::PathBuf::from("/run/host/user-share/icons"),
     ] {
         if dir.is_dir() {
             theme.add_search_path(dir);

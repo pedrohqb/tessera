@@ -37,7 +37,11 @@ pub enum Setup {
 pub struct ClientApp {
     pub id: &'static str,
     pub name: &'static str,
+    /// A generic icon, for when the app's own is not available.
     pub icon: &'static str,
+    /// Tessera's copy of the app's icon (data/app-icons), when its license
+    /// allows one.
+    pub bundled_icon: Option<&'static str>,
     pub setup: Setup,
 }
 
@@ -45,36 +49,42 @@ pub const FIREFOX: ClientApp = ClientApp {
     id: "org.mozilla.firefox",
     name: "Firefox",
     icon: "web-browser-symbolic",
+    bundled_icon: None,
     setup: Setup::Firefox,
 };
 pub const CHROMIUM: ClientApp = ClientApp {
     id: "org.chromium.Chromium",
     name: "Chromium",
     icon: "web-browser-symbolic",
+    bundled_icon: Some("tessera-app-chromium"),
     setup: Setup::Chromium,
 };
 pub const CHROME: ClientApp = ClientApp {
     id: "com.google.Chrome",
     name: "Google Chrome",
     icon: "web-browser-symbolic",
+    bundled_icon: None,
     setup: Setup::Chromium,
 };
 pub const EDGE: ClientApp = ClientApp {
     id: "com.microsoft.Edge",
     name: "Microsoft Edge",
     icon: "web-browser-symbolic",
+    bundled_icon: None,
     setup: Setup::Chromium,
 };
 pub const BRAVE: ClientApp = ClientApp {
     id: "com.brave.Browser",
     name: "Brave",
     icon: "web-browser-symbolic",
+    bundled_icon: None,
     setup: Setup::Chromium,
 };
 pub const PAPERS: ClientApp = ClientApp {
     id: "org.gnome.Papers",
     name: "Papers",
     icon: "x-office-document-symbolic",
+    bundled_icon: Some("tessera-app-papers"),
     setup: Setup::Poppler,
 };
 /// Okular signs through poppler too (KDE runtime, same freedesktop base).
@@ -82,12 +92,14 @@ pub const OKULAR: ClientApp = ClientApp {
     id: "org.kde.okular",
     name: "Okular",
     icon: "x-office-document-symbolic",
+    bundled_icon: Some("tessera-app-okular"),
     setup: Setup::Poppler,
 };
 pub const PJEOFFICE: ClientApp = ClientApp {
     id: "br.jus.cnj.PJeOfficePro",
     name: "PJeOffice Pro",
     icon: "document-edit-symbolic",
+    bundled_icon: None,
     setup: Setup::None,
 };
 

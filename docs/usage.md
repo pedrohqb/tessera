@@ -35,20 +35,6 @@ tar -xzf tessera-repo.tar.gz
 
 The GNOME runtime comes from Flathub, which must be configured.
 
-## Installing the AppImage
-
-Each release also publishes `Tessera-x86_64.AppImage`, for systems without Flatpak (glibc 2.39 or newer: Ubuntu 24.04, Fedora 40, Debian 13 and later):
-
-```sh
-curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/Tessera-x86_64.AppImage
-chmod +x Tessera-x86_64.AppImage
-./Tessera-x86_64.AppImage
-```
-
-The vendor drivers are not in the AppImage. Its `AppRun` (`appimage/AppRun`) downloads them on the first start, and again when a newer AppImage pins other versions, with `curl` or `wget`; checks each against the pins (`drivers.list`, made from the Flatpak manifest at build time); and unpacks them into `~/.local/share/tessera/extra` with the same `apply_extra.sh` the Flatpak runs at install time. A download that fails is tried again on the next start, and a complete older set is kept until a newer one downloads in full. The driver descriptions are copied to `~/.local/share/tessera/drivers` with their paths pointing there (`TESSERA_DRIVERS_PATH`).
-
-The AppImage uses the system's `p11-kit-client.so` and `p11-kit-server` when they exist, and its own copies otherwise; the PC/SC library (`libpcsclite`) is always the system's, to match `pcscd`. **Start automatically at login** writes `~/.config/autostart/io.github.pedrohqb.Tessera.desktop`, pointing at the AppImage file. The window opens on the **Native** apps tab.
-
 ## Installing the test build
 
 Each push to `main` produces, in continuous integration, the `tessera-x86_64` artifact. It contains `tessera-repo.tar.gz`, a small Flatpak repository. A standalone `.flatpak` bundle does not work, because it does not carry the drivers' extra-data: the installation fails with "Extra data missing in detached metadata".
@@ -70,7 +56,7 @@ After updating, quit Tessera (menu → **Quit**) and open it again.
 - **Readers:** the readers that `pcscd` sees and whether there is a card.
 - **Tokens:** each token with its driver and certificates (holder, issuer, validity). An expired certificate is highlighted.
 - **Drivers:** each driver with its on/off switch and its state: "Published: the apps can use it", "Starting…", "No answer; trying again (1 of 3)", "Stopped: …" or "Switched off". The buttons for the vendor tools (Token Administration, SerproID) are here.
-- **Apps:** two tabs. **Flatpak:** the two steps for each app (see [Apps](apps.md)), with the state "Ready", "Step 1 missing", "Step 2 missing" or "Steps 1 and 2 missing". **Native:** the apps installed from the distribution (Firefox, the Chromium-based browsers, the PDF viewers), each with its one step, **Set up** (see [Native apps](apps.md#native-apps)). A completed step appears with ✓ and no button, and the states update on their own, without restarting Tessera.
+- **Apps:** two tabs. **Flatpak:** the two steps for each app (see [Apps](apps.md)), with the state "Ready", "Step 1 missing", "Step 2 missing" or "Steps 1 and 2 missing". **Native:** the apps installed from the distribution (Firefox, the Chromium-based browsers, the PDF viewers, PJeOffice Pro), each with its one step, **Set up** (see [Native apps](apps.md#native-apps)). A completed step appears with ✓ and no button, and the states update on their own, without restarting Tessera.
 - The refresh button, in the top left corner, runs a check right away. The menu has **Start automatically at login**, **Show an icon in the tray**, **About Tessera** and **Quit** (Ctrl+Q).
 
 Configuration errors appear in a dialog box, with the full text and what to do.

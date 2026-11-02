@@ -94,17 +94,6 @@ flatpak --system install flatpark io.github.pedrohqb.Tessera
 
 Funciona do mesmo jeito: cada usuário que abrir o Tessera tem a sua própria instância, com os seus tokens, e o passo 1 de cada aplicativo continua sendo por usuário.
 
-#### Ou como AppImage
-
-Para quem não usa Flatpak, há também um AppImage, publicado a cada versão em [Releases](https://github.com/pedrohqb/tessera/releases). Baixe o `Tessera-x86_64.AppImage`, dê permissão de execução e abra:
-
-```bash
-chmod +x Tessera-x86_64.AppImage
-./Tessera-x86_64.AppImage
-```
-
-Na primeira execução, ele baixa os drivers dos sites oficiais dos fornecedores, confere cada um pelo SHA256 e os guarda em `~/.local/share/tessera`. Precisa do `curl` (ou do `wget`) e de um sistema com glibc 2.39 ou mais nova (Ubuntu 24.04, Fedora 40, Debian 13 ou posteriores). O preparo do sistema, acima, vale do mesmo jeito.
-
 **Observação:** quem instalou antes uma versão de teste (o repositório `tessera-test`) deve tirá-la primeiro, sem apagar as configurações: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ---
@@ -138,8 +127,9 @@ A seção **Aplicativos** tem duas abas: **Flatpak**, com os passos acima, e **N
 | Firefox | todos os perfis |
 | Chromium, Chrome, Edge e Brave | o banco que eles compartilham (`~/.pki/nssdb` ou `~/.local/share/pki/nssdb`) |
 | Okular, Papers e Evince | o perfil padrão do Firefox, que é o banco que eles leem ao assinar |
+| PJeOffice Pro | a lista de bibliotecas A3 (`list.a3`) em `~/.pjeoffice-pro/pjeoffice-pro.config`, com o caminho do p11-kit da sua distribuição |
 
-No Fedora, o sistema pode já carregar o p11-kit nesses bancos (nss-sysinit); nesse caso a linha diz "Provavelmente pronto", e só vale configurar se os tokens não aparecerem. No AppImage, a aba Nativos é a que abre primeiro.
+No Fedora, o sistema pode já carregar o p11-kit nesses bancos (nss-sysinit); nesse caso a linha diz "Provavelmente pronto", e só vale configurar se os tokens não aparecerem.
 
 #### Em segundo plano
 
@@ -284,17 +274,6 @@ flatpak --system install flatpark io.github.pedrohqb.Tessera
 
 It works the same way: each user who opens Tessera gets their own instance, with their own tokens, and each app's step 1 is still per user.
 
-#### Or as an AppImage
-
-If you don't use Flatpak, there is also an AppImage, published with each release on [Releases](https://github.com/pedrohqb/tessera/releases). Download `Tessera-x86_64.AppImage`, make it executable and open it:
-
-```bash
-chmod +x Tessera-x86_64.AppImage
-./Tessera-x86_64.AppImage
-```
-
-On its first start, it downloads the drivers from the vendors' official sites, checks each against its SHA256 and keeps them in `~/.local/share/tessera`. It needs `curl` (or `wget`) and a system with glibc 2.39 or newer (Ubuntu 24.04, Fedora 40, Debian 13 or later). Preparing the system, above, applies all the same.
-
 **Note:** if you installed a test build before (the `tessera-test` remote), remove it first, keeping your settings: `flatpak --user uninstall io.github.pedrohqb.Tessera && flatpak --user remote-delete tessera-test`.
 
 ### Usage
@@ -326,8 +305,9 @@ The **Apps** section has two tabs: **Flatpak**, with the steps above, and **Nati
 | Firefox | every profile |
 | Chromium, Chrome, Edge and Brave | the database they share (`~/.pki/nssdb` or `~/.local/share/pki/nssdb`) |
 | Okular, Papers and Evince | the default Firefox profile, the database they read when signing |
+| PJeOffice Pro | the list of A3 libraries (`list.a3`) in `~/.pjeoffice-pro/pjeoffice-pro.config`, with p11-kit's path on your distribution |
 
-On Fedora, the system may already load p11-kit in those databases (nss-sysinit); the row then says "Probably ready", and setting up is only worth it if the tokens do not appear. In the AppImage, the Native tab opens first.
+On Fedora, the system may already load p11-kit in those databases (nss-sysinit); the row then says "Probably ready", and setting up is only worth it if the tokens do not appear.
 
 #### In the background
 

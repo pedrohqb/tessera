@@ -59,6 +59,9 @@ finish-args:
   - --filesystem=~/.mozilla/firefox
   - --filesystem=xdg-config/mozilla/firefox
   - --filesystem=xdg-data/pki/nssdb
+  # The native PJeOffice Pro's settings, where "Set up" points its list of
+  # A3 libraries (list.a3) at p11-kit's library. Only that line changes.
+  - --filesystem=~/.pjeoffice-pro
   # Read-only: the icons Flatpak exports for the installed apps, to show each
   # app with its own icon. The exported icons are links into each app's
   # folder under app/, so those are needed too.
@@ -66,6 +69,10 @@ finish-args:
   - --filesystem=xdg-data/flatpak/app:ro
   - --filesystem=/var/lib/flatpak/exports/share/icons:ro
   - --filesystem=/var/lib/flatpak/app:ro
+  # Read-only: the AppStream data Flatpak keeps for each remote, with the
+  # icons of the apps that are not installed.
+  - --filesystem=xdg-data/flatpak/appstream:ro
+  - --filesystem=/var/lib/flatpak/appstream:ro
   # Read-only: whether `flatpak override --user` already gave an app the
   # p11-kit socket, to show it in the window.
   - --filesystem=xdg-data/flatpak/overrides:ro
@@ -131,6 +138,10 @@ modules:
       - install -Dm644 data/io.github.pedrohqb.Tessera.metainfo.xml /app/share/metainfo/io.github.pedrohqb.Tessera.metainfo.xml
       - install -Dm644 data/icons/io.github.pedrohqb.Tessera.svg /app/share/icons/hicolor/scalable/apps/io.github.pedrohqb.Tessera.svg
       - install -Dm644 data/icons/io.github.pedrohqb.Tessera-symbolic.svg /app/share/icons/hicolor/symbolic/apps/io.github.pedrohqb.Tessera-symbolic.svg
+      # The apps' icons, for apps that are not installed (data/app-icons).
+      - install -Dm644 data/app-icons/tessera-app-chromium.png /app/share/icons/hicolor/256x256/apps/tessera-app-chromium.png
+      - install -Dm644 data/app-icons/tessera-app-okular.svg /app/share/icons/hicolor/scalable/apps/tessera-app-okular.svg
+      - install -Dm644 data/app-icons/tessera-app-papers.svg /app/share/icons/hicolor/scalable/apps/tessera-app-papers.svg
       # The window's icons for desktops whose theme lacks them (Plasma).
       - sh flatpak/fallback-icons.sh
       - for d in safesign safenet serproid; do install -Dm644 flatpak/drivers/$d/driver.toml /app/lib/tessera/drivers/$d/driver.toml; done

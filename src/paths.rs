@@ -195,8 +195,8 @@ pub fn profiles_in(roots: &[PathBuf]) -> Vec<PathBuf> {
     out
 }
 
-/// Is Tessera running as a Flatpak (rather than as an AppImage or a plain
-/// binary on the host)?
+/// Is Tessera running as a Flatpak (rather than as a plain binary on the
+/// host, as in development)?
 pub fn in_flatpak() -> bool {
     std::path::Path::new("/.flatpak-info").exists()
 }
@@ -237,44 +237,33 @@ pub fn user_override(app_id: &str) -> PathBuf {
     home().join(".local/share/flatpak/overrides").join(app_id)
 }
 
-/// The app icon (for the tray's pixmaps): next to the executable, as in
-/// /app/bin and /app/share (Flatpak) or usr/bin and usr/share (AppImage).
-pub fn app_icon_file() -> PathBuf {
-    let rel = format!("share/icons/hicolor/scalable/apps/{APP_ID}.svg");
-    std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent()?.parent().map(|p| p.join(&rel)))
-        .filter(|p| p.exists())
-        .unwrap_or_else(|| PathBuf::from("/app").join(rel))
-}
-
-/// The command that starts Tessera in the background: the AppImage file
-/// itself when running from one ($APPIMAGE), otherwise this executable.
-fn background_command() -> String {
-    let exe = env::var_os("APPIMAGE")
-        .map(PathBuf::from)
-        .or_else(|| std::env::current_exe().ok())
-        .unwrap_or_else(|| PathBuf::from("tessera"));
-    format!("\"{}\" --background", exe.display())
-}
-
-/// Outside Flatpak: start at login through ~/.config/autostart.
-pub fn set_host_autostart(on: bool) -> std::io::Result<()> {
-    let file = host_config_home()
-        .join("autostart")
-        .join(format!("{APP_ID}.desktop"));
-    if !on {
-        return match std::fs::remove_file(&file) {
-            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
-            _ => Ok(()),
-        };
+/// An app's icon from the AppStream data Flatpak keeps for each remote
+/// (Flathub, FlatPark…), which has the icons of every app in the remote,
+/// installed or not: what software centers show.
+pub fn appstream_icon(app_id: &str) -> Option<PathBuf> {
+    if !app_id.contains('.') {
+        return None;
     }
-    std::fs::create_dir_all(file.parent().unwrap_or(&file))?;
-    std::fs::write(
-        &file,
-        format!(
-            "[Desktop Entry]\nType=Application\nName=Tessera\nExec={}\nIcon={APP_ID}\nX-GNOME-Autostart-enabled=true\n",
-            background_command()
-        ),
-    )
+    for base in [
+        home().join(".local/share/flatpak/appstream"),
+        PathBuf::from("/var/lib/flatpak/appstream"),
+    ] {
+        let Ok(remotes) = std::fs::read_dir(&base) else {
+            continue;
+        };
+        let mut remotes: Vec<PathBuf> = remotes.flatten().map(|e| e.path()).collect();
+        remotes.sort();
+        for remote in remotes {
+            for size in ["128x128", "64x64"] {
+                let icon = remote
+                    .join("x86_64/active/icons")
+                    .join(size)
+                    .join(format!("{app_id}.png"));
+                if icon.is_file() {
+                    return Some(icon);
+                }
+            }
+        }
+    }
+    None
 }

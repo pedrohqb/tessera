@@ -128,7 +128,10 @@ impl Drop for Tray {
 /// The app icon as tray pixmaps (ARGB32, network byte order).
 pub fn icon_pixmaps() -> Vec<ksni::Icon> {
     use gtk::gdk_pixbuf::Pixbuf;
-    let path = paths::app_icon_file();
+    let path = format!(
+        "/app/share/icons/hicolor/scalable/apps/{}.svg",
+        paths::APP_ID
+    );
     [22, 32, 48]
         .iter()
         .filter_map(|&size| {
