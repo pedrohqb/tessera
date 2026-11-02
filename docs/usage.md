@@ -29,9 +29,10 @@ Nothing else is installed on the system.
 
 ## Installing from FlatPark
 
-The standard install, with updates through `flatpak update`:
+The standard install, with updates through `flatpak update`. The GNOME runtime comes from Flathub, and Flatpak only downloads it from a remote in the same installation as Tessera (`--user` here; for a system install, `--system` in all three lines):
 
 ```sh
+flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
 flatpak --user install flatpark io.github.pedrohqb.Tessera
 ```

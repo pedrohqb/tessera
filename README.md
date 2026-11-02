@@ -91,28 +91,26 @@ O comando do servidor p11-kit é o que deixa os aplicativos verem os tokens do T
 
 **Observação:** num Fedora em que algum desses pacotes tenha sido removido, reinstale-os com `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
 
-**Observação:** se o Flathub ainda não estiver configurado, rode:
-
-```bash
-flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-```
-
 #### 2. Instalar o Tessera
 
 [![Get it on FlatPark](https://flatpark.org/badges/get-it-on-flatpark.svg)](https://flatpark.org/apps/io.github.pedrohqb.Tessera)
 
-O Tessera é distribuído pelo [FlatPark](https://flatpark.org), um repositório de Flatpaks. Adicione o repositório (uma vez) e instale:
+O Tessera é distribuído pelo [FlatPark](https://flatpark.org), um repositório de Flatpaks. A base em que ele roda (o runtime do GNOME) vem do Flathub, e o Flatpak só a baixa de um repositório da **mesma instalação** do Tessera: de usuário (`--user`) ou de sistema (`--system`). Por isso os comandos abaixo adicionam os dois repositórios; se algum já estiver configurado, o `--if-not-exists` não muda nada.
+
+Para instalar só para você:
 
 ```bash
+flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
 flatpak --user install flatpark io.github.pedrohqb.Tessera
 ```
 
 Na instalação, o Flatpak baixa os drivers dos sites oficiais dos fornecedores e confere cada um pelo SHA256. As atualizações chegam com o `flatpak update`, como as dos outros aplicativos.
 
-Para instalar para todos os usuários do computador (instalação de sistema, que pede a senha de administrador), use `--system` no lugar de `--user`:
+Para instalar para todos os usuários do computador (instalação de sistema, que pede a senha de administrador):
 
 ```bash
+flatpak --system remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak --system remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
 flatpak --system install flatpark io.github.pedrohqb.Tessera
 ```
@@ -297,28 +295,26 @@ The p11-kit server command is what lets apps see Tessera's tokens. Tessera's win
 
 **Note:** on a Fedora system where one of these packages was removed, reinstall them with `sudo dnf install pcsc-lite pcsc-lite-ccid p11-kit-server`.
 
-**Note:** if Flathub is not set up yet, run:
-
-```bash
-flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-```
-
 #### 2. Install Tessera
 
 [![Get it on FlatPark](https://flatpark.org/badges/get-it-on-flatpark.svg)](https://flatpark.org/apps/io.github.pedrohqb.Tessera)
 
-Tessera is distributed through [FlatPark](https://flatpark.org), a Flatpak remote. Add the remote (once) and install:
+Tessera is distributed through [FlatPark](https://flatpark.org), a Flatpak remote. The base it runs on (the GNOME runtime) comes from Flathub, and Flatpak only downloads it from a remote in the **same installation** as Tessera: the user's (`--user`) or the system's (`--system`). So the commands below add both remotes; if one is already set up, `--if-not-exists` leaves it as it is.
+
+To install for yourself only:
 
 ```bash
+flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
 flatpak --user install flatpark io.github.pedrohqb.Tessera
 ```
 
 During installation, Flatpak downloads the drivers from the vendors' official sites and checks each one against its SHA256. Updates come with `flatpak update`, like any other app.
 
-To install for every user of the computer (a system-wide install, which asks for the administrator password), use `--system` instead of `--user`:
+To install for every user of the computer (a system-wide install, which asks for the administrator password):
 
 ```bash
+flatpak --system remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak --system remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
 flatpak --system install flatpark io.github.pedrohqb.Tessera
 ```
