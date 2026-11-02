@@ -25,7 +25,10 @@ Os tokens ficam disponíveis para estes aplicativos:
 | Firefox, Chromium, Google Chrome, Microsoft Edge e Brave | entrar com certificado em sites como Projudi e eproc |
 | Papers e Okular | assinar PDF e conferir assinaturas |
 
-Para o **Lacuna Web PKI** e o **Softplan WebSigner**, exigidos por alguns tribunais, como o e-SAJ, use também o [**Sigillum**](https://github.com/pedrohqb/sigillum), que os instala nos navegadores e os liga aos tokens do Tessera.
+Para o **Lacuna Web PKI** e o **Softplan WebSigner**, exigidos por alguns tribunais, como o e-SAJ:
+
+- **nos navegadores em Flatpak**, use o [**Sigillum**](https://github.com/pedrohqb/sigillum), que os instala nos navegadores e os liga aos tokens do Tessera;
+- **nos navegadores nativos**, use os pacotes oficiais dos fornecedores ([Web PKI](https://get.webpkiplugin.com/) e [WebSigner](https://websigner.softplan.com.br/)). Para que eles usem os tokens do Tessera, abra o plugin no navegador, vá em "Cripto Dispositivos" e, em "Opções personalizadas", acrescente o caminho do `p11-kit-proxy.so` da sua distribuição: `/usr/lib64/p11-kit-proxy.so` (Fedora e openSUSE), `/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so` (Debian e Ubuntu) ou `/usr/lib/p11-kit-proxy.so` (Arch e derivados).
 
 ![O Tessera com o SafeSign e o SerproID](data/screenshots/main.png)
 
@@ -210,7 +213,10 @@ The tokens are available to these apps:
 | Firefox, Chromium, Google Chrome, Microsoft Edge and Brave | certificate login on sites such as Projudi and eproc |
 | Papers and Okular | signing PDFs and checking signatures |
 
-For **Lacuna Web PKI** and **Softplan WebSigner**, required by some courts (e-SAJ, for example), also use [**Sigillum**](https://github.com/pedrohqb/sigillum), which installs them in the browsers and connects them to Tessera's tokens.
+For **Lacuna Web PKI** and **Softplan WebSigner**, required by some courts (e-SAJ, for example):
+
+- **in Flatpak browsers**, use [**Sigillum**](https://github.com/pedrohqb/sigillum), which installs them in the browsers and connects them to Tessera's tokens;
+- **in native browsers**, use the vendors' official packages ([Web PKI](https://get.webpkiplugin.com/) and [WebSigner](https://websigner.softplan.com.br/)). For them to use Tessera's tokens, open the plugin in the browser, go to "Cripto Dispositivos" and, under "Opções personalizadas", add the path of your distribution's `p11-kit-proxy.so`: `/usr/lib64/p11-kit-proxy.so` (Fedora and openSUSE), `/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so` (Debian and Ubuntu) or `/usr/lib/p11-kit-proxy.so` (Arch and derivatives).
 
 ### Installation
 
