@@ -213,6 +213,16 @@ A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --u
 
 ---
 
+### A fazer
+
+- **Novos aplicativos:**
+  - LibreOffice, Thunderbird e Evolution, em Flatpak e nativos, pelo banco de certificados de cada um;
+  - JSignPdf, apontado para o p11-kit, como o PJeOffice Pro;
+  - Assinador SERPRO, que depende antes de um Flatpak próprio.
+- **Novo driver:** OpenSC, que é software livre e atende tokens como o ePass2003.
+
+---
+
 ### Documentação
 
 A documentação técnica, em inglês, está em [docs/](docs/README.md):
@@ -436,6 +446,14 @@ flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 For a system-wide install, use `--system` instead of `--user`.
 
 Each app's step 1 permission is undone with `flatpak override --user --reset <app>`. That command also removes any other permission you gave the app.
+
+### To do
+
+- **New apps:**
+  - LibreOffice, Thunderbird and Evolution, as Flatpaks and native, through each one's certificate database;
+  - JSignPdf, pointed at p11-kit, like PJeOffice Pro;
+  - Assinador SERPRO, which first needs a Flatpak of its own.
+- **New driver:** OpenSC, which is free software and supports tokens such as the ePass2003.
 
 ### Documentation
 

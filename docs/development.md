@@ -115,6 +115,6 @@ A driver is a folder with a `driver.toml` (the format is in [Drivers](drivers.md
 - whether it needs any file or environment variable (`[env]`, `create_dirs`, `library_path`);
 - how it behaves without a token: if it hangs, supervision stops it after three attempts.
 
-## Toward Flathub
+## To do
 
-Still to do: publishing on Flathub, which requires a review of the permissions (the folders of other apps and the tray's `talk-name` need justification) and a current screenshot; and testing SafeNet and the Chromium browsers with real tokens.
+The list is in the README, under [To do](../README.md#to-do).
