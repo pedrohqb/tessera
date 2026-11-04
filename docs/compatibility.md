@@ -25,6 +25,7 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | Bluefin (GNOME) | SafeSign (GD Burti) | Okular and Papers (Flatpak) | Signs PDFs |
 | Bluefin (GNOME) | SafeSign (GD Burti) | PJeOffice Pro (FlatPark) | Signs, with no steps |
 | Bluefin (GNOME) | SerproID | Firefox (Flatpak), TLS 1.3 sites | Works since the fix in `stable.rs` (see [Drivers](drivers.md)) |
+| Bluefin (GNOME) | a real token (type not recorded) | Tessera 0.2.x: Flatpak and native apps | Works |
 | Fedora 44 (VM) | SerproID | Native Firefox (RPM), nothing set up | Token visible through the system's own p11-kit (crypto-policies); Tessera shows it as ready, with no button |
 | KDE Plasma | — | Window, icons and tray icon on a dark panel | Works |
 | KDE Plasma | SerproID | Flatpak apps, several signatures in a row | Each "approve on your phone" notification shows (since the portal notification gets a new ID each time, [History](history.md) item 36) |
