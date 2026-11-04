@@ -89,3 +89,21 @@ Supervision runs in the service, with or without the window (`supervise` in `src
 | `--persist=.config/serproid` | SerproID's certificate folder and log stay in Tessera's own data |
 
 The browser folders do not get `:create`. The browser creates its own database the first time it runs, and Tessera does not create folders for browsers that are not installed.
+
+## Security
+
+What Tessera protects against, what it does not, and why.
+
+**Downloads.** The vendor drivers come from the vendors' own sites over HTTPS, at install time, and Flatpak checks each file against the SHA256 pinned in the manifest: a file changed on the way, or on the vendor's site, makes the installation fail. FlatPark's package pins Tessera's own release tarball the same way. A weekly workflow (`check-downloads.yml`) opens an issue if a vendor's file stops matching.
+
+**No network path.** Everything between the apps and the drivers goes through Unix sockets under `$XDG_RUNTIME_DIR` (`/run/user/<uid>`), a folder only the user (and root) can open; p11-kit also creates its sockets without access for group and others. Nothing listens on a network port, so nobody on another machine, and no other user of the same machine, can reach a token through Tessera.
+
+**What crosses the sockets.** PKCS#11 calls: listing tokens and certificates, the PIN when an app logs in, the data to sign and the signature. For a TLS login, that is the hash of the handshake and its signature; the TLS session keys stay in the browser, so watching or tampering with this channel does not open or alter the connection to the site.
+
+**The limit: programs running as the user.** A program that already runs unsandboxed as the user can connect to Tessera's sockets and use a token as the user would (it still needs the PIN, unless the driver keeps a token logged in across connections, which varies; SerproID asks for approval on the phone for every signature). It could also pose as a token, by editing a `tessera-*.module` file in `~/.config/pkcs11/modules` or by listening on a driver's socket path while Tessera is closed, and so catch the PIN the next time it is typed. This is the same trust boundary as `ssh-agent` or `gpg-agent`, whose sockets are protected only by the user's permissions, and as a native vendor install, where any such program can load the vendor's library itself or edit Firefox's `pkcs11.txt`. On a Linux desktop, code running as the user is trusted with what the user can do.
+
+**Sandboxed apps.** A Flatpak app reaches the tokens only after step 1 (`--filesystem=xdg-run/p11-kit/pkcs11`), which the user grants per app. An app without it does not see the system's p11-kit server, and so no token.
+
+**The drivers.** The vendors' drivers are closed source. They run inside Tessera's sandbox, one process per connection, with Tessera's permissions only (the list above): they do not see the home folder, and nothing of theirs is installed on the system. A native install, by contrast, runs the vendors' install scripts as root and loads their libraries into every app that uses the token.
+
+**Tessera's own reach.** Tessera writes to other apps' certificate databases (the `pkcs11.txt` of the Firefox profiles and of the Chromium-based browsers' NSS databases, PJeOffice Pro's `list.a3`) and to `~/.config/pkcs11/modules`. Only Tessera's own entries are added or removed, and other programs' modules are never touched, but a compromised Tessera could register a module of its choice there. That is why its permissions are listed above one by one, why each one is limited to the folder it needs, and why none of the browser folders gets `:create`.
