@@ -62,6 +62,7 @@ pub(super) struct Win {
     pub(super) app_rows: RefCell<Vec<AppRows>>,
     pub(super) native_rows: RefCell<Vec<NativeRows>>,
     pub(super) last: RefCell<String>,
+    pub(super) old_p11kit: adw::Banner,
 }
 
 impl Win {
@@ -139,15 +140,21 @@ pub(super) fn copy_button(win: &Rc<Win>, text: String) -> gtk::Button {
 }
 
 /// On systems whose p11-kit is too old for signing (native.rs), a banner
-/// that says so, with a button to the README's list of distributions.
-fn old_p11kit_banner(win: &Rc<Win>) -> adw::Banner {
+/// that says so, with a button to the README's list of distributions. It is
+/// shown or hidden again in update_service, once the system's server has
+/// told its protocol version.
+fn old_p11kit_banner() -> adw::Banner {
     let banner = adw::Banner::new(t(
         "On this system signing does not work (old p11-kit); see the project's documentation",
     ));
     banner.set_button_label(Some(t("Documentation")));
-    banner.set_revealed(crate::native::host_has_old_p11kit());
+    banner.set_revealed(crate::native::host_has_old_p11kit(None));
+    banner
+}
+
+fn connect_old_p11kit_banner(win: &Rc<Win>) {
     let w = Rc::downgrade(win);
-    banner.connect_button_clicked(move |_| {
+    win.old_p11kit.connect_button_clicked(move |_| {
         let parent = w.upgrade().map(|win| win.window.clone());
         gtk::UriLauncher::new(t("https://github.com/pedrohqb/tessera#distributions")).launch(
             parent.as_ref(),
@@ -155,7 +162,6 @@ fn old_p11kit_banner(win: &Rc<Win>) -> adw::Banner {
             |_| {},
         );
     });
-    banner
 }
 
 /// What to tell the user to run for the host's p11-kit server: the command
@@ -179,6 +185,8 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
         State::Failed(msg) => (format!("{}: {msg}", t("The server exited")), t("Start"), true),
     };
     win.service_row.set_subtitle(&subtitle);
+    win.old_p11kit
+        .set_revealed(crate::native::host_has_old_p11kit(hub.host_protocol.get()));
     win.service_button.set_label(button);
     if warn {
         win.service_row.add_css_class("error");
@@ -529,7 +537,9 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         app_rows: RefCell::new(vec![]),
         native_rows: RefCell::new(vec![]),
         last: RefCell::new(String::new()),
+        old_p11kit: old_p11kit_banner(),
     });
+    connect_old_p11kit_banner(&win);
     win.host_row
         .add_suffix(&copy_button(&win, apps::host_server_command().to_string()));
     page.add(&win.readers.group);
@@ -539,7 +549,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
 
     let view = adw::ToolbarView::new();
     view.add_top_bar(&header);
-    view.add_top_bar(&old_p11kit_banner(&win));
+    view.add_top_bar(&win.old_p11kit);
     view.set_content(Some(&page));
     win.toasts.set_child(Some(&view));
     win.window.set_content(Some(&win.toasts));

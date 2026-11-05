@@ -52,6 +52,9 @@ struct Hub {
     /// (it may fall in a restart, when nothing is published yet), and is
     /// checked again after 5 s.
     host_misses: Cell<u32>,
+    /// The protocol version of the system's p11-kit server, read when it
+    /// was last seen serving Tessera's tokens (native.rs, host_has_old_p11kit).
+    pub(super) host_protocol: Cell<Option<u8>>,
     /// The open window, if any (dropped when the window is destroyed).
     win: RefCell<Option<Rc<Win>>>,
     tray: RefCell<Option<tray::Tray>>,
@@ -256,6 +259,7 @@ pub fn run() -> ExitCode {
                 host_checked: RefCell::new(None),
                 host_busy: Cell::new(false),
                 host_misses: Cell::new(0),
+                host_protocol: Cell::new(None),
                 win: RefCell::new(None),
                 tray: RefCell::new(None),
                 tray_events: tx,

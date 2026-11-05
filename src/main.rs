@@ -100,7 +100,12 @@ fn print_status() -> ExitCode {
         .iter()
         .map(|t| (t.label.clone(), t.serial.clone()))
         .collect();
-    let view = match status::host_view(&ours) {
+    let host = status::host_view(&ours);
+    let protocol = match host {
+        status::HostView::Sees(_) => status::host_protocol(),
+        _ => None,
+    };
+    let view = match host {
         status::HostView::Off => format!(
             "OFF: nothing answers; run once: {}",
             apps::host_server_command()
@@ -118,7 +123,10 @@ fn print_status() -> ExitCode {
         "\nSystem p11-kit server ({}): {view}",
         paths::host_p11kit_socket().display()
     );
-    if native::host_has_old_p11kit() {
+    if let Some(v) = protocol {
+        println!("System p11-kit RPC protocol: {v} (1 means p11-kit 0.25.5 or older)");
+    }
+    if native::host_has_old_p11kit(protocol) {
         println!(
             "WARNING: on this system signing does not work (old p11-kit); see the project's documentation: https://github.com/pedrohqb/tessera#distributions"
         );

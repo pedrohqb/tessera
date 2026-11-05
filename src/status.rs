@@ -457,6 +457,26 @@ pub enum HostView {
     Unknown,
 }
 
+/// The protocol version the system's p11-kit server answers with: 1 up to
+/// p11-kit 0.25.5, 2 from 0.25.6 on, the line that decides whether signing
+/// works through it (native.rs, OLD_P11KIT_CODENAMES). It sends the client's
+/// byte of p11-kit's handshake (2, the highest it knows), reads the server's
+/// (its own highest, if lower) and hangs up. Must run off the main thread.
+pub fn host_protocol() -> Option<u8> {
+    protocol_at(&paths::host_p11kit_socket())
+}
+
+fn protocol_at(socket: &std::path::Path) -> Option<u8> {
+    use std::io::{Read, Write};
+    let mut s = std::os::unix::net::UnixStream::connect(socket).ok()?;
+    s.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
+    s.set_write_timeout(Some(Duration::from_secs(3))).ok()?;
+    s.write_all(&[2]).ok()?;
+    let mut answer = [0u8];
+    s.read_exact(&mut answer).ok()?;
+    Some(answer[0])
+}
+
 /// Must run off the main thread. `ours` are the tokens Tessera serves.
 pub fn host_view(ours: &[(String, String)]) -> HostView {
     let socket = paths::host_p11kit_socket();
@@ -524,4 +544,39 @@ pub fn snapshot(drivers: &[(String, String)]) -> Snapshot {
         }
     }
     snap
+}
+
+#[cfg(test)]
+mod protocol_tests {
+    use super::protocol_at;
+    use std::io::{Read, Write};
+    use std::os::unix::net::UnixListener;
+
+    /// A server that answers the handshake as p11-kit does: the client's
+    /// version, or its own highest if that is lower.
+    fn fake_server(highest: u8) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("tessera-protocol-{}-{highest}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("pkcs11");
+        let listener = UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            let (mut s, _) = listener.accept().unwrap();
+            let mut v = [0u8];
+            s.read_exact(&mut v).unwrap();
+            s.write_all(&[v[0].min(highest)]).unwrap();
+        });
+        socket
+    }
+
+    #[test]
+    fn reads_the_servers_protocol_version() {
+        assert_eq!(protocol_at(&fake_server(1)), Some(1));
+        assert_eq!(protocol_at(&fake_server(2)), Some(2));
+        assert_eq!(
+            protocol_at(std::path::Path::new("/nonexistent/pkcs11")),
+            None
+        );
+    }
 }

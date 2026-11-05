@@ -95,14 +95,30 @@ pub(super) fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
     let hub = hub.clone();
     let generation = hub.generation.get();
     glib::spawn_future_local(async move {
-        let view = gio::spawn_blocking(move || status::host_view(&ours)).await;
+        let view = gio::spawn_blocking(move || {
+            let view = status::host_view(&ours);
+            // Only a server that serves Tessera's tokens is surely the
+            // system's (and not Flatpak's own, which answers there when the
+            // system's is off).
+            let protocol = match view {
+                status::HostView::Sees(_) => status::host_protocol(),
+                _ => None,
+            };
+            (view, protocol)
+        })
+        .await;
         hub.host_busy.set(false);
         if generation != hub.generation.get() {
             // Started before a restart: the answer says nothing about now.
             return;
         }
-        if let Ok(view) = view {
-            use status::HostView::{Unknown, WithoutTessera};
+        if let Ok((view, protocol)) = view {
+            use status::HostView::{Off, Sees, Unknown, WithoutTessera};
+            match view {
+                Sees(_) if protocol.is_some() => hub.host_protocol.set(protocol),
+                Off => hub.host_protocol.set(None),
+                _ => {}
+            }
             let miss = matches!(view, WithoutTessera | Unknown);
             hub.host_misses
                 .set(if miss { hub.host_misses.get() + 1 } else { 0 });

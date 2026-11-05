@@ -212,9 +212,19 @@ pub fn host_is_debian_family() -> bool {
 const OLD_P11KIT_CODENAMES: [&str; 6] =
     ["bullseye", "bookworm", "trixie", "focal", "jammy", "noble"];
 
-/// Is the host's p11-kit too old for signing through Tessera?
-pub fn host_has_old_p11kit() -> bool {
-    old_p11kit_by_release(&host_os_release())
+/// Is the host's p11-kit too old for signing through Tessera? `protocol` is
+/// what the system's p11-kit server answered (status::host_protocol), when
+/// it is known to be that server: the version it speaks decides. Without it
+/// (the server is off), the release codename.
+pub fn host_has_old_p11kit(protocol: Option<u8>) -> bool {
+    old_p11kit(protocol, || old_p11kit_by_release(&host_os_release()))
+}
+
+fn old_p11kit(protocol: Option<u8>, by_release: impl FnOnce() -> bool) -> bool {
+    match protocol {
+        Some(v) => v < 2,
+        None => by_release(),
+    }
 }
 
 fn old_p11kit_by_release(os_release: &str) -> bool {
@@ -661,6 +671,16 @@ mod tests {
             "ID=opensuse-tumbleweed\nID_LIKE=\"opensuse suse\"\n"
         ));
         assert!(!debian_family(""));
+    }
+
+    #[test]
+    fn the_servers_protocol_decides_before_the_codename() {
+        // MX 25 with p11-kit 0.26 from its test repository: trixie, but 2.
+        assert!(!old_p11kit(Some(2), || true));
+        assert!(old_p11kit(Some(1), || false));
+        assert!(old_p11kit(Some(0), || false));
+        assert!(old_p11kit(None, || true));
+        assert!(!old_p11kit(None, || false));
     }
 
     #[test]
