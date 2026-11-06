@@ -20,7 +20,7 @@
 - [O aplicativo não vê o token.](#o-aplicativo-não-vê-o-token)
 - [O token não aparece no Tessera.](#o-token-não-aparece-no-tessera)
 - [O token aparece duas vezes, ou o navegador pede o PIN duas vezes.](#o-token-aparece-duas-vezes-ou-o-navegador-pede-o-pin-duas-vezes)
-- [Eu usava o SafeSign ou o SerproID instalado no sistema. Preciso fazer algo?](#eu-usava-o-safesign-ou-o-serproid-instalado-no-sistema-preciso-fazer-algo)
+- [Eu usava o SafeSign, o SafeNet ou o SerproID instalado no sistema. Preciso fazer algo?](#eu-usava-o-safesign-o-safenet-ou-o-serproid-instalado-no-sistema-preciso-fazer-algo)
 - [Fechei a janela. O Tessera continua rodando?](#fechei-a-janela-o-tessera-continua-rodando)
 - [Aparece um aviso no topo da janela dizendo que a assinatura não funciona.](#aparece-um-aviso-no-topo-da-janela-dizendo-que-a-assinatura-não-funciona)
 
@@ -87,11 +87,11 @@ Tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**.
 
 No **Fedora e derivados**, o próprio sistema já carrega o p11-kit nos aplicativos nativos. Se o módulo do Tessera também foi acrescentado, cada token aparece duas vezes, e o botão do aplicativo vira **Retirar**, que tira só o do Tessera. Nos navegadores Chromium em Flatpak, veja [Apps](docs/apps.md#chromium-google-chrome-microsoft-edge-and-brave) (em inglês).
 
-### Eu usava o SafeSign ou o SerproID instalado no sistema. Preciso fazer algo?
+### Eu usava o SafeSign, o SafeNet ou o SerproID instalado no sistema. Preciso fazer algo?
 
 Sim: retire a indicação da biblioteca do fornecedor dos bancos de certificados dos navegadores. Se o mesmo token chega ao navegador por dois caminhos, o do pacote do fornecedor e o do Tessera, os dois disputam o token, e o resultado é token em dobro, PIN pedido mais de uma vez ou falha na assinatura. O Tessera não retira módulos de outros programas por conta própria, porque eles podem ser usados por outra coisa; por isso é preciso fazer à mão, com os navegadores fechados.
 
-- **Firefox:** Configurações → Privacidade e Segurança → **Dispositivos de segurança**. Selecione o módulo do SafeSign ou do SerproID (o que não é do Tessera nem do sistema) e clique em **Descarregar**. Faça isso em cada perfil.
+- **Firefox:** Configurações → Privacidade e Segurança → **Dispositivos de segurança**. Selecione o módulo do SafeSign, do SafeNet ou do SerproID (o que não é do Tessera nem do sistema) e clique em **Descarregar**. Faça isso em cada perfil.
 - **Chromium, Chrome, Edge e Brave:** liste os módulos do banco que eles compartilham e retire o do fornecedor pelo nome que aparecer:
 
   ```bash
@@ -151,7 +151,7 @@ Abra uma [issue](https://github.com/pedrohqb/tessera/issues/new/choose) com o mo
 - [An app does not see the token.](#an-app-does-not-see-the-token)
 - [The token does not appear in Tessera.](#the-token-does-not-appear-in-tessera)
 - [The token shows twice, or the browser asks for the PIN twice.](#the-token-shows-twice-or-the-browser-asks-for-the-pin-twice)
-- [I used SafeSign or SerproID installed on the system. Do I need to do anything?](#i-used-safesign-or-serproid-installed-on-the-system-do-i-need-to-do-anything)
+- [I used SafeSign, SafeNet or SerproID installed on the system. Do I need to do anything?](#i-used-safesign-safenet-or-serproid-installed-on-the-system-do-i-need-to-do-anything)
 - [I closed the window. Is Tessera still running?](#i-closed-the-window-is-tessera-still-running)
 - [A warning at the top of the window says signing does not work.](#a-warning-at-the-top-of-the-window-says-signing-does-not-work)
 
@@ -218,11 +218,11 @@ Unplug it and plug it in again. If a driver shows as "Stopped", press **Restart*
 
 On **Fedora and its derivatives**, the system itself already loads p11-kit in native apps. If Tessera's module was added too, each token shows twice, and the app's button becomes **Remove**, which takes out only Tessera's. For Chromium-based browsers as Flatpaks, see [Apps](docs/apps.md#chromium-google-chrome-microsoft-edge-and-brave).
 
-### I used SafeSign or SerproID installed on the system. Do I need to do anything?
+### I used SafeSign, SafeNet or SerproID installed on the system. Do I need to do anything?
 
 Yes: remove the vendor library's entry from the browsers' certificate databases. If the same token reaches the browser by two paths, the vendor package's and Tessera's, the two compete for the token, and the result is a token shown twice, the PIN asked more than once, or failed signatures. Tessera does not remove other programs' modules on its own, since something else may use them, so this is done by hand, with the browsers closed.
 
-- **Firefox:** Settings → Privacy & Security → **Security Devices**. Select the SafeSign or SerproID module (the one that is neither Tessera's nor the system's) and click **Unload**. Do it in each profile.
+- **Firefox:** Settings → Privacy & Security → **Security Devices**. Select the SafeSign, SafeNet or SerproID module (the one that is neither Tessera's nor the system's) and click **Unload**. Do it in each profile.
 - **Chromium, Chrome, Edge and Brave:** list the modules of the database they share and remove the vendor's by the name shown:
 
   ```bash
