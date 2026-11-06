@@ -183,7 +183,7 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 - **[Perguntas frequentes](FAQ.md)**, em português e inglês.
 - **Documentação técnica**, em inglês, em [docs/](docs/README.md): arquitetura, drivers, aplicativos, compatibilidade (o que já foi testado, e como relatar o seu teste), solução de problemas, histórico e desenvolvimento.
 - **Suporte:** abra uma [issue](https://github.com/pedrohqb/tessera/issues) ou peça ajuda no grupo oficial no [Telegram](https://t.me/advogados_linux).
-- **Licença:** GPL-3.0-or-later. Os drivers dos fornecedores não fazem parte do Tessera: são baixados dos fornecedores na instalação e seguem as licenças deles.
+- **Licença:** GPL-3.0-or-later. Os drivers dos fornecedores não fazem parte do Tessera: são baixados dos fornecedores na instalação e seguem as licenças deles. O OpenSC, que vem compilado no Tessera, é LGPL-2.1-or-later.
 
 ---
 
@@ -354,4 +354,4 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 - **[FAQ](FAQ.md)**, in Portuguese and English.
 - **Technical documentation** in [docs/](docs/README.md): architecture, drivers, apps, compatibility (what has been tested, and how to report your test), troubleshooting, history and development.
 - **Support:** open an [issue](https://github.com/pedrohqb/tessera/issues) or ask in the [Telegram](https://t.me/advogados_linux) group (in Portuguese).
-- **License:** GPL-3.0-or-later. The vendor drivers are not part of Tessera: they are downloaded from their vendors at installation and are covered by the vendors' own licenses.
+- **License:** GPL-3.0-or-later. The vendor drivers are not part of Tessera: they are downloaded from their vendors at installation and are covered by the vendors' own licenses. OpenSC, built into Tessera, is LGPL-2.1-or-later.
