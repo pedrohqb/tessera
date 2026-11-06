@@ -45,6 +45,11 @@ fn xdg(var: &str, fallback: &str) -> PathBuf {
     }
 }
 
+/// $XDG_DATA_HOME (in the Flatpak, Tessera's own data folder).
+pub fn data_home() -> PathBuf {
+    xdg("XDG_DATA_HOME", ".local/share")
+}
+
 pub fn home() -> PathBuf {
     env::var_os("HOME")
         .map(PathBuf::from)
@@ -143,21 +148,6 @@ pub fn poppler_nss_dir(app_id: &str) -> PathBuf {
         .join(".var/app")
         .join(app_id)
         .join("config/mozilla/firefox/tessera.default")
-}
-
-/// Where the Firefox Flatpak keeps its profiles (Firefox 147+ uses
-/// .config/mozilla/firefox; older releases .mozilla/firefox).
-pub fn firefox_profile_roots() -> Vec<PathBuf> {
-    let base = home().join(".var/app/org.mozilla.firefox");
-    vec![
-        base.join("config/mozilla/firefox"),
-        base.join(".mozilla/firefox"),
-    ]
-}
-
-/// The Firefox Flatpak's profile folders, from each root's profiles.ini.
-pub fn firefox_profiles() -> Vec<PathBuf> {
-    profiles_in(&firefox_profile_roots())
 }
 
 /// The profile folders listed in each root's profiles.ini.

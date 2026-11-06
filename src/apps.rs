@@ -22,14 +22,25 @@ use crate::paths;
 /// How an app is set up once it may reach the host's p11-kit server.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Setup {
-    /// Register p11-kit-client.so in every Firefox profile.
-    Firefox,
+    /// Register p11-kit-client.so in every profile listed by the
+    /// profiles.ini in these folders of the app's own (~/.var/app/<id>/…):
+    /// Firefox and Thunderbird.
+    Profiles(&'static [&'static str]),
     /// Signs through poppler: an empty NSS database of its own, in the
     /// first place poppler looks (NSS's roots module, p11-kit in the
     /// runtime, already reaches the server).
     Poppler,
     /// Register p11-kit-client.so in the browser's ~/.pki/nssdb.
     Chromium,
+    /// An empty NSS database of its own, named in its settings (CertDir):
+    /// see libreoffice.rs.
+    LibreOffice,
+    /// p11-kit-client.so and the slot of Tessera's tokens in its pkcs11.cfg:
+    /// see jsignpdf.rs.
+    JSignPdf,
+    /// By hand in the app's settings (Master PDF Editor, whose settings key
+    /// is not known): the row shows where, and the module's path.
+    ByHand,
     /// Nothing: the app's package already does it (PJeOffice Pro).
     None,
 }
@@ -43,6 +54,9 @@ pub struct ClientApp {
     /// allows one.
     pub bundled_icon: Option<&'static str>,
     pub setup: Setup,
+    /// Where, in the app, the module can be loaded by hand (shown with
+    /// p11-kit-client.so's path).
+    pub by_hand: Option<&'static str>,
 }
 
 pub const FIREFOX: ClientApp = ClientApp {
@@ -50,7 +64,47 @@ pub const FIREFOX: ClientApp = ClientApp {
     name: "Firefox",
     icon: "web-browser-symbolic",
     bundled_icon: None,
-    setup: Setup::Firefox,
+    // Firefox 147+ keeps its profiles under .config, older releases under
+    // .mozilla.
+    setup: Setup::Profiles(&["config/mozilla/firefox", ".mozilla/firefox"]),
+    by_hand: Some("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"),
+};
+/// Thunderbird's Flatpak, built by Mozilla. Its ESR has an ID of its own,
+/// and the old ID (org.mozilla.Thunderbird) stopped being updated in 2026;
+/// those two show only when installed. Mozilla's builds carry their own NSS,
+/// which does not load the runtime's p11-kit by itself: like Firefox, the
+/// module goes into every profile.
+pub const THUNDERBIRD: ClientApp = ClientApp {
+    id: "org.mozilla.thunderbird",
+    name: "Thunderbird",
+    icon: "mail-send-symbolic",
+    bundled_icon: None,
+    setup: Setup::Profiles(THUNDERBIRD_ROOTS),
+    by_hand: Some(THUNDERBIRD_BY_HAND),
+};
+pub const THUNDERBIRD_ESR: ClientApp = ClientApp {
+    id: "org.mozilla.thunderbird_esr",
+    name: "Thunderbird ESR",
+    ..THUNDERBIRD
+};
+pub const THUNDERBIRD_OLD: ClientApp = ClientApp {
+    id: "org.mozilla.Thunderbird",
+    name: "Thunderbird",
+    ..THUNDERBIRD
+};
+const THUNDERBIRD_BY_HAND: &str =
+    "Or by hand in Thunderbird: Settings → Privacy & Security → Security Devices → Load, module file:";
+/// Evolution's Flatpak reads the real ~/.pki/nssdb when there is one, else
+/// its own data/pki/nssdb (evolution-data-server 3.62). When it starts its
+/// S/MIME certificates it adds NSS's root-certificates module, which in the
+/// runtime is p11-kit's trust module: as for Chromium, step 1 is enough.
+pub const EVOLUTION: ClientApp = ClientApp {
+    id: "org.gnome.Evolution",
+    name: "Evolution",
+    icon: "mail-send-symbolic",
+    bundled_icon: None,
+    setup: Setup::Chromium,
+    by_hand: None,
 };
 pub const CHROMIUM: ClientApp = ClientApp {
     id: "org.chromium.Chromium",
@@ -58,6 +112,7 @@ pub const CHROMIUM: ClientApp = ClientApp {
     icon: "web-browser-symbolic",
     bundled_icon: Some("tessera-app-chromium"),
     setup: Setup::Chromium,
+    by_hand: None,
 };
 pub const CHROME: ClientApp = ClientApp {
     id: "com.google.Chrome",
@@ -65,6 +120,7 @@ pub const CHROME: ClientApp = ClientApp {
     icon: "web-browser-symbolic",
     bundled_icon: None,
     setup: Setup::Chromium,
+    by_hand: None,
 };
 pub const EDGE: ClientApp = ClientApp {
     id: "com.microsoft.Edge",
@@ -72,6 +128,7 @@ pub const EDGE: ClientApp = ClientApp {
     icon: "web-browser-symbolic",
     bundled_icon: None,
     setup: Setup::Chromium,
+    by_hand: None,
 };
 pub const BRAVE: ClientApp = ClientApp {
     id: "com.brave.Browser",
@@ -79,6 +136,7 @@ pub const BRAVE: ClientApp = ClientApp {
     icon: "web-browser-symbolic",
     bundled_icon: None,
     setup: Setup::Chromium,
+    by_hand: None,
 };
 pub const PAPERS: ClientApp = ClientApp {
     id: "org.gnome.Papers",
@@ -86,6 +144,7 @@ pub const PAPERS: ClientApp = ClientApp {
     icon: "x-office-document-symbolic",
     bundled_icon: Some("tessera-app-papers"),
     setup: Setup::Poppler,
+    by_hand: None,
 };
 /// Okular signs through poppler too (KDE runtime, same freedesktop base).
 pub const OKULAR: ClientApp = ClientApp {
@@ -94,6 +153,37 @@ pub const OKULAR: ClientApp = ClientApp {
     icon: "x-office-document-symbolic",
     bundled_icon: Some("tessera-app-okular"),
     setup: Setup::Poppler,
+    by_hand: None,
+};
+pub const LIBREOFFICE: ClientApp = ClientApp {
+    id: crate::libreoffice::FLATPAK_ID,
+    name: "LibreOffice",
+    icon: "x-office-document-symbolic",
+    bundled_icon: None,
+    setup: Setup::LibreOffice,
+    by_hand: None,
+};
+pub const JSIGNPDF: ClientApp = ClientApp {
+    id: crate::jsignpdf::FLATPAK_ID,
+    name: "JSignPdf",
+    icon: "document-edit-symbolic",
+    bundled_icon: None,
+    setup: Setup::JSignPdf,
+    by_hand: None,
+};
+/// Master PDF Editor (Flathub, Qt 6 build) loads one PKCS#11 library,
+/// chosen in Tools → Settings → Certificates → "PKCS#11 provider". Its
+/// settings file is ~/.var/app/<id>/config/Code Industry/Master PDF Editor
+/// 5.conf, but the key that field writes is not known, so step 2 is by hand.
+pub const MASTERPDF: ClientApp = ClientApp {
+    id: "net.code_industry.MasterPDFEditor",
+    name: "Master PDF Editor",
+    icon: "x-office-document-symbolic",
+    bundled_icon: None,
+    setup: Setup::ByHand,
+    by_hand: Some(
+        "By hand in Master PDF Editor: Tools → Settings → Certificates → PKCS#11 provider, file:",
+    ),
 };
 pub const PJEOFFICE: ClientApp = ClientApp {
     id: "br.jus.cnj.PJeOfficePro",
@@ -101,12 +191,63 @@ pub const PJEOFFICE: ClientApp = ClientApp {
     icon: "document-edit-symbolic",
     bundled_icon: None,
     setup: Setup::None,
+    by_hand: None,
+};
+/// Assinador SERPRO (FlatPark): its package already has the p11-kit socket
+/// and its own bridge to p11-kit-client.so (which hides the trust slots).
+pub const ASSINADOR: ClientApp = ClientApp {
+    id: "br.gov.serpro.desktop.assinador",
+    name: "Assinador SERPRO",
+    icon: "document-edit-symbolic",
+    bundled_icon: None,
+    setup: Setup::None,
+    by_hand: None,
 };
 
-/// The apps shown in the window, in order.
-pub const APPS: [&ClientApp; 7] = [
-    &FIREFOX, &CHROMIUM, &CHROME, &EDGE, &BRAVE, &PAPERS, &OKULAR,
+/// Where Thunderbird's Flatpak keeps its profiles, in its own folder
+/// (--persist=.thunderbird; newer releases may use the XDG one).
+const THUNDERBIRD_ROOTS: &[&str] = &[".thunderbird", "config/thunderbird"];
+
+/// The apps with steps, shown in the window, in order.
+pub const APPS: [&ClientApp; 14] = [
+    &FIREFOX,
+    &CHROMIUM,
+    &CHROME,
+    &EDGE,
+    &BRAVE,
+    &THUNDERBIRD,
+    &THUNDERBIRD_ESR,
+    &THUNDERBIRD_OLD,
+    &EVOLUTION,
+    &PAPERS,
+    &OKULAR,
+    &LIBREOFFICE,
+    &JSIGNPDF,
+    &MASTERPDF,
 ];
+
+/// Is the app's row shown? Thunderbird's ESR and old ID only when they are
+/// installed (their folder is there).
+pub fn shown(app: &ClientApp) -> bool {
+    ![THUNDERBIRD_ESR.id, THUNDERBIRD_OLD.id].contains(&app.id)
+        || paths::home().join(".var/app").join(app.id).is_dir()
+}
+
+/// The apps whose package already reaches the system's p11-kit server.
+pub const NO_STEPS: [&ClientApp; 2] = [&PJEOFFICE, &ASSINADOR];
+
+/// The profiles of an app that keeps Mozilla-style profiles in its own
+/// folder.
+pub fn app_profiles(app: &ClientApp) -> Vec<std::path::PathBuf> {
+    match app.setup {
+        Setup::Profiles(roots) => {
+            let base = paths::home().join(".var/app").join(app.id);
+            let roots: Vec<_> = roots.iter().map(|r| base.join(r)).collect();
+            paths::profiles_in(&roots)
+        }
+        _ => vec![],
+    }
+}
 
 /// The one-time host command that starts the host's p11-kit server.
 const SOCKET_COMMAND: &str = "systemctl --user enable --now p11-kit-server.socket";
@@ -154,7 +295,7 @@ pub fn override_command(app: &ClientApp) -> String {
     )
 }
 
-/// The NSS database a Chromium-based browser reads: since Chromium 146,
+/// The NSS database a Chromium-based browser (or Evolution) reads: since Chromium 146,
 /// $XDG_DATA_HOME/pki/nssdb (in Flatpak, ~/.var/app/<id>/data/pki/nssdb),
 /// unless the older ~/.pki/nssdb exists, which then wins. ~/.pki is the real
 /// one for Chromium, which may use the home folder, and the one kept by
@@ -162,7 +303,7 @@ pub fn override_command(app: &ClientApp) -> String {
 /// (Tessera sees the folder only if it existed when Tessera started).
 pub fn chromium_nssdb(app: &ClientApp) -> Option<std::path::PathBuf> {
     let data = paths::home().join(".var/app").join(app.id);
-    let legacy = if app.id == CHROMIUM.id {
+    let legacy = if app.id == CHROMIUM.id || app.id == EVOLUTION.id {
         paths::home().join(".pki/nssdb")
     } else {
         data.join(".pki/nssdb")

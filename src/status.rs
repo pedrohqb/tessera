@@ -45,6 +45,11 @@ pub struct Token {
     pub model: String,
     pub serial: String,
     pub certificates: Vec<Certificate>,
+    /// The slot's position among all slots, with or without a token
+    /// (C_GetSlotList(CK_FALSE)), which is what Java's SunPKCS11 counts in
+    /// `slotListIndex` (see jsignpdf.rs).
+    #[serde(default)]
+    pub slot_index: usize,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -318,7 +323,12 @@ pub fn list_tokens_in_process(with_certs: bool) -> Result<String, String> {
     ctx.initialize(CInitializeArgs::new(CInitializeFlags::OS_LOCKING_OK))
         .map_err(|e| e.to_string())?;
     let mut out = Vec::new();
-    for slot in ctx.get_slots_with_token().map_err(|e| e.to_string())? {
+    for (slot_index, slot) in ctx
+        .get_all_slots()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .enumerate()
+    {
         let Ok(info) = ctx.get_token_info(slot) else {
             continue;
         };
@@ -333,6 +343,7 @@ pub fn list_tokens_in_process(with_certs: bool) -> Result<String, String> {
             model: clean(info.model()),
             serial: clean(info.serial_number()),
             certificates: vec![],
+            slot_index,
         };
         if let Some(session) = with_certs.then(|| ctx.open_ro_session(slot).ok()).flatten() {
             let handles = session
@@ -475,6 +486,32 @@ fn protocol_at(socket: &std::path::Path) -> Option<u8> {
     let mut answer = [0u8];
     s.read_exact(&mut answer).ok()?;
     Some(answer[0])
+}
+
+/// The position, among all the slots the system's p11-kit server lists, of
+/// the first one holding one of Tessera's tokens (`ours`: label and
+/// serial). None when the server does not answer or has none of them. Must
+/// run off the main thread.
+pub fn host_slot_index(ours: &[(String, String)]) -> Option<usize> {
+    let seen = tokens_at(&paths::host_p11kit_socket(), "", false).ok()?;
+    seen.iter()
+        .filter(|t| ours.iter().any(|(l, s)| &t.label == l && &t.serial == s))
+        .map(|t| t.slot_index)
+        .min()
+}
+
+/// The tokens Tessera serves (label, serial), read from each driver's
+/// server. Must run off the main thread.
+pub fn tessera_tokens() -> Vec<(String, String)> {
+    let Ok(entries) = std::fs::read_dir(paths::socket_dir()) else {
+        return vec![];
+    };
+    entries
+        .flatten()
+        .filter_map(|e| tokens_at(&e.path(), "", false).ok())
+        .flatten()
+        .map(|t| (t.label, t.serial))
+        .collect()
 }
 
 /// Must run off the main thread. `ours` are the tokens Tessera serves.

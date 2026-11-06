@@ -17,6 +17,8 @@
 mod apps;
 mod drivers;
 mod i18n;
+mod jsignpdf;
+mod libreoffice;
 mod native;
 mod nss;
 mod paths;

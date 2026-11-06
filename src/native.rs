@@ -32,14 +32,18 @@ use std::path::PathBuf;
 
 use crate::apps;
 use crate::i18n::t;
+use crate::libreoffice;
 use crate::nss;
 use crate::paths;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Firefox,
+    Thunderbird,
     Chromium,
+    Evolution,
     Poppler,
+    LibreOffice,
     PjeOffice,
 }
 
@@ -79,7 +83,37 @@ pub const PJEOFFICE: NativeApp = NativeApp {
     kind: Kind::PjeOffice,
 };
 
-pub const APPS: [&NativeApp; 4] = [&FIREFOX, &CHROMIUM_BROWSERS, &PDF_VIEWERS, &PJEOFFICE];
+pub const THUNDERBIRD: NativeApp = NativeApp {
+    name: "Thunderbird",
+    icons: &["thunderbird", "org.mozilla.Thunderbird"],
+    fallback_icon: "mail-send-symbolic",
+    kind: Kind::Thunderbird,
+};
+/// Evolution opens the same database as the Chromium-based browsers
+/// (evolution-data-server's camel_init: ~/.pki/nssdb if it exists, else
+/// $XDG_DATA_HOME/pki/nssdb from 3.62).
+pub const EVOLUTION: NativeApp = NativeApp {
+    name: "Evolution",
+    icons: &["org.gnome.Evolution", "evolution"],
+    fallback_icon: "mail-send-symbolic",
+    kind: Kind::Evolution,
+};
+pub const LIBREOFFICE: NativeApp = NativeApp {
+    name: "LibreOffice",
+    icons: &["libreoffice-startcenter", "org.libreoffice.LibreOffice"],
+    fallback_icon: "x-office-document-symbolic",
+    kind: Kind::LibreOffice,
+};
+
+pub const APPS: [&NativeApp; 7] = [
+    &FIREFOX,
+    &CHROMIUM_BROWSERS,
+    &THUNDERBIRD,
+    &EVOLUTION,
+    &PDF_VIEWERS,
+    &LIBREOFFICE,
+    &PJEOFFICE,
+];
 
 /// The Chromium-based browsers, by their folder under ~/.config.
 const CHROMIUM_FAMILY: [(&str, &str); 4] = [
@@ -99,6 +133,30 @@ fn firefox_roots() -> Vec<PathBuf> {
 /// The native Firefox's profile folders.
 pub fn firefox_profiles() -> Vec<PathBuf> {
     paths::profiles_in(&firefox_roots())
+}
+
+/// Thunderbird keeps using ~/.thunderbird while it exists; a new install
+/// may use $XDG_CONFIG_HOME/thunderbird (no "mozilla" level, unlike
+/// Firefox).
+fn thunderbird_roots() -> Vec<PathBuf> {
+    vec![
+        paths::home().join(".thunderbird"),
+        paths::host_config_home().join("thunderbird"),
+    ]
+}
+
+/// The native Thunderbird's profile folders.
+pub fn thunderbird_profiles() -> Vec<PathBuf> {
+    paths::profiles_in(&thunderbird_roots())
+}
+
+/// The database the native LibreOffice signs with, when its settings name
+/// one that exists (CertDir; see libreoffice.rs).
+fn libreoffice_cert_dir() -> Option<PathBuf> {
+    libreoffice::cert_dir(&libreoffice::native_profile())
+        .flatten()
+        .map(PathBuf::from)
+        .filter(|d| d.is_dir())
 }
 
 /// The Chromium-based browsers that have been used on this host.
@@ -122,15 +180,15 @@ pub fn chromium_nssdb() -> Option<PathBuf> {
     .find(|d| d.is_dir())
 }
 
-/// The Chromium Flatpak may read the real ~/.pki/nssdb too: p11-kit-proxy.so
-/// there would make it list each token twice (it already sees them through
-/// its root-certificates module), and ask for the PIN twice.
+/// The Chromium and Evolution Flatpaks may read the real ~/.pki/nssdb too:
+/// p11-kit-proxy.so there would make them list each token twice (they
+/// already see them through their root-certificates module), and ask for
+/// the PIN twice.
 fn shared_with_chromium_flatpak(db: &std::path::Path) -> bool {
     db == paths::home().join(".pki/nssdb")
-        && paths::home()
-            .join(".var/app")
-            .join(apps::CHROMIUM.id)
-            .is_dir()
+        && [apps::CHROMIUM.id, apps::EVOLUTION.id]
+            .iter()
+            .any(|id| paths::home().join(".var/app").join(id).is_dir())
 }
 
 /// The databases poppler may open: every *default* Firefox profile with a
@@ -335,8 +393,10 @@ fn with_a3(text: &str, library: &str) -> String {
 fn databases(app: &NativeApp) -> Vec<PathBuf> {
     match app.kind {
         Kind::Firefox => firefox_profiles(),
-        Kind::Chromium => chromium_nssdb().into_iter().collect(),
+        Kind::Thunderbird => thunderbird_profiles(),
+        Kind::Chromium | Kind::Evolution => chromium_nssdb().into_iter().collect(),
         Kind::Poppler => poppler_dbs(),
+        Kind::LibreOffice => libreoffice_cert_dir().into_iter().collect(),
         Kind::PjeOffice => vec![],
     }
 }
@@ -365,6 +425,9 @@ pub fn state(app: &NativeApp) -> State {
             Some(v) if v.split('|').any(|e| is_p11kit_entry(e.trim())) => State::Ready,
             Some(_) => State::ToDo,
         };
+    }
+    if app.kind == Kind::LibreOffice {
+        return libreoffice_state();
     }
     let dbs = databases(app);
     // Okular and Papers cannot be detected (no folder of their own); with
@@ -402,6 +465,27 @@ pub fn state(app: &NativeApp) -> State {
     State::ToDo
 }
 
+/// LibreOffice: with no certificate path of its own (CertDir), it opens a
+/// Thunderbird or old-style Firefox profile, or a temporary database, so
+/// Set up gives it one; a CertDir the user chose gets the module instead.
+fn libreoffice_state() -> State {
+    let Some(_) = libreoffice::cert_dir(&libreoffice::native_profile()) else {
+        return State::NoDatabase;
+    };
+    let db = libreoffice_cert_dir();
+    if system_nss_loads_p11kit() {
+        return match db {
+            Some(d) if nss::has_tessera_module(&d) => State::Twice,
+            _ => State::BySystem,
+        };
+    }
+    match db {
+        Some(d) if nss::has_p11kit(&d) => State::Ready,
+        Some(d) if nss::uses_sysinit(&d) => State::BySystem,
+        _ => State::ToDo,
+    }
+}
+
 /// One line about the app: what it is and what it still needs.
 pub fn subtitle(app: &NativeApp) -> String {
     let what = match app.kind {
@@ -414,6 +498,9 @@ pub fn subtitle(app: &NativeApp) -> String {
             }
         }
         Kind::Poppler => t("Native apps; they use Firefox's certificate database").to_string(),
+        Kind::Evolution => {
+            t("Native app; same certificate database as the Chromium-based browsers").to_string()
+        }
         _ => t("Native app").to_string(),
     };
     let state = match state(app) {
@@ -424,10 +511,11 @@ pub fn subtitle(app: &NativeApp) -> String {
         State::NeedsFirefox => t("Set up Firefox first"),
         State::NoDatabase => match app.kind {
             Kind::PjeOffice => t("Open PJeOffice Pro once (it writes ~/.pjeoffice-pro/pjeoffice-pro.config when it closes), then come back"),
+            Kind::LibreOffice => t("Open LibreOffice once (it writes its settings when it closes), then come back"),
             Kind::Poppler => t("Needs Firefox: install it, open it once and set it up"),
             _ => t("Open the app once, then come back"),
         },
-        State::SharedWithFlatpak => t("Not available: the Chromium Flatpak uses the same certificate database (~/.pki/nssdb) and would see each token twice"),
+        State::SharedWithFlatpak => t("Not available: the Chromium or Evolution Flatpak uses the same certificate database (~/.pki/nssdb) and would see each token twice"),
     };
     format!("{what} · {state}")
 }
@@ -462,9 +550,21 @@ pub fn set_up(app: &NativeApp) -> Result<String, String> {
             t("set up; restart the app")
         ));
     }
+    if app.kind == Kind::LibreOffice && libreoffice::running(&libreoffice::native_profile()) {
+        return Err(format!(
+            "{}: {} ({})",
+            t(app.name),
+            t("close the app first, then try again"),
+            t("if it is closed, a crash may have left the file .lock in its profile")
+        ));
+    }
     let dbs = databases(app);
     if dbs.iter().any(|d| nss::profile_in_use(d)) {
-        return Err(t("Close Firefox first, then try again").into());
+        return Err(format!(
+            "{}: {}",
+            t(app.name),
+            t("close the app first, then try again")
+        ));
     }
     if matches!(state(app), State::Twice) {
         for d in dbs.iter().filter(|d| nss::has_tessera_module(d)) {
@@ -475,6 +575,14 @@ pub fn set_up(app: &NativeApp) -> Result<String, String> {
             t(app.name),
             t("Tessera's duplicate module removed; restart the app")
         ));
+    }
+    if app.kind == Kind::LibreOffice && dbs.is_empty() {
+        // No certificate path of its own yet: one in Tessera's data folder.
+        let db = libreoffice::native_db();
+        nss::add_library(&db, paths::PROXY_MODULE)
+            .map_err(|e| format!("{}: {e:#}", db.display()))?;
+        libreoffice::set_cert_dir(&libreoffice::native_profile(), &db)?;
+        return Ok(format!("{}: {}", t(app.name), t("set up; restart the app")));
     }
     if dbs.is_empty() {
         return Err(subtitle(app));
@@ -618,6 +726,55 @@ mod tests {
             .unwrap()
             .ends_with(&format!("list.a3={}\n", host_p11kit_library())));
 
+        // Thunderbird: its profiles under ~/.thunderbird and the XDG folder.
+        assert!(matches!(state(&THUNDERBIRD), State::NoDatabase));
+        let tb = home.join(".thunderbird");
+        fs::create_dir_all(tb.join("p1.default-esr")).unwrap();
+        fs::write(
+            tb.join("profiles.ini"),
+            "[Profile0]\nPath=p1.default-esr\nIsRelative=1\n",
+        )
+        .unwrap();
+        let xtb = home.join(".config/thunderbird");
+        fs::create_dir_all(xtb.join("p2.default")).unwrap();
+        fs::write(
+            xtb.join("profiles.ini"),
+            "[Profile0]\nPath=p2.default\nIsRelative=1\n",
+        )
+        .unwrap();
+        assert_eq!(thunderbird_profiles().len(), 2);
+        assert!(matches!(state(&THUNDERBIRD), State::ToDo));
+        fs::write(tb.join("p1.default-esr/pkcs11.txt"), proxy).unwrap();
+        fs::write(xtb.join("p2.default/pkcs11.txt"), proxy).unwrap();
+        assert!(matches!(state(&THUNDERBIRD), State::Ready));
+
+        // Evolution shares the Chromium-based browsers' database, and so its
+        // state (here, the Chromium Flatpak reads it too).
+        assert!(matches!(state(&EVOLUTION), State::SharedWithFlatpak));
+
+        // LibreOffice: no settings yet, then no certificate path of its own
+        // (Set up would make one), then one the user chose.
+        assert!(matches!(state(&LIBREOFFICE), State::NoDatabase));
+        let lo = libreoffice::native_profile();
+        fs::create_dir_all(&lo).unwrap();
+        let xcu = "<?xml version=\"1.0\"?>\n<oor:items xmlns:oor=\"http://openoffice.org/2001/registry\">\n</oor:items>\n";
+        fs::write(lo.join("registrymodifications.xcu"), xcu).unwrap();
+        assert!(matches!(state(&LIBREOFFICE), State::ToDo));
+        assert!(can_set_up(&LIBREOFFICE));
+        let mine = home.join("my-nssdb");
+        fs::create_dir_all(&mine).unwrap();
+        libreoffice::set_cert_dir(&lo, &mine).unwrap();
+        assert_eq!(databases(&LIBREOFFICE), vec![mine.clone()]);
+        assert!(matches!(state(&LIBREOFFICE), State::ToDo));
+        fs::write(mine.join("pkcs11.txt"), proxy).unwrap();
+        assert!(matches!(state(&LIBREOFFICE), State::Ready));
+        // While it runs (its .lock), Set up waits.
+        fs::write(lo.join(".lock"), b"").unwrap();
+        fs::remove_file(mine.join("pkcs11.txt")).unwrap();
+        assert!(set_up(&LIBREOFFICE).is_err());
+        fs::remove_file(lo.join(".lock")).unwrap();
+        fs::write(mine.join("pkcs11.txt"), proxy).unwrap();
+
         // Fedora and its family: their NSS loads p11-kit in every database.
         // Native Firefox (its profiles have Tessera's module from above)
         // then shows each token twice, and offers to remove the module.
@@ -626,8 +783,10 @@ mod tests {
         assert!(matches!(state(&FIREFOX), State::Twice));
         assert!(can_set_up(&FIREFOX));
         assert_eq!(button_label(&FIREFOX), "Remove");
+        // LibreOffice's database has Tessera's module too: twice.
+        assert!(matches!(state(&LIBREOFFICE), State::Twice));
         // The others need nothing.
-        for app in [&CHROMIUM_BROWSERS, &PDF_VIEWERS] {
+        for app in [&CHROMIUM_BROWSERS, &PDF_VIEWERS, &EVOLUTION] {
             assert!(matches!(state(app), State::BySystem));
             assert!(!can_set_up(app));
         }
@@ -642,6 +801,32 @@ mod tests {
         assert!(matches!(state(&FIREFOX), State::BySystem));
         assert!(!can_set_up(&FIREFOX));
         std::env::remove_var("TESSERA_OS_RELEASE");
+
+        // The Flatpaks' side, on the same made-up home (HOME is the
+        // process's): Thunderbird's profiles in its own folder, and its ESR
+        // and old ID shown only when installed.
+        let tbf = home.join(".var/app/org.mozilla.thunderbird/.thunderbird");
+        fs::create_dir_all(tbf.join("q.default-release")).unwrap();
+        fs::write(
+            tbf.join("profiles.ini"),
+            "[Profile0]\nPath=q.default-release\n",
+        )
+        .unwrap();
+        assert_eq!(
+            apps::app_profiles(&apps::THUNDERBIRD),
+            vec![tbf.join("q.default-release")]
+        );
+        assert!(apps::app_profiles(&apps::THUNDERBIRD_ESR).is_empty());
+        assert!(apps::shown(&apps::THUNDERBIRD));
+        assert!(!apps::shown(&apps::THUNDERBIRD_ESR));
+        fs::create_dir_all(home.join(".var/app/org.mozilla.thunderbird_esr")).unwrap();
+        assert!(apps::shown(&apps::THUNDERBIRD_ESR));
+        assert!(!apps::shown(&apps::THUNDERBIRD_OLD));
+        // Evolution's Flatpak reads the real ~/.pki/nssdb, like Chromium's.
+        assert_eq!(
+            apps::chromium_nssdb(&apps::EVOLUTION),
+            Some(home.join(".pki/nssdb"))
+        );
 
         let _ = fs::remove_dir_all(&home);
     }

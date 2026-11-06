@@ -8,9 +8,9 @@ use std::rc::Rc;
 use super::window::{copy_button, plain_row, Win};
 use crate::apps::{self, ClientApp, Setup};
 use crate::i18n::t;
-use crate::native;
 use crate::nss;
 use crate::paths;
+use crate::{jsignpdf, libreoffice, native, status};
 
 /// The app's own icon (see themed_icon), else Tessera's copy of it, else a
 /// generic one.
@@ -29,17 +29,29 @@ pub(super) fn app_state(app: &ClientApp) -> (bool, bool) {
 pub(super) fn step2_needed(app: &ClientApp) -> bool {
     match app.setup {
         Setup::Poppler => !nss::poppler_db_ready(&paths::poppler_nss_dir(app.id)),
-        Setup::Firefox => {
-            let profiles = paths::firefox_profiles();
+        Setup::Profiles(_) => {
+            let profiles = apps::app_profiles(app);
             profiles.is_empty() || !profiles.iter().all(|p| nss::has_module(p))
         }
         Setup::Chromium => apps::chromium_nssdb(app).is_some_and(|db| nss::has_module(&db)),
-        Setup::None => false,
+        Setup::LibreOffice => {
+            let db = libreoffice::flatpak_db();
+            libreoffice::cert_dir(&libreoffice::flatpak_profile()).flatten()
+                != Some(db.to_string_lossy().into_owned())
+                || !nss::poppler_db_ready(&db)
+        }
+        // Whether the slot is still the right one takes a look at the
+        // system's server, too slow for here: Set up stays available.
+        Setup::JSignPdf => !std::fs::read_to_string(jsignpdf::config_file())
+            .is_ok_and(|t| jsignpdf::is_set_up(&t, None)),
+        Setup::ByHand | Setup::None => false,
     }
 }
 
 pub(super) fn app_subtitle(app: &ClientApp) -> String {
     let state = match app_state(app) {
+        (true, true) if app.setup == Setup::ByHand => t("Step 2 by hand"),
+        (false, true) if app.setup == Setup::ByHand => t("Step 1 missing; step 2 by hand"),
         (true, true) => t("Ready"),
         (false, true) => t("Step 1 missing"),
         (true, false) => t("Step 2 missing"),
@@ -58,15 +70,21 @@ pub(super) fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
         Setup::Poppler => nss::set_up_poppler_db(&paths::poppler_nss_dir(app.id))
             .map(|_| step2_done(app))
             .map_err(|e| format!("{e:#}")),
-        Setup::Firefox => {
-            let profiles = paths::firefox_profiles();
+        Setup::Profiles(_) => {
+            let profiles = apps::app_profiles(app);
             if profiles.is_empty() {
-                return Err(
-                    t("No Firefox profile found: open Firefox once, then try again").into(),
-                );
+                return Err(format!(
+                    "{}: {}",
+                    app.name,
+                    t("no profile found: open the app once, then try again")
+                ));
             }
             if profiles.iter().any(|p| nss::profile_in_use(p)) {
-                return Err(t("Close Firefox first, then try again").into());
+                return Err(format!(
+                    "{}: {}",
+                    app.name,
+                    t("close the app first, then try again")
+                ));
             }
             for p in &profiles {
                 nss::add_module(p).map_err(|e| format!("{}: {e:#}", p.display()))?;
@@ -86,7 +104,41 @@ pub(super) fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
             }
             _ => Ok(step2_done(app)),
         },
-        Setup::None => Ok(String::new()),
+        Setup::LibreOffice => {
+            let profile = libreoffice::flatpak_profile();
+            if libreoffice::cert_dir(&profile).is_none() {
+                return Err(format!(
+                    "{}: {}",
+                    app.name,
+                    t("open the app once, then try again")
+                ));
+            }
+            if libreoffice::running(&profile) {
+                return Err(format!(
+                    "{}: {} ({})",
+                    app.name,
+                    t("close the app first, then try again"),
+                    t("if it is closed, a crash may have left the file .lock in its profile")
+                ));
+            }
+            let db = libreoffice::flatpak_db();
+            nss::set_up_poppler_db(&db).map_err(|e| format!("{}: {e:#}", db.display()))?;
+            libreoffice::set_cert_dir(&profile, &db)?;
+            Ok(step2_done(app))
+        }
+        Setup::JSignPdf => {
+            let ours = status::tessera_tokens();
+            let index = status::host_slot_index(&ours).ok_or_else(|| {
+                format!(
+                    "{}: {}",
+                    app.name,
+                    t("the system's p11-kit server does not list Tessera's tokens: plug in the token, check the system connection, then try again")
+                )
+            })?;
+            jsignpdf::set_up(index)?;
+            Ok(step2_done(app))
+        }
+        Setup::ByHand | Setup::None => Ok(String::new()),
     }
 }
 
@@ -129,7 +181,8 @@ pub(super) fn update_app(r: &AppRows) {
     r.copy.set_visible(!s1);
 
     let chromium = app.setup == Setup::Chromium;
-    r.step2.set_visible(!chromium || !s2);
+    r.step2
+        .set_visible(app.setup != Setup::ByHand && (!chromium || !s2));
     let title = if chromium {
         t("Step 2 · remove the duplicate module")
     } else {
@@ -138,20 +191,25 @@ pub(super) fn update_app(r: &AppRows) {
     if s2 {
         r.step2.set_title(&format!("{title} ✓"));
         r.step2.set_subtitle(match app.setup {
-            Setup::Firefox => t("Done: Tessera's module is in every Firefox profile"),
+            Setup::Profiles(_) => t("Done: Tessera's module is in every profile"),
+            Setup::JSignPdf => t("Done: JSignPdf's pkcs11.cfg names p11-kit and the slot of Tessera's tokens. Set up again if the token moves to another reader; in JSignPdf, choose the keystore type PKCS11"),
+            Setup::LibreOffice => t("Done: LibreOffice uses a certificate database of its own (Tools → Options → Security → Certificate Path)"),
             _ => t("Done: the app has its own certificate database"),
         });
     } else {
         r.step2.set_title(title);
         r.step2.set_subtitle(match app.setup {
-            Setup::Firefox => t("Close Firefox first: adds the module to every Firefox profile"),
+            Setup::Profiles(_) => t("Close the app first: adds the module to every profile"),
             Setup::Poppler => t("Makes the certificate database the app reads when signing"),
+            Setup::LibreOffice => t("Close LibreOffice first: makes a certificate database of its own and sets it as its certificate path"),
+            Setup::JSignPdf => t("Close JSignPdf first: writes its pkcs11.cfg with p11-kit and the slot of Tessera's tokens (needs the token plugged in and the system connection)"),
             _ => t("An older Tessera added a module that makes the browser ask for the PIN twice. Close the browser first"),
         });
     }
-    r.button.set_visible(!s2);
+    // JSignPdf's slot may change: Set up stays available.
+    r.button.set_visible(!s2 || app.setup == Setup::JSignPdf);
     if let Some(m) = &r.manual {
-        m.set_visible(!s2);
+        m.set_visible(!s2 || app.setup == Setup::ByHand);
     }
 }
 
@@ -213,7 +271,7 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
     step2.add_suffix(&button);
     row.add_row(&step2);
 
-    let manual = (app.setup == Setup::Firefox).then(|| {
+    let manual = app.by_hand.map(|how| {
         let manual = adw::ActionRow::builder()
             .use_markup(false)
             .subtitle(paths::CLIENT_MODULE)
@@ -221,7 +279,10 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
             .build();
         // Set after use-markup is off: in the builder the title may come
         // first, and GTK then reads its "&" as markup.
-        manual.set_title(t("Or by hand in Firefox: Settings → Privacy & Security → Security Devices → Load, module file:"));
+        manual.set_title(t(how));
+        if app.setup == Setup::ByHand {
+            manual.add_suffix(&copy_button(win, paths::CLIENT_MODULE.to_string()));
+        }
         row.add_row(&manual);
         manual
     });
@@ -367,24 +428,27 @@ pub(super) fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
     let (flatpak_page, flatpak_list) = apps_page(t(
         "Each needs one or two steps, once: access to the system connection, then (for some) a certificate database.",
     ));
-    for app in apps::APPS {
+    for app in apps::APPS.into_iter().filter(|a| apps::shown(a)) {
         let rows = client_row(win, app);
         flatpak_list.append(&rows.row);
         win.app_rows.borrow_mut().push(rows);
     }
-    // PJeOffice Pro (FlatPark) already has access to the host's p11-kit
-    // server socket and loads p11-kit-client.so through its own bridge.
-    let pje = plain_row(
-        apps::PJEOFFICE.name,
-        &format!(
-            "{} · {}",
-            apps::PJEOFFICE.id,
-            t("No steps: the system connection is enough")
-        ),
-        "",
-    );
-    pje.add_prefix(&app_icon(&apps::PJEOFFICE));
-    flatpak_list.append(&pje);
+    // PJeOffice Pro and Assinador SERPRO (FlatPark) already have access to
+    // the host's p11-kit server socket and load p11-kit-client.so through
+    // their own bridges.
+    for app in apps::NO_STEPS {
+        let row = plain_row(
+            app.name,
+            &format!(
+                "{} · {}",
+                app.id,
+                t("No steps: the system connection is enough")
+            ),
+            "",
+        );
+        row.add_prefix(&app_icon(app));
+        flatpak_list.append(&row);
+    }
 
     let (native_page, native_list) = apps_page(t(
         "Apps installed from the distribution reach Tessera through p11-kit-proxy.so, without the system connection: each needs it in its certificate database, once.",

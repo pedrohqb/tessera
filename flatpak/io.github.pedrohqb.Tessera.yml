@@ -50,6 +50,26 @@ finish-args:
   - --filesystem=~/.var/app/com.google.Chrome/data/pki/nssdb
   - --filesystem=~/.var/app/com.microsoft.Edge/.pki/nssdb
   - --filesystem=~/.var/app/com.microsoft.Edge/data/pki/nssdb
+  # Thunderbird's Flatpaks (Mozilla's; the ESR and the old ID too): their
+  # profiles (--persist=.thunderbird, or the XDG folder in newer releases),
+  # so "Set up" can register the module in each profile's NSS database.
+  # Only pkcs11.txt changes.
+  - --filesystem=~/.var/app/org.mozilla.thunderbird/.thunderbird
+  - --filesystem=~/.var/app/org.mozilla.thunderbird/config/thunderbird
+  - --filesystem=~/.var/app/org.mozilla.thunderbird_esr/.thunderbird
+  - --filesystem=~/.var/app/org.mozilla.thunderbird_esr/config/thunderbird
+  - --filesystem=~/.var/app/org.mozilla.Thunderbird/.thunderbird
+  # Evolution's Flatpak, when it has no ~/.pki/nssdb to share: its own
+  # database, where "Set up" only removes a duplicate module.
+  - --filesystem=~/.var/app/org.gnome.Evolution/data/pki/nssdb
+  # LibreOffice's Flatpak: its settings (registrymodifications.xcu, where
+  # "Set up" writes the certificate path, CertDir) and its data folder,
+  # where Tessera makes the empty NSS database it points to. No :create.
+  - --filesystem=~/.var/app/org.libreoffice.LibreOffice/config/libreoffice
+  - --filesystem=~/.var/app/org.libreoffice.LibreOffice/data
+  # JSignPdf's Flatpak: its config folder, where "Set up" writes
+  # jsignpdf/pkcs11.cfg (p11-kit-client.so and the slot of Tessera's tokens).
+  - --filesystem=~/.var/app/io.github.intoolswetrust.JSignPdf/config
   # Native apps (installed from the distribution), which load
   # p11-kit-proxy.so from their NSS database: the native Firefox's profiles
   # (Firefox 147+ under ~/.config, older releases under ~/.mozilla) and the
@@ -62,6 +82,13 @@ finish-args:
   # The native PJeOffice Pro's settings, where "Set up" points its list of
   # A3 libraries (list.a3) at p11-kit's library. Only that line changes.
   - --filesystem=~/.pjeoffice-pro
+  # The native Thunderbird's profiles (~/.thunderbird, or the XDG folder in
+  # newer releases). Only pkcs11.txt changes.
+  - --filesystem=~/.thunderbird
+  - --filesystem=xdg-config/thunderbird
+  # The native LibreOffice's settings, where "Set up" writes the
+  # certificate path (CertDir) to a database in Tessera's own data folder.
+  - --filesystem=xdg-config/libreoffice
   # Read-only: the AppStream data Flatpak keeps for each remote, with the
   # icons of every app in it, installed or not: each app's row shows its
   # own icon without access to the apps' folders.
