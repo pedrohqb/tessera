@@ -174,13 +174,15 @@ No **Fedora e derivados**, o próprio sistema já carrega o p11-kit nos aplicati
 O **Lacuna Web PKI** e o **Softplan WebSigner** são exigidos por alguns tribunais, como o e-SAJ.
 
 - **Nos navegadores em Flatpak**, use o [**Sigillum**](https://github.com/pedrohqb/sigillum), que os instala e os liga aos tokens do Tessera.
-- **Nos navegadores nativos**, use os pacotes oficiais dos fornecedores ([Web PKI](https://get.webpkiplugin.com/) e [WebSigner](https://websigner.softplan.com.br/)). Para que eles usem os tokens do Tessera, abra o plugin no navegador, vá em "Cripto Dispositivos" e, em "Opções personalizadas", acrescente o caminho do p11-kit da sua distribuição:
+- **Nos navegadores nativos**, não é preciso o Sigillum: use os pacotes oficiais dos fornecedores ([Web PKI](https://get.webpkiplugin.com/) e [WebSigner](https://websigner.softplan.com.br/)). Para que eles usem os tokens do Tessera, abra o plugin no navegador, vá em "Cripto Dispositivos" e, em "Opções personalizadas", acrescente o caminho do p11-kit da sua distribuição:
 
   | Distribuição | Caminho |
   |---|---|
   | Fedora e openSUSE | `/usr/lib64/p11-kit-proxy.so` |
   | Ubuntu | `/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so` |
   | Arch e derivados | `/usr/lib/p11-kit-proxy.so` (ou `/lib/libp11-kit.so`, que é a mesma biblioteca) |
+
+  As chaves "Tokens SafeNet" e "Dispositivos SafeSign AET" do plugin podem ficar desligadas: elas procuram os drivers instalados no sistema, que o Tessera não instala. Basta a entrada em "Opções personalizadas".
 
 #### Em segundo plano
 
@@ -413,13 +415,15 @@ On **Fedora and its derivatives**, the system itself already loads p11-kit in na
 **Lacuna Web PKI** and **Softplan WebSigner** are required by some courts (e-SAJ, for example).
 
 - **In Flatpak browsers**, use [**Sigillum**](https://github.com/pedrohqb/sigillum), which installs them and connects them to Tessera's tokens.
-- **In native browsers**, use the vendors' official packages ([Web PKI](https://get.webpkiplugin.com/) and [WebSigner](https://websigner.softplan.com.br/)). For them to use Tessera's tokens, open the plugin in the browser, go to "Cripto Dispositivos" and, under "Opções personalizadas", add your distribution's p11-kit path:
+- **In native browsers**, Sigillum is not needed: use the vendors' official packages ([Web PKI](https://get.webpkiplugin.com/) and [WebSigner](https://websigner.softplan.com.br/)). For them to use Tessera's tokens, open the plugin in the browser, go to "Cripto Dispositivos" and, under "Opções personalizadas", add your distribution's p11-kit path:
 
   | Distribution | Path |
   |---|---|
   | Fedora and openSUSE | `/usr/lib64/p11-kit-proxy.so` |
   | Ubuntu | `/usr/lib/x86_64-linux-gnu/p11-kit-proxy.so` |
   | Arch and derivatives | `/usr/lib/p11-kit-proxy.so` (or `/lib/libp11-kit.so`, the same library) |
+
+  The plugin's "Tokens SafeNet" and "Dispositivos SafeSign AET" switches can stay off: they look for drivers installed on the system, which Tessera does not install. The entry under "Opções personalizadas" is all it takes.
 
 #### In the background
 
