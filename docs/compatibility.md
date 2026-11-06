@@ -43,4 +43,5 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 
 Not yet confirmed by hand:
 
+- **The apps added in November 2026** (see [Apps](apps.md)): Thunderbird and Evolution, as Flatpaks and native; LibreOffice, as a Flatpak and native; JSignPdf, Master PDF Editor and Assinador SERPRO, as Flatpaks. Their set-up is checked by unit tests on a made-up home folder, but none has been tried with a real token yet.
 - **Snap** packages (Ubuntu's Firefox and Chromium): not supported.

@@ -13,6 +13,10 @@ First of all, the system server must be turned on, once per user: `systemctl --u
 
 `br.jus.cnj.PJeOfficePro`. **Nothing to do.** The FlatPark package already has `xdg-run/p11-kit/pkcs11` and loads `p11-kit-client.so`. All it needs is the system server turned on. One note: a PJeOffice opened before Tessera does not see the drivers published afterwards; just reopen it.
 
+## Assinador SERPRO (FlatPark)
+
+`br.gov.serpro.desktop.assinador`. **Nothing to do**, as with PJeOffice. The FlatPark package already has `xdg-run/p11-kit/pkcs11`, and its wrapper sets `PKCS11_DRIVER` to a bridge of its own (`pkcs11-bridge.so`) that opens the runtime's `p11-kit-client.so`, hides p11-kit's trust slots and fixes two details the Assinador needs (`CKF_OS_LOCKING_OK`, the size of `CKA_TOKEN`).
+
 ## Firefox
 
 `org.mozilla.firefox`.
@@ -23,6 +27,52 @@ First of all, the system server must be turned on, once per user: `systemctl --u
 You can also do it by hand: Settings → Privacy & Security → Security Devices → Load, file `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`.
 
 In the Device Manager, one module appears with the slots for SerproID, SafeSign and the system trust. The "Builtin Roots Module" is the set of roots that ships with Firefox itself, not p11-kit, so there is no duplicate.
+
+## Thunderbird
+
+`org.mozilla.thunderbird`, and `org.mozilla.thunderbird_esr` for the ESR. Mozilla builds the Flatpak itself and moved it to these IDs in 2026; the old `org.mozilla.Thunderbird` stopped at 150.0b1 and 140.10.2esr. The ESR and the old ID show in the window only when installed. Like Firefox, Mozilla's build carries its own NSS, which does not load the runtime's p11-kit by itself, so:
+
+1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.mozilla.thunderbird`
+2. Close Thunderbird and press **Set up**. Tessera registers the "Tessera (p11-kit)" module in every profile listed in `profiles.ini` under `~/.var/app/<id>/.thunderbird` (the package's `--persist=.thunderbird`; `config/thunderbird` too, in case a newer release moves it). The lock check is the same as Firefox's.
+
+By hand: Settings → Privacy & Security → Security Devices → Load, file `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`. Not yet tested with a real token.
+
+## Evolution
+
+`org.gnome.Evolution`. **Step 1 is enough**, as with Chromium. Evolution (evolution-data-server's `camel_init`) opens the real `~/.pki/nssdb` when there is one (the package has `--filesystem=~/.pki`), otherwise `~/.var/app/org.gnome.Evolution/data/pki/nssdb`. When it starts its S/MIME certificates, it adds NSS's root-certificates module (`libnssckbi.so`) itself, which in the runtime is p11-kit's trust module and reaches the system server after step 1. Step 2 only removes a "Tessera (p11-kit)" module, if one is there. Not yet tested with a real token.
+
+## LibreOffice
+
+`org.libreoffice.LibreOffice`. LibreOffice opens one NSS database per run (xmlsecurity's `nssinitializer.cxx`). The first of these wins: the `MOZILLA_CERTIFICATE_FOLDER` variable; the **certificate path** the user chose in Tools → Options → Security (`CertDir` in `registrymodifications.xcu`, a plain path that must exist); the default Thunderbird or Firefox profile under `~/.thunderbird` and `~/.mozilla/firefox` only; otherwise a temporary database, deleted on exit. The Flatpak uses the runtime's NSS and loads the root-certificates module (p11-kit, again) when the database has no roots.
+
+1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.libreoffice.LibreOffice`. The package has `--filesystem=host`, which does not include the p11-kit socket.
+2. Close LibreOffice and press **Set up**. Tessera creates an **empty** NSS database in `~/.var/app/org.libreoffice.LibreOffice/data/tessera-nssdb` (as for Papers: the roots module reaches the tokens, and `p11-kit-client.so` as well would list each token twice) and writes it as `CertDir` in `~/.var/app/org.libreoffice.LibreOffice/config/libreoffice/4/user/registrymodifications.xcu`. LibreOffice rewrites that file when it closes, so Tessera waits while LibreOffice's `.lock` file is there (a crash can leave it behind; it can then be deleted). Open LibreOffice once before, so that the file exists.
+
+The tokens' certificates then appear in File → Digital Signatures, and the PIN is asked when the list opens. Not yet tested with a real token.
+
+## JSignPdf
+
+`io.github.intoolswetrust.JSignPdf` (Flathub). JSignPdf is Java: its PKCS#11 keystore is Java's SunPKCS11 (or JSignPdf's fork of it), set up by one file, `pkcs11.cfg`, in its config folder (`~/.var/app/io.github.intoolswetrust.JSignPdf/config/jsignpdf`), read once at startup.
+
+1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 io.github.intoolswetrust.JSignPdf`
+2. Close JSignPdf, plug in the token and press **Set up**. Tessera writes:
+   ```
+   name=Tessera
+   library=/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so
+   slotListIndex=N
+   ```
+   SunPKCS11 opens **one** slot, by default the first of all the slots, and on the system's p11-kit server the first ones are p11-kit's trust store, with no keys. So Tessera asks the system's server for its slots and writes the position of the first one holding one of Tessera's tokens. That position changes if the system's modules or the readers change: the button stays available to write it again. A `pkcs11.cfg` that was there before is kept as `pkcs11.cfg.before-tessera`.
+
+In JSignPdf, choose the keystore type **PKCS11**. Not yet tested with a real token.
+
+## Master PDF Editor
+
+`net.code_industry.MasterPDFEditor` (Flathub). It loads one PKCS#11 library, chosen in Tools → Settings → Certificates → "PKCS#11 provider". Its settings are a Qt file (`~/.var/app/net.code_industry.MasterPDFEditor/config/Code Industry/Master PDF Editor 5.conf`), but the key that field writes is not known, so step 2 is **by hand**:
+
+1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 net.code_industry.MasterPDFEditor`
+2. In Master PDF Editor, set the PKCS#11 provider to `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` (the row has a button to copy it).
+
+Not yet tested with a real token. The certificates of p11-kit's trust store may show in the signing list next to the token's.
 
 ## Chromium, Google Chrome, Microsoft Edge and Brave
 
@@ -76,13 +126,16 @@ Apps installed from the distribution (not Flatpak) are on the window's **Native*
 
 - **Firefox:** every profile listed in `profiles.ini`, under `~/.config/mozilla/firefox` (Firefox 147+) and `~/.mozilla/firefox`. A running Firefox is detected by the lock on its profile.
 - **Chromium, Google Chrome, Microsoft Edge and Brave:** they share one database, `~/.pki/nssdb` if it exists, otherwise `~/.local/share/pki/nssdb` (Chromium 146+). The browsers are found by their folders in `~/.config` (outside Flatpak; the Flatpak does not look into the browsers' folders, and lists them generically). If the Chromium **Flatpak** is installed and the database is `~/.pki/nssdb`, Set up is refused: the Flatpak reads the real `~/.pki/nssdb` too and, since it already sees the tokens through its root-certificates module, it would list each token twice.
+- **Thunderbird:** every profile listed in `profiles.ini`, under `~/.thunderbird` and `~/.config/thunderbird` (where a new install of a recent Thunderbird may go; Thunderbird keeps using `~/.thunderbird` while it exists).
+- **Evolution:** the same database as the Chromium-based browsers (evolution-data-server: `~/.pki/nssdb` if it exists, otherwise `~/.local/share/pki/nssdb` from 3.62), so the same state and the same Set up. If the **Evolution Flatpak** is installed and the database is `~/.pki/nssdb`, Set up is refused, as with the Chromium Flatpak.
 - **Okular and Papers:** poppler opens the most recent `*default*` Firefox profile that has a `cert9.db` (see Papers above). They depend on Firefox: the row has no button of its own, says "Set up Firefox first" until those profiles are set up, and "Needs Firefox" when there is no such profile.
 
+- **LibreOffice:** with no certificate path of its own, it may open a Thunderbird profile, an old-style Firefox profile (not Firefox 147's `~/.config/mozilla/firefox`) or a temporary database, so Set up gives it one: a database in Tessera's own data folder (in the Flatpak, `~/.var/app/io.github.pedrohqb.Tessera/data/tessera/libreoffice-nssdb`) with `p11-kit-proxy.so`, written as `CertDir` in `~/.config/libreoffice/4/user/registrymodifications.xcu`. If the user already chose a certificate path, that database gets the module instead. LibreOffice must be closed (its `.lock` file), and opened once before.
 - **PJeOffice Pro:** a Java program with its own list of PKCS#11 libraries, `list.a3=` in `~/.pjeoffice-pro/pjeoffice-pro.config` (written when PJeOffice closes; entries separated by `|`). Set up adds `p11-kit-proxy.so` there by full path, replacing any other p11-kit entry and keeping the other libraries. The path depends on the distribution, and a Flatpak cannot look into the host's `/usr`, so it comes from the host's `os-release`: `/usr/lib64` (Fedora, RHEL, openSUSE), `/usr/lib/x86_64-linux-gnu` (Debian, Ubuntu), `/usr/lib` (Arch and the rest). Only one path: PJeOffice skips paths that do not exist, but on Arch `/usr/lib64` is a link to `/usr/lib`, and both would load the module twice. PJeOffice (signer4j's `ConfigPersister`) also skips names that do not end in a known extension, such as `libp11-kit.so.0`; `/lib/libp11-kit.so`, set by hand, counts as done. Close PJeOffice first: it rewrites the file when it closes.
 
 Before offering **Set up**, Tessera checks whether the app already gets p11-kit without it:
 
-- **Fedora and its family (Bluefin, Aurora, Bazzite, RHEL…)** load p11-kit in every NSS database through crypto-policies: `/etc/crypto-policies/back-ends/nss.config` registers `p11-kit-proxy.so`, and NSS reads it whenever it opens a database. A fresh database lists nothing, yet NSS loads the proxy (CI found this; see [Development](development.md#tests)). openSUSE ships the same file, but its NSS does not load it, so the file alone does not tell: Tessera goes by the distribution in `os-release` (also all a Flatpak can see of the host), and CI checks on each distribution that this matches what NSS actually loads. The native Firefox, Chromium-based browsers, Okular and Papers then show as **Ready** with no button. If Tessera's module was registered there earlier, each token shows twice, and the button becomes **Remove**, which takes out only Tessera's module (by its name, `Tessera (p11-kit)`).
+- **Fedora and its family (Bluefin, Aurora, Bazzite, RHEL…)** load p11-kit in every NSS database through crypto-policies: `/etc/crypto-policies/back-ends/nss.config` registers `p11-kit-proxy.so`, and NSS reads it whenever it opens a database. A fresh database lists nothing, yet NSS loads the proxy (CI found this; see [Development](development.md#tests)). openSUSE ships the same file, but its NSS does not load it, so the file alone does not tell: Tessera goes by the distribution in `os-release` (also all a Flatpak can see of the host), and CI checks on each distribution that this matches what NSS actually loads. The native Firefox, Thunderbird, Chromium-based browsers, Evolution, LibreOffice, Okular and Papers then show as **Ready** with no button. If Tessera's module was registered there earlier, each token shows twice, and the button becomes **Remove**, which takes out only Tessera's module (by its name, `Tessera (p11-kit)`).
 - **Elsewhere,** a database that already lists a p11-kit module (the proxy, `libp11-kit.so`, the client module; not the trust module), whoever registered it, or that loads NSS's `nss-sysinit`, also shows as **Ready** with no button.
 
 PJeOffice Pro does not use NSS, so it always needs its own Set up.

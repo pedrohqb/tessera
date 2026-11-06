@@ -21,9 +21,11 @@ Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pe
 
 | Aplicativo | Para quê |
 |---|---|
-| PJeOffice Pro | assinar no PJe |
+| PJeOffice Pro e Assinador SERPRO | assinar no PJe e documentos em geral |
 | Firefox, Chromium, Google Chrome, Microsoft Edge e Brave | entrar com certificado em sites como Projudi e eproc |
-| Papers e Okular | assinar PDF e conferir assinaturas |
+| Papers, Okular, JSignPdf e Master PDF Editor | assinar PDF e conferir assinaturas |
+| LibreOffice | assinar documentos e PDFs exportados |
+| Thunderbird e Evolution | e-mail assinado e cifrado (S/MIME) |
 
 ![O Tessera com o SafeSign e o SerproID](data/screenshots/main.png)
 
@@ -133,9 +135,10 @@ A seção **Aplicativos** tem duas abas, **Flatpak** e **Nativos**. Cada aplicat
 
 | Aplicativo | Passos |
 |---|---|
-| PJeOffice Pro ([FlatPark](https://flatpark.org)) | nenhum |
-| Firefox, Papers e Okular | passo 1 e passo 2 |
-| Chromium, Chrome, Edge e Brave | só o passo 1 |
+| PJeOffice Pro e Assinador SERPRO ([FlatPark](https://flatpark.org)) | nenhum |
+| Firefox, Thunderbird, Papers, Okular, LibreOffice e JSignPdf | passo 1 e passo 2 |
+| Chromium, Chrome, Edge, Brave e Evolution | só o passo 1 |
+| Master PDF Editor | passo 1; o passo 2 é à mão, nas configurações dele (a janela mostra onde e o caminho) |
 
 #### Aplicativos nativos
 
@@ -143,9 +146,10 @@ São os instalados pela própria distribuição. O único passo é o botão **Co
 
 | Aplicativo nativo | Onde o Tessera configura |
 |---|---|
-| Firefox | todos os perfis |
-| Chromium, Chrome, Edge e Brave | o banco que eles compartilham |
+| Firefox e Thunderbird | todos os perfis |
+| Chromium, Chrome, Edge, Brave e Evolution | o banco que eles compartilham |
 | Okular e Papers | usam o banco do Firefox: ficam prontos quando o Firefox estiver configurado |
+| LibreOffice | um banco próprio, indicado como caminho do certificado |
 | PJeOffice Pro | a lista de bibliotecas A3 (`list.a3`) |
 
 No Fedora e derivados, o próprio sistema já faz isso, e os aplicativos nativos aparecem como **Pronto**, sem botão.
@@ -169,11 +173,8 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 
 ### A fazer
 
-- **Novos aplicativos:**
-  - LibreOffice, Thunderbird e Evolution, em Flatpak e nativos;
-  - JSignPdf e Master PDF Editor, apontados para o p11-kit, como o PJeOffice Pro;
-  - Assinador SERPRO, que depende antes de um Flatpak próprio.
 - **Novo driver:** OpenSC, que é software livre e atende tokens como o ePass2003.
+- **Testar com token real** os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor e Assinador SERPRO.
 
 ---
 
@@ -203,9 +204,11 @@ The tokens are available to these apps, as Flatpaks or installed from the distri
 
 | App | For |
 |---|---|
-| PJeOffice Pro | signing in PJe |
+| PJeOffice Pro and Assinador SERPRO | signing in PJe and documents in general |
 | Firefox, Chromium, Google Chrome, Microsoft Edge and Brave | certificate login on sites such as Projudi and eproc |
-| Papers and Okular | signing PDFs and checking signatures |
+| Papers, Okular, JSignPdf and Master PDF Editor | signing PDFs and checking signatures |
+| LibreOffice | signing documents and exported PDFs |
+| Thunderbird and Evolution | signed and encrypted e-mail (S/MIME) |
 
 ### Distributions
 
@@ -307,9 +310,10 @@ The **Apps** section has two tabs, **Flatpak** and **Native**. Each app shows wh
 
 | App | Steps |
 |---|---|
-| PJeOffice Pro ([FlatPark](https://flatpark.org)) | none |
-| Firefox, Papers and Okular | step 1 and step 2 |
-| Chromium, Chrome, Edge and Brave | step 1 only |
+| PJeOffice Pro and Assinador SERPRO ([FlatPark](https://flatpark.org)) | none |
+| Firefox, Thunderbird, Papers, Okular, LibreOffice and JSignPdf | step 1 and step 2 |
+| Chromium, Chrome, Edge, Brave and Evolution | step 1 only |
+| Master PDF Editor | step 1; step 2 by hand, in its settings (the window shows where, and the path) |
 
 #### Native apps
 
@@ -317,9 +321,10 @@ These are the apps installed from the distribution itself. The only step is the 
 
 | Native app | Where Tessera sets it up |
 |---|---|
-| Firefox | every profile |
-| Chromium, Chrome, Edge and Brave | the database they share |
+| Firefox and Thunderbird | every profile |
+| Chromium, Chrome, Edge, Brave and Evolution | the database they share |
 | Okular and Papers | they use Firefox's database: ready once Firefox is set up |
+| LibreOffice | a database of its own, set as its certificate path |
 | PJeOffice Pro | the list of A3 libraries (`list.a3`) |
 
 On Fedora and its derivatives, the system itself already does this, and native apps show as **Ready**, with no button.
@@ -341,11 +346,8 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 
 ### To do
 
-- **New apps:**
-  - LibreOffice, Thunderbird and Evolution, as Flatpaks and native;
-  - JSignPdf and Master PDF Editor, pointed at p11-kit, like PJeOffice Pro;
-  - Assinador SERPRO, which first needs a Flatpak of its own.
 - **New driver:** OpenSC, which is free software and supports tokens such as the ePass2003.
+- **Test with a real token** the apps added last: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor and Assinador SERPRO.
 
 ### Documentation, support and license
 

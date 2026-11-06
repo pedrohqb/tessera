@@ -21,6 +21,7 @@
 - [O token não aparece no Tessera.](#o-token-não-aparece-no-tessera)
 - [O token aparece duas vezes, ou o navegador pede o PIN duas vezes.](#o-token-aparece-duas-vezes-ou-o-navegador-pede-o-pin-duas-vezes)
 - [Eu usava o SafeSign, o SafeNet ou o SerproID instalado no sistema. Preciso fazer algo?](#eu-usava-o-safesign-o-safenet-ou-o-serproid-instalado-no-sistema-preciso-fazer-algo)
+- [O JSignPdf não acha mais o certificado.](#o-jsignpdf-não-acha-mais-o-certificado)
 - [Fechei a janela. O Tessera continua rodando?](#fechei-a-janela-o-tessera-continua-rodando)
 - [Aparece um aviso no topo da janela dizendo que a assinatura não funciona.](#aparece-um-aviso-no-topo-da-janela-dizendo-que-a-assinatura-não-funciona)
 
@@ -103,6 +104,10 @@ Sim: retire a indicação da biblioteca do fornecedor dos bancos de certificados
 
 Se não for mais usar os pacotes do fornecedor, pode também desinstalá-los do sistema.
 
+### O JSignPdf não acha mais o certificado.
+
+O JSignPdf abre um único slot do servidor p11-kit, e o Tessera grava a posição do slot do token quando você aperta **Configurar**. Se o token mudar de leitora, ou se o sistema ganhar ou perder algum módulo, essa posição muda. Feche o JSignPdf, conecte o token e aperte **Configurar** de novo na linha dele. No JSignPdf, o tipo de keystore deve ser **PKCS11**.
+
 ### Fechei a janela. O Tessera continua rodando?
 
 Sim: os tokens continuam disponíveis, e um ícone na bandeja mostra o resumo. No GNOME, o ícone depende da extensão AppIndicator, que o Bluefin e o Aurora já trazem. **Sair**, pelo menu ☰ ou pela bandeja, desliga o Tessera, e os tokens deixam de aparecer nos aplicativos. Para o Tessera abrir sozinho ao entrar na sessão, use o menu ☰ → **Iniciar automaticamente no login**; para tirar o ícone, ☰ → **Mostrar ícone na bandeja**.
@@ -152,6 +157,7 @@ Abra uma [issue](https://github.com/pedrohqb/tessera/issues/new/choose) com o mo
 - [The token does not appear in Tessera.](#the-token-does-not-appear-in-tessera)
 - [The token shows twice, or the browser asks for the PIN twice.](#the-token-shows-twice-or-the-browser-asks-for-the-pin-twice)
 - [I used SafeSign, SafeNet or SerproID installed on the system. Do I need to do anything?](#i-used-safesign-safenet-or-serproid-installed-on-the-system-do-i-need-to-do-anything)
+- [JSignPdf no longer finds the certificate.](#jsignpdf-no-longer-finds-the-certificate)
 - [I closed the window. Is Tessera still running?](#i-closed-the-window-is-tessera-still-running)
 - [A warning at the top of the window says signing does not work.](#a-warning-at-the-top-of-the-window-says-signing-does-not-work)
 
@@ -233,6 +239,10 @@ Yes: remove the vendor library's entry from the browsers' certificate databases.
   If `~/.pki/nssdb` does not exist, the database is in `~/.local/share/pki/nssdb`: use that path in both commands.
 
 If you will not use the vendor packages anymore, you can also uninstall them from the system.
+
+### JSignPdf no longer finds the certificate.
+
+JSignPdf opens a single slot of the p11-kit server, and Tessera writes the position of the token's slot when you press **Set up**. If the token moves to another reader, or the system gains or loses a module, that position changes. Close JSignPdf, plug in the token and press **Set up** again on its row. In JSignPdf, the keystore type must be **PKCS11**.
 
 ### I closed the window. Is Tessera still running?
 
