@@ -103,7 +103,8 @@ finish-args:
   # Read-only: whether `flatpak override --user` already gave an app the
   # p11-kit socket, to show it in the window.
   - --filesystem=xdg-data/flatpak/overrides:ro
-  # The host's p11-kit server socket, only to show whether it is on.
+  # The host's p11-kit server socket: Tessera lists the tokens through it to
+  # show whether the apps see its own.
   - --filesystem=xdg-run/p11-kit/pkcs11
   # The tray icon (StatusNotifierItem).
   - --talk-name=org.kde.StatusNotifierWatcher
