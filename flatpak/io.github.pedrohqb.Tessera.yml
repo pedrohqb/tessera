@@ -148,6 +148,43 @@ modules:
         tag: 2.5.3
         commit: 58de510789550941e6548399e024083f54b8d4f5
 
+  # OpenSC, the free PKCS#11 driver for many cards and tokens (Feitian
+  # ePass2003, PIV cards and YubiKeys, OpenPGP cards, CardOS, IDPrime,
+  # national ID cards…). Free software (LGPL 2.1), so it is built here, not
+  # downloaded at install time like the vendors' drivers. Its driver.toml
+  # (flatpak/drivers/opensc) points at /app/lib/opensc-pkcs11.so and at its
+  # own configuration, so /app/etc is not used. The command-line tools stay,
+  # for `tessera opensc TOOL` (PIN change, listings).
+  - name: opensc
+    config-opts:
+      - --disable-strict
+      - --disable-notify
+      - --disable-man
+      - --disable-doc
+      - --disable-tests
+      - --disable-cmocka
+      - --disable-openpace
+      - --disable-autostart-items
+      - --disable-readline
+      - --with-pcsc-provider=libpcsclite.so.1
+      - --with-completiondir=/app/share/bash-completion/completions
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - '*.la'
+      - /etc
+      - /share/doc
+      - /share/man
+      - /share/bash-completion
+      - /share/applications
+      # Adds OpenSC to the browsers' NSS databases by itself; Tessera does
+      # that its own way.
+      - /bin/pkcs11-register
+    sources:
+      - type: archive
+        url: https://github.com/OpenSC/OpenSC/releases/download/0.27.1/opensc-0.27.1.tar.gz
+        sha256: 976f4a23eaf3397a1a2c3a7aac80bf971a8c3d829c9a79f06145bfaeeae5eca7
+
   - name: tessera
     buildsystem: simple
     build-options:
@@ -172,7 +209,8 @@ modules:
       - install -Dm644 data/app-icons/tessera-app-papers.svg /app/share/icons/hicolor/scalable/apps/tessera-app-papers.svg
       # The window's icons for desktops whose theme lacks them (Plasma).
       - sh flatpak/fallback-icons.sh
-      - for d in safesign safenet serproid; do install -Dm644 flatpak/drivers/$d/driver.toml /app/lib/tessera/drivers/$d/driver.toml; done
+      - for d in safesign safenet serproid opensc; do install -Dm644 flatpak/drivers/$d/driver.toml /app/lib/tessera/drivers/$d/driver.toml; done
+      - install -Dm644 -t /app/lib/tessera/drivers/opensc flatpak/drivers/opensc/opensc.conf flatpak/drivers/opensc/opensc-without-idprime.conf
       - mkdir -p /app/lib/tessera/extensions
     sources:
       - type: dir

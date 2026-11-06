@@ -101,7 +101,7 @@ pub(super) fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
             // system's (and not Flatpak's own, which answers there when the
             // system's is off).
             let protocol = match view {
-                status::HostView::Sees(_) => status::host_protocol(),
+                status::HostView::Sees(..) => status::host_protocol(),
                 _ => None,
             };
             (view, protocol)
@@ -115,7 +115,7 @@ pub(super) fn check_host(hub: &Rc<Hub>, ours: Vec<(String, String)>) {
         if let Ok((view, protocol)) = view {
             use status::HostView::{Off, Sees, Unknown, WithoutTessera};
             match view {
-                Sees(_) if protocol.is_some() => hub.host_protocol.set(protocol),
+                Sees(..) if protocol.is_some() => hub.host_protocol.set(protocol),
                 Off => hub.host_protocol.set(None),
                 _ => {}
             }

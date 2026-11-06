@@ -22,6 +22,7 @@
 - [O token aparece duas vezes, ou o navegador pede o PIN duas vezes.](#o-token-aparece-duas-vezes-ou-o-navegador-pede-o-pin-duas-vezes)
 - [Eu usava o SafeSign, o SafeNet ou o SerproID instalado no sistema. Preciso fazer algo?](#eu-usava-o-safesign-o-safenet-ou-o-serproid-instalado-no-sistema-preciso-fazer-algo)
 - [O JSignPdf não acha mais o certificado.](#o-jsignpdf-não-acha-mais-o-certificado)
+- [Como troco ou desbloqueio o PIN de um token do OpenSC (ePass2003)?](#como-troco-ou-desbloqueio-o-pin-de-um-token-do-opensc-epass2003)
 - [Fechei a janela. O Tessera continua rodando?](#fechei-a-janela-o-tessera-continua-rodando)
 - [Aparece um aviso no topo da janela dizendo que a assinatura não funciona.](#aparece-um-aviso-no-topo-da-janela-dizendo-que-a-assinatura-não-funciona)
 
@@ -88,6 +89,11 @@ Tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**.
 
 No **Fedora e derivados**, o próprio sistema já carrega o p11-kit nos aplicativos nativos. Se o módulo do Tessera também foi acrescentado, cada token aparece duas vezes, e o botão do aplicativo vira **Retirar**, que tira só o do Tessera. Nos navegadores Chromium em Flatpak, veja [Apps](docs/apps.md#chromium-google-chrome-microsoft-edge-and-brave) (em inglês).
 
+O token também aparece duas vezes quando **dois drivers atendem o mesmo token**, e o Tessera avisa na janela:
+
+- **Dois drivers do Tessera** (o OpenSC e o do fornecedor): desligue um deles na lista de drivers. Com o SafeNet ligado, o OpenSC já deixa para ele os cartões IDPrime e o eToken 5110.
+- **O sistema também tem o OpenSC** (o Fedora e o Bluefin o trazem instalado): o token do OpenSC chega aos aplicativos pelo do sistema e pelo do Tessera. Desligue o OpenSC no Tessera; o do sistema basta.
+
 ### Eu usava o SafeSign, o SafeNet ou o SerproID instalado no sistema. Preciso fazer algo?
 
 Sim: retire a indicação da biblioteca do fornecedor dos bancos de certificados dos navegadores. Se o mesmo token chega ao navegador por dois caminhos, o do pacote do fornecedor e o do Tessera, os dois disputam o token, e o resultado é token em dobro, PIN pedido mais de uma vez ou falha na assinatura. O Tessera não retira módulos de outros programas por conta própria, porque eles podem ser usados por outra coisa; por isso é preciso fazer à mão, com os navegadores fechados.
@@ -107,6 +113,17 @@ Se não for mais usar os pacotes do fornecedor, pode também desinstalá-los do 
 ### O JSignPdf não acha mais o certificado.
 
 O JSignPdf abre um único slot do servidor p11-kit, e o Tessera grava a posição do slot do token quando você aperta **Configurar**. Se o token mudar de leitora, ou se o sistema ganhar ou perder algum módulo, essa posição muda. Feche o JSignPdf, conecte o token e aperte **Configurar** de novo na linha dele. No JSignPdf, o tipo de keystore deve ser **PKCS11**.
+
+### Como troco ou desbloqueio o PIN de um token do OpenSC (ePass2003)?
+
+O OpenSC não tem programa com janela para isso; as ferramentas de linha de comando dele vêm no Tessera. Num terminal, com o token conectado:
+
+```bash
+flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --change-pin
+flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --unblock-pin
+```
+
+O primeiro pede o PIN atual e o novo; o segundo, o PUK e o novo PIN. `opensc pkcs15-tool --list-certificates` lista os certificados, e `opensc opensc-tool --list-readers`, as leitoras. Erre o PIN com cuidado: depois de algumas tentativas o token bloqueia, e sem o PUK só a autoridade certificadora resolve.
 
 ### Fechei a janela. O Tessera continua rodando?
 
@@ -158,6 +175,7 @@ Abra uma [issue](https://github.com/pedrohqb/tessera/issues/new/choose) com o mo
 - [The token shows twice, or the browser asks for the PIN twice.](#the-token-shows-twice-or-the-browser-asks-for-the-pin-twice)
 - [I used SafeSign, SafeNet or SerproID installed on the system. Do I need to do anything?](#i-used-safesign-safenet-or-serproid-installed-on-the-system-do-i-need-to-do-anything)
 - [JSignPdf no longer finds the certificate.](#jsignpdf-no-longer-finds-the-certificate)
+- [How do I change or unblock the PIN of an OpenSC token (ePass2003)?](#how-do-i-change-or-unblock-the-pin-of-an-opensc-token-epass2003)
 - [I closed the window. Is Tessera still running?](#i-closed-the-window-is-tessera-still-running)
 - [A warning at the top of the window says signing does not work.](#a-warning-at-the-top-of-the-window-says-signing-does-not-work)
 
@@ -224,6 +242,11 @@ Unplug it and plug it in again. If a driver shows as "Stopped", press **Restart*
 
 On **Fedora and its derivatives**, the system itself already loads p11-kit in native apps. If Tessera's module was added too, each token shows twice, and the app's button becomes **Remove**, which takes out only Tessera's. For Chromium-based browsers as Flatpaks, see [Apps](docs/apps.md#chromium-google-chrome-microsoft-edge-and-brave).
 
+A token also shows twice when **two drivers serve it**, and Tessera says so in its window:
+
+- **Two of Tessera's drivers** (OpenSC and the vendor's): switch one off in the list of drivers. While SafeNet is on, OpenSC already leaves IDPrime cards and the eToken 5110 to it.
+- **The system has OpenSC too** (Fedora and Bluefin ship it installed): OpenSC's token reaches the apps through the system's and through Tessera's. Switch OpenSC off in Tessera; the system's is enough.
+
 ### I used SafeSign, SafeNet or SerproID installed on the system. Do I need to do anything?
 
 Yes: remove the vendor library's entry from the browsers' certificate databases. If the same token reaches the browser by two paths, the vendor package's and Tessera's, the two compete for the token, and the result is a token shown twice, the PIN asked more than once, or failed signatures. Tessera does not remove other programs' modules on its own, since something else may use them, so this is done by hand, with the browsers closed.
@@ -243,6 +266,17 @@ If you will not use the vendor packages anymore, you can also uninstall them fro
 ### JSignPdf no longer finds the certificate.
 
 JSignPdf opens a single slot of the p11-kit server, and Tessera writes the position of the token's slot when you press **Set up**. If the token moves to another reader, or the system gains or loses a module, that position changes. Close JSignPdf, plug in the token and press **Set up** again on its row. In JSignPdf, the keystore type must be **PKCS11**.
+
+### How do I change or unblock the PIN of an OpenSC token (ePass2003)?
+
+OpenSC has no windowed program for that; its command-line tools come with Tessera. In a terminal, with the token plugged in:
+
+```bash
+flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --change-pin
+flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --unblock-pin
+```
+
+The first asks for the current PIN and the new one; the second, for the PUK and the new PIN. `opensc pkcs15-tool --list-certificates` lists the certificates, and `opensc opensc-tool --list-readers` the readers. Be careful with wrong PINs: after a few tries the token locks, and without the PUK only the certificate authority can help.
 
 ### I closed the window. Is Tessera still running?
 

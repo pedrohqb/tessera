@@ -11,6 +11,7 @@ USB token ──► pcscd (system)
 │   $XDG_RUNTIME_DIR/tessera/safesign  ◄─ libaetpkss │
 │   $XDG_RUNTIME_DIR/tessera/safenet   ◄─ libeToken  │
 │   $XDG_RUNTIME_DIR/tessera/serproid  ◄─ libserproidp11 ──► Serpro cloud
+│   $XDG_RUNTIME_DIR/tessera/opensc    ◄─ opensc-pkcs11 │
 │ each connection is handled by `tessera remote`     │
 └────────────────────────────────────────────────────┘
                  ▲  "remote: unix:path=…" in

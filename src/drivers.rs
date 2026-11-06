@@ -19,7 +19,12 @@
 //!
 //! `library_path` is put in LD_LIBRARY_PATH for the process that loads the
 //! module (for libraries the runtime doesn't have). `env` sets other
-//! variables for that process; a leading `~/` in a value is the home folder.
+//! variables for that process; a leading `~/` in a value is the home folder,
+//! and a leading `./` the driver's directory.
+//!
+//! `[when_on.<other driver id>.env]` changes some of those variables while
+//! that other driver is switched on too. OpenSC uses it to leave to
+//! SafeNet's driver the cards both know (see flatpak/drivers/opensc).
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
@@ -55,6 +60,14 @@ struct DriverFile {
     library_path: Vec<String>,
     #[serde(default)]
     env: BTreeMap<String, String>,
+    #[serde(default)]
+    when_on: BTreeMap<String, WhenOn>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+struct WhenOn {
+    #[serde(default)]
+    env: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -69,6 +82,8 @@ pub struct Driver {
     pub library_path: Vec<PathBuf>,
     /// Environment for the process that loads the module.
     pub env: BTreeMap<String, String>,
+    /// Changes to `env` while another driver (the key) is on as well.
+    pub when_on: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 impl Driver {
@@ -77,15 +92,56 @@ impl Driver {
     pub fn available(&self) -> bool {
         self.module.is_file()
     }
+
+    /// The module's environment when the drivers `on` are switched on.
+    pub fn env_with(&self, on: &[String]) -> BTreeMap<String, String> {
+        let mut env = self.env.clone();
+        for (other, changes) in &self.when_on {
+            if other != &self.id && on.contains(other) {
+                env.extend(changes.iter().map(|(k, v)| (k.clone(), v.clone())));
+            }
+        }
+        env
+    }
 }
 
+/// A value of `env`: `~/` is the home folder, `./` the driver's directory.
+fn env_value(dir: &Path, v: String) -> String {
+    if let Some(rest) = v.strip_prefix("~/") {
+        paths::home().join(rest).to_string_lossy().into_owned()
+    } else if let Some(rest) = v.strip_prefix("./") {
+        dir.join(rest).to_string_lossy().into_owned()
+    } else {
+        v
+    }
+}
+
+fn env_map(dir: &Path, env: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    env.into_iter()
+        .map(|(k, v)| (k, env_value(dir, v)))
+        .collect()
+}
+
+/// A path in driver.toml: absolute, or relative to the driver's directory
+/// (`..` taken out, so OpenSC's module, built into Tessera, reads as
+/// /app/lib/opensc-pkcs11.so).
 fn resolve(dir: &Path, p: &str) -> PathBuf {
+    use std::path::Component;
     let p = Path::new(p);
     if p.is_absolute() {
-        p.to_path_buf()
-    } else {
-        dir.join(p)
+        return p.to_path_buf();
     }
+    let mut out = dir.to_path_buf();
+    for c in p.components() {
+        match c {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 fn load_one(dir: &Path) -> Result<Driver> {
@@ -116,13 +172,11 @@ fn load_one(dir: &Path) -> Result<Driver> {
         tools,
         create_dirs: d.create_dirs,
         library_path: d.library_path.iter().map(|p| resolve(dir, p)).collect(),
-        env: d
-            .env
+        env: env_map(dir, d.env),
+        when_on: d
+            .when_on
             .into_iter()
-            .map(|(k, v)| match v.strip_prefix("~/") {
-                Some(rest) => (k, paths::home().join(rest).to_string_lossy().into_owned()),
-                None => (k, v),
-            })
+            .map(|(other, w)| (other, env_map(dir, w.env)))
             .collect(),
     })
 }
@@ -189,6 +243,33 @@ mod tests {
         assert_eq!(d.tools[0].exec[0], dir.join("bin/admin").to_string_lossy());
         assert_eq!(d.tools[0].exec[1], "--x");
         assert!(!d.available());
+        fs::remove_dir_all(tmp).unwrap();
+    }
+
+    #[test]
+    fn env_follows_the_other_drivers() {
+        let tmp = std::env::temp_dir().join(format!("tessera-test-env-{}", std::process::id()));
+        let dir = tmp.join("opensc");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("driver.toml"),
+            "name = \"OpenSC\"\nmodule = \"../../../opensc-pkcs11.so\"\n\
+             [env]\nOPENSC_CONF = \"./opensc.conf\"\nKEEP = \"x\"\n\
+             [when_on.safenet.env]\nOPENSC_CONF = \"./other.conf\"\n",
+        )
+        .unwrap();
+        let d = load_one(&dir).unwrap();
+        assert_eq!(
+            d.module,
+            dir.ancestors().nth(3).unwrap().join("opensc-pkcs11.so")
+        );
+        let conf = |env: &BTreeMap<String, String>| env["OPENSC_CONF"].clone();
+        let alone = d.env_with(&["opensc".to_string()]);
+        assert_eq!(conf(&alone), dir.join("opensc.conf").to_string_lossy());
+        assert_eq!(alone["KEEP"], "x");
+        let both = d.env_with(&["opensc".to_string(), "safenet".to_string()]);
+        assert_eq!(conf(&both), dir.join("other.conf").to_string_lossy());
+        assert_eq!(both["KEEP"], "x");
         fs::remove_dir_all(tmp).unwrap();
     }
 }

@@ -97,6 +97,9 @@ fn print_status() -> ExitCode {
     for e in &snap.errors {
         println!("  error: {e}");
     }
+    for (token, a, b) in status::same_token_twice(&snap.tokens) {
+        println!("  WARNING: {token} comes from two drivers, {a} and {b}: apps would list it twice; switch one off");
+    }
     let ours: Vec<(String, String)> = snap
         .tokens
         .iter()
@@ -104,7 +107,7 @@ fn print_status() -> ExitCode {
         .collect();
     let host = status::host_view(&ours);
     let protocol = match host {
-        status::HostView::Sees(_) => status::host_protocol(),
+        status::HostView::Sees(..) => status::host_protocol(),
         _ => None,
     };
     let view = match host {
@@ -115,7 +118,18 @@ fn print_status() -> ExitCode {
         status::HostView::WithoutTessera => {
             "apps do NOT see Tessera's tokens (server off)".to_string()
         }
-        status::HostView::Sees(n) => format!("on; apps see {n} of {} token(s)", ours.len()),
+        status::HostView::Sees(n, twice) if twice.is_empty() => {
+            format!("on; apps see {n} of {} token(s)", ours.len())
+        }
+        status::HostView::Sees(n, twice) => format!(
+            "on; apps see {n} of {} token(s), and these TWICE (the system has a driver of its own for them, its OpenSC for example; switch one off): {}",
+            ours.len(),
+            twice
+                .iter()
+                .map(|(label, _)| label.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         status::HostView::NothingToCheck => "answers (no token to check)".to_string(),
         status::HostView::Unknown => {
             "could not list the tokens through it (it failed or took too long)".to_string()
@@ -241,6 +255,55 @@ extern "C" {
     fn signal(signum: i32, handler: usize) -> usize;
 }
 
+/// `tessera opensc TOOL [ARGS]`: one of OpenSC's command-line tools
+/// (pkcs15-tool, pkcs11-tool, opensc-tool…), built into Tessera next to its
+/// binary, with the configuration its driver uses. pkcs11-tool gets the
+/// driver's module unless `--module` is given (its built-in default is
+/// wrong where Tessera's files are not under /app, as in FlatPark's
+/// package).
+fn opensc_tool(args: &[String]) -> ExitCode {
+    let Some(tool) = args.first() else {
+        eprintln!("usage: tessera opensc TOOL [ARGS]   (e.g. pkcs15-tool --list-certificates)");
+        return ExitCode::FAILURE;
+    };
+    let ds = drivers::discover();
+    let Some(opensc) = ds.iter().find(|d| d.id == "opensc") else {
+        eprintln!("tessera: OpenSC is not part of this build");
+        return ExitCode::FAILURE;
+    };
+    let bin = std::env::current_exe()
+        .ok()
+        .and_then(|e| e.parent().map(|p| p.join(tool)));
+    let Some(bin) = bin.filter(|b| {
+        !tool.contains('/') && tool != "tessera" && !tool.starts_with('.') && b.is_file()
+    }) else {
+        eprintln!("tessera: no OpenSC tool named {tool}");
+        return ExitCode::FAILURE;
+    };
+    let disabled = settings::Settings::load().disabled_drivers;
+    let on: Vec<String> = ds
+        .iter()
+        .filter(|d| d.available() && !disabled.contains(&d.id))
+        .map(|d| d.id.clone())
+        .collect();
+    let mut cmd = std::process::Command::new(&bin);
+    if tool == "pkcs11-tool"
+        && !args
+            .iter()
+            .any(|a| a == "--module" || a.starts_with("--module="))
+    {
+        cmd.arg("--module").arg(&opensc.module);
+    }
+    cmd.args(&args[1..]).envs(opensc.env_with(&on));
+    match cmd.status() {
+        Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
+        Err(e) => {
+            eprintln!("tessera: {}: {e}", bin.display());
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     match args.get(1).map(String::as_str) {
@@ -255,6 +318,7 @@ fn main() -> ExitCode {
             return print_status();
         }
         Some("serve") => return serve(),
+        Some("opensc") => return opensc_tool(&args[2..]),
         Some("remote") => return ExitCode::from(remote::run(&args[2..]) as u8),
         Some("probe-sign") => {
             let Some(module) = args.get(2) else {

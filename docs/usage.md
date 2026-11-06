@@ -97,6 +97,9 @@ flatpak run --command=tessera io.github.pedrohqb.Tessera status
                                                        drivers, readers, tokens and certificates
 flatpak run --command=tessera io.github.pedrohqb.Tessera nss-setup DIR
                                                        registers p11-kit-client.so in the NSS database DIR
+flatpak run --command=tessera io.github.pedrohqb.Tessera opensc TOOL [ARGS]
+                                                       one of OpenSC's tools (pkcs15-tool --change-pin, …),
+                                                       with the configuration of Tessera's OpenSC driver
 ```
 
 `serve` cannot run together with the window, because both would use the same sockets. Quit Tessera first. The troubleshooting tools are in [Troubleshooting](troubleshooting.md).

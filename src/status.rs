@@ -33,6 +33,14 @@ pub struct Certificate {
     /// "YYYY-MM-DD"
     pub not_after: String,
     pub expired: bool,
+    /// The certificate's serial number (hex), which with the issuer tells
+    /// it apart from any other.
+    #[serde(default)]
+    pub serial: String,
+    /// A CA's certificate (the chain some tokens carry), shared by many
+    /// tokens.
+    #[serde(default)]
+    pub ca: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,7 +145,89 @@ fn parse_cert(label: String, der: &[u8]) -> Option<Certificate> {
             date.day()
         ),
         expired: !cert.validity().is_valid(),
+        serial: cert.raw_serial_as_string(),
+        ca: cert.is_ca(),
     })
+}
+
+/// The first fields of CK_FUNCTION_LIST, up to C_GetSlotList.
+#[repr(C)]
+struct FunctionListHead {
+    version: [u8; 2],
+    initialize: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> std::ffi::c_ulong>,
+    finalize: Option<unsafe extern "C" fn(*mut std::ffi::c_void) -> std::ffi::c_ulong>,
+    get_info: usize,
+    get_function_list: usize,
+    get_slot_list: Option<
+        unsafe extern "C" fn(
+            u8,
+            *mut std::ffi::c_ulong,
+            *mut std::ffi::c_ulong,
+        ) -> std::ffi::c_ulong,
+    >,
+}
+
+/// How many slots the module lists (with a token only, or all), asked once
+/// with no buffer. Needed because cryptoki asks a second time with a
+/// (non-null) buffer even when the count is 0, and through p11-kit's RPC
+/// that answers CKR_BUFFER_TOO_SMALL, which cryptoki retries without end:
+/// the listing spins until its time limit, and supervision takes the driver
+/// for hung. OpenSC with no reader connected (an ePass2003 unplugged) has
+/// no slot at all.
+///
+/// p11-kit-client.so hands out a new, uninitialized instance on each
+/// C_GetFunctionList (CKR_CRYPTOKI_NOT_INITIALIZED): that one is
+/// initialized for the question and finalized after it. A driver loaded
+/// directly hands out the copy cryptoki already initialized.
+fn slot_count(module: &str, token_present: bool) -> Option<u64> {
+    type GetFunctionList = unsafe extern "C" fn(*mut *const FunctionListHead) -> std::ffi::c_ulong;
+    // SAFETY: the module is the one cryptoki has already loaded and
+    // initialized in this process (dlopen of the same path gives the same
+    // copy, which stays loaded while `lib` lives). C_GetFunctionList fills
+    // in a pointer to the module's own CK_FUNCTION_LIST, whose layout starts
+    // with FunctionListHead (CK_VERSION, then function pointers, in this
+    // order, per PKCS#11). C_GetSlotList with a null list only writes the
+    // count. C_Initialize with no arguments and C_Finalize are only called
+    // on an instance that said it is not initialized, so cryptoki's own is
+    // left alone.
+    unsafe {
+        let lib = libloading::Library::new(module).ok()?;
+        let get: libloading::Symbol<GetFunctionList> = lib.get(b"C_GetFunctionList\0").ok()?;
+        let mut list: *const FunctionListHead = std::ptr::null();
+        if get(&mut list) != 0 || list.is_null() {
+            return None;
+        }
+        const NOT_INITIALIZED: std::ffi::c_ulong = 0x190;
+        let f = (*list).get_slot_list?;
+        let mut n: std::ffi::c_ulong = 0;
+        let mut rv = f(u8::from(token_present), std::ptr::null_mut(), &mut n);
+        if rv == NOT_INITIALIZED {
+            let (init, fini) = ((*list).initialize?, (*list).finalize?);
+            if init(std::ptr::null_mut()) != 0 {
+                return None;
+            }
+            rv = f(u8::from(token_present), std::ptr::null_mut(), &mut n);
+            fini(std::ptr::null_mut());
+        }
+        (rv == 0).then_some(n as u64)
+    }
+}
+
+/// The module's slots (all, or with a token), without cryptoki's endless
+/// retry on a module with none (see slot_count).
+fn slots(
+    ctx: &Pkcs11,
+    module: &str,
+    token_present: bool,
+) -> cryptoki::error::Result<Vec<cryptoki::slot::Slot>> {
+    if slot_count(module, token_present) == Some(0) {
+        return Ok(vec![]);
+    }
+    if token_present {
+        ctx.get_slots_with_token()
+    } else {
+        ctx.get_all_slots()
+    }
 }
 
 /// Token fields are fixed-size, padded with spaces, and some drivers
@@ -173,7 +263,7 @@ pub fn probe_module(module: &str) -> i32 {
                     Ok(i) => eprintln!("probe: library: {i:?}"),
                     Err(e) => eprintln!("probe: C_GetInfo: {e}"),
                 }
-                match ctx.get_all_slots() {
+                match slots(&ctx, module, false) {
                     Ok(slots) => {
                         eprintln!("probe: {} slot(s)", slots.len());
                         for s in slots {
@@ -225,8 +315,7 @@ pub fn probe_sign(module: &str) -> i32 {
         eprintln!("sign: C_Initialize failed: {e}");
         return 2;
     }
-    let slots = ctx.get_slots_with_token().unwrap_or_default();
-    for slot in slots {
+    for slot in slots(&ctx, module, true).unwrap_or_default() {
         let Ok(info) = ctx.get_token_info(slot) else {
             continue;
         };
@@ -319,12 +408,12 @@ pub fn probe_sign(module: &str) -> i32 {
 /// With `with_certs` false, only the tokens (no certificate is read): for
 /// asking a server what it serves, cheaply.
 pub fn list_tokens_in_process(with_certs: bool) -> Result<String, String> {
-    let ctx = Pkcs11::new(client_module()).map_err(|e| e.to_string())?;
+    let module = client_module();
+    let ctx = Pkcs11::new(&module).map_err(|e| e.to_string())?;
     ctx.initialize(CInitializeArgs::new(CInitializeFlags::OS_LOCKING_OK))
         .map_err(|e| e.to_string())?;
     let mut out = Vec::new();
-    for (slot_index, slot) in ctx
-        .get_all_slots()
+    for (slot_index, slot) in slots(&ctx, &module, false)
         .map_err(|e| e.to_string())?
         .into_iter()
         .enumerate()
@@ -460,8 +549,11 @@ pub enum HostView {
     Off,
     /// A server answers, but not with Tessera's tokens.
     WithoutTessera,
-    /// The apps see Tessera's tokens.
-    Sees(usize),
+    /// The apps see Tessera's tokens: how many, and those they see more
+    /// often than Tessera serves them (label, serial): the system has a
+    /// driver of its own for them too (its OpenSC, say), so each shows
+    /// twice.
+    Sees(usize, Vec<(String, String)>),
     /// Tessera has no token to look for.
     NothingToCheck,
     /// The listing failed or took too long: nothing learned.
@@ -525,21 +617,57 @@ pub fn host_view(ours: &[(String, String)]) -> HostView {
     }
     match tokens_at(&socket, "", false) {
         Ok(seen) => {
-            let n = ours
-                .iter()
-                .filter(|(label, serial)| {
-                    seen.iter()
-                        .any(|t| &t.label == label && &t.serial == serial)
-                })
-                .count();
+            let seen: Vec<(String, String)> =
+                seen.into_iter().map(|t| (t.label, t.serial)).collect();
+            let n = ours.iter().filter(|t| seen.contains(t)).count();
             if n > 0 {
-                HostView::Sees(n)
+                HostView::Sees(n, served_twice(ours, &seen))
             } else {
                 HostView::WithoutTessera
             }
         }
         Err(_) => HostView::Unknown,
     }
+}
+
+/// The tokens of `ours` that `seen` lists more often than `ours` does.
+fn served_twice(ours: &[(String, String)], seen: &[(String, String)]) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for t in ours {
+        let mine = ours.iter().filter(|o| *o == t).count();
+        let there = seen.iter().filter(|s| *s == t).count();
+        if there > mine && !out.contains(t) {
+            out.push(t.clone());
+        }
+    }
+    out
+}
+
+/// Tokens from different drivers that hold the same certificate: the same
+/// token, served by two of Tessera's drivers (OpenSC and the vendor's, say),
+/// which the apps would list twice. Each pair once: (token, driver, other
+/// driver).
+pub fn same_token_twice(tokens: &[Token]) -> Vec<(String, String, String)> {
+    let mut out = Vec::new();
+    for (i, a) in tokens.iter().enumerate() {
+        for b in &tokens[i + 1..] {
+            // The holder's own certificate, not the CA chain both may carry.
+            let shared = a.certificates.iter().filter(|c| !c.ca).any(|c| {
+                b.certificates
+                    .iter()
+                    .any(|d| c.issuer == d.issuer && c.serial == d.serial && !c.serial.is_empty())
+            });
+            if a.driver != b.driver && shared {
+                let name = if a.label.is_empty() {
+                    &a.model
+                } else {
+                    &a.label
+                };
+                out.push((name.clone(), a.driver.clone(), b.driver.clone()));
+            }
+        }
+    }
+    out
 }
 
 /// Readers and tokens. `drivers` are (id, name) of the running servers,
@@ -615,5 +743,78 @@ mod protocol_tests {
             protocol_at(std::path::Path::new("/nonexistent/pkcs11")),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod duplicate_tests {
+    use super::*;
+
+    fn cert(serial: &str, ca: bool) -> Certificate {
+        Certificate {
+            subject: format!("S{serial}"),
+            issuer: "AC Teste".into(),
+            not_after: "2030-01-01".into(),
+            expired: false,
+            serial: serial.into(),
+            ca,
+        }
+    }
+
+    fn token(driver: &str, label: &str, certs: Vec<Certificate>) -> Token {
+        Token {
+            driver: driver.into(),
+            label: label.into(),
+            manufacturer: String::new(),
+            model: String::new(),
+            serial: String::new(),
+            certificates: certs,
+            slot_index: 0,
+        }
+    }
+
+    #[test]
+    fn a_token_from_two_drivers_is_found_by_its_certificate() {
+        let tokens = vec![
+            token(
+                "SafeNet",
+                "eToken",
+                vec![cert("01", true), cert("aa", false)],
+            ),
+            token(
+                "OpenSC",
+                "Pedro (User)",
+                vec![cert("01", true), cert("aa", false)],
+            ),
+            // Another token with the same CA chain only: not the same.
+            token(
+                "SafeSign",
+                "Outro",
+                vec![cert("01", true), cert("bb", false)],
+            ),
+        ];
+        assert_eq!(
+            same_token_twice(&tokens),
+            vec![(
+                "eToken".to_string(),
+                "SafeNet".to_string(),
+                "OpenSC".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn the_host_listing_a_token_twice_is_noticed() {
+        let a = ("A".to_string(), "1".to_string());
+        let b = ("B".to_string(), "2".to_string());
+        let ours = vec![a.clone(), b.clone()];
+        assert!(served_twice(&ours, &[a.clone(), b.clone()]).is_empty());
+        assert_eq!(
+            served_twice(&ours, &[a.clone(), b.clone(), b.clone()]),
+            vec![b.clone()]
+        );
+        // Tessera serving it twice itself is reported elsewhere.
+        let twice = vec![b.clone(), b.clone()];
+        assert!(served_twice(&twice, &[b.clone(), b.clone()]).is_empty());
     }
 }

@@ -1,0 +1,18 @@
+name = "OpenSC"
+vendor = "OpenSC Project"
+description = "Open-source driver: Feitian ePass2003, PIV cards and YubiKeys, OpenPGP cards, CardOS, IDPrime and many others"
+# Built into Tessera, not downloaded: under /app/lib in Tessera's own
+# Flatpak, under /app/extra/tessera/lib in FlatPark's package. The path is
+# relative to this folder, so it holds in both.
+module = "../../../opensc-pkcs11.so"
+
+[env]
+# Tessera's own configuration (next to this file), the same in both
+# packages: OpenSC's defaults.
+OPENSC_CONF = "./opensc.conf"
+
+# SafeNet's driver serves IDPrime cards and the eToken 5110 too. While it is
+# switched on, OpenSC leaves those cards to it (every card driver but
+# idprime), so each token shows once. With SafeNet off, OpenSC serves them.
+[when_on.safenet.env]
+OPENSC_CONF = "./opensc-without-idprime.conf"

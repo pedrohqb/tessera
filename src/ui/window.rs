@@ -199,9 +199,23 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
     );
     let (text, bad) = match (&*hub.host.borrow(), &*hub.host_view.borrow()) {
         (Err(e), _) => (format!("{}: {e}", t("Could not write the host module files")), true),
-        (Ok(_), Some(status::HostView::Sees(n))) => (
+        (Ok(_), Some(status::HostView::Sees(n, twice))) if twice.is_empty() => (
             format!("{} · {n} {}", t("On"), t("token(s) of Tessera seen by the apps")),
             false,
+        ),
+        (Ok(_), Some(status::HostView::Sees(n, twice))) => (
+            format!(
+                "{} · {n} {} · {}: {}",
+                t("On"),
+                t("token(s) of Tessera seen by the apps"),
+                t("these show twice to the apps, because the system has a driver of its own for them too (its OpenSC, for example); switch off Tessera's driver for them below, or remove the system's"),
+                twice
+                    .iter()
+                    .map(|(label, _)| label.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            true,
         ),
         (Ok(n), Some(status::HostView::NothingToCheck)) => (
             format!("{} · {n} {}", t("On"), t("driver(s) published; no token to check yet")),
@@ -269,6 +283,17 @@ pub(super) fn apply_snapshot(win: &Win, snap: Snapshot) {
     }
 
     win.tokens.clear();
+    for (token, a, b) in status::same_token_twice(&snap.tokens) {
+        let row = status_page_row(
+            t("The same token comes from two drivers"),
+            &format!(
+                "{token}: {a} · {b}. {}",
+                t("The apps would list it twice: switch one of the two drivers off below")
+            ),
+        );
+        row.add_css_class("warning");
+        win.tokens.add(&row);
+    }
     for e in &snap.errors {
         let row = status_page_row(t("A driver could not be read"), e);
         row.add_css_class("error");

@@ -6,6 +6,7 @@
 |---|---|
 | Overall status | `flatpak run --command=tessera io.github.pedrohqb.Tessera status` |
 | Output of each driver (and of `tessera remote`) | `~/.var/app/io.github.pedrohqb.Tessera/data/tessera/logs/<driver>.log` (recreated each time the driver starts) |
+| OpenSC's own log | Start Tessera with `flatpak run --env=OPENSC_DEBUG=3 io.github.pedrohqb.Tessera`; it goes to `opensc.log` in the folder above. `flatpak run --command=tessera io.github.pedrohqb.Tessera opensc opensc-tool --list-readers` and `opensc pkcs15-tool --list-certificates` read the card directly |
 | SerproID log | `~/.var/app/io.github.pedrohqb.Tessera/.config/serproid/serproid.log`: one line per signature, with the program that requested it; `CKR_FUNCTION_CANCELED depois de receber 20 vezes AGUARDANDO` when the approval does not arrive |
 | What was published | `ls ~/.config/pkcs11/modules/` (`tessera-*.module` files) |
 | What the host sees | `p11-kit list-modules` (on the host) |

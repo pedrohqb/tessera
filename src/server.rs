@@ -88,7 +88,7 @@ pub fn socket_answers(socket: &Path) -> bool {
     UnixStream::connect(socket).is_ok()
 }
 
-fn spawn(driver: &Driver) -> Result<Child> {
+fn spawn(driver: &Driver, on: &[String]) -> Result<Child> {
     let socket = paths::driver_socket(&driver.id);
     if socket.exists() {
         if socket_answers(&socket) {
@@ -119,7 +119,7 @@ fn spawn(driver: &Driver) -> Result<Child> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(log);
-    cmd.envs(&driver.env);
+    cmd.envs(driver.env_with(on));
     // Each connection is served by `tessera remote` instead of
     // `p11-kit remote` (see remote.rs).
     match crate::remote::private_dir() {
@@ -166,11 +166,13 @@ impl Server {
         fs::create_dir_all(paths::log_dir())?;
         drivers::prepare_dirs(drivers);
         let mut conflict = false;
-        for d in drivers
+        let on: Vec<String> = drivers
             .iter()
             .filter(|d| d.available() && !disabled.contains(&d.id))
-        {
-            let (child, failure) = match spawn(d) {
+            .map(|d| d.id.clone())
+            .collect();
+        for d in drivers.iter().filter(|d| on.contains(&d.id)) {
+            let (child, failure) = match spawn(d, &on) {
                 Ok(c) => (Some(c), None),
                 Err(e) => {
                     let msg = format!("{e:#}");
@@ -222,12 +224,14 @@ impl Server {
 
     /// Start one driver's server again (after it stopped answering once).
     pub fn restart_driver(&mut self, driver: &Driver) {
+        // The drivers switched on: the same set start() was given.
+        let on: Vec<String> = self.instances.iter().map(|i| i.id.clone()).collect();
         for inst in self.instances.iter_mut().filter(|i| i.id == driver.id) {
             if let Some(child) = inst.child.take() {
                 stop_child(child);
                 let _ = fs::remove_file(paths::driver_socket(&inst.id));
             }
-            match spawn(driver) {
+            match spawn(driver, &on) {
                 Ok(c) => {
                     inst.child = Some(c);
                     inst.failure = None;

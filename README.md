@@ -15,7 +15,8 @@ Estão incluídos:
 1. o driver **SafeSign**, necessário para o token GD Burti, atualmente o mais usado pela advocacia;
 2. o driver **SafeNet**, necessário para o token SafeNet 5100, o segundo mais usado pela advocacia;
 3. o driver **SerproID**, necessário para o certificado digital em nuvem do Serpro, com o aplicativo SerproID;
-4. o **Token Administration** do SafeSign, para trocar e desbloquear o PIN.
+4. o driver **OpenSC**, software livre, para o token ePass2003 (Feitian) e os muitos outros cartões e tokens que o OpenSC atende (PIV e YubiKey, OpenPGP, CardOS, IDPrime, carteiras de identidade de vários países);
+5. o **Token Administration** do SafeSign, para trocar e desbloquear o PIN.
 
 Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pela distribuição:
 
@@ -173,8 +174,7 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 
 ### A fazer
 
-- **Novo driver:** OpenSC, que é software livre e atende tokens como o ePass2003.
-- **Testar com token real** os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor e Assinador SERPRO.
+- **Testar com token real** o driver OpenSC (ePass2003) e os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor e Assinador SERPRO.
 
 ---
 
@@ -198,7 +198,8 @@ Included:
 1. the **SafeSign** driver, for GD Burti tokens, currently the most used by Brazilian lawyers;
 2. the **SafeNet** driver, for SafeNet 5100 tokens, the second most used;
 3. the **SerproID** driver, for Serpro's cloud certificate, with the SerproID app;
-4. SafeSign's **Token Administration**, to change and unlock the PIN.
+4. the **OpenSC** driver, free software, for Feitian's ePass2003 token and the many other cards and tokens OpenSC supports (PIV and YubiKey, OpenPGP, CardOS, IDPrime, national ID cards);
+5. SafeSign's **Token Administration**, to change and unlock the PIN.
 
 The tokens are available to these apps, as Flatpaks or installed from the distribution:
 
@@ -346,8 +347,7 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 
 ### To do
 
-- **New driver:** OpenSC, which is free software and supports tokens such as the ePass2003.
-- **Test with a real token** the apps added last: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor and Assinador SERPRO.
+- **Test with a real token** the OpenSC driver (ePass2003) and the apps added last: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor and Assinador SERPRO.
 
 ### Documentation, support and license
 

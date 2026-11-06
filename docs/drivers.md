@@ -2,7 +2,7 @@
 
 ## How the drivers reach Tessera
 
-The drivers are not part of Tessera, because the vendors' licenses do not allow redistributing them. They use Flatpak's *extra-data*: at install time, Flatpak downloads each file from the vendor's site, checks the sha256 pinned in the manifest, and only then runs `flatpak/apply_extra.sh`, without network, inside the sandbox.
+The vendors' drivers are not part of Tessera, because their licenses do not allow redistributing them. (OpenSC, which is free software, is: see [OpenSC](#opensc) below.) They use Flatpak's *extra-data*: at install time, Flatpak downloads each file from the vendor's site, checks the sha256 pinned in the manifest, and only then runs `flatpak/apply_extra.sh`, without network, inside the sandbox.
 
 | Driver | Vendor file | sha256 |
 |---|---|---|
@@ -57,6 +57,20 @@ exec = ["/app/extra/drivers/serproid/serproid"]
 - The zip contains packages for several distributions. As in distrobox-adv-br, only the Ubuntu "withoutUI" package is used (`safenetauthenticationclient-core_*_amd64.deb`).
 - **Library:** `libeToken.so`.
 - **Observed behavior:** with no token connected, the driver was slow to respond in the first test, and the system's p11-kit, when loading it, made Firefox show "Unable to add module". That is why supervision exists: a driver that does not respond is not published. Each driver can also be turned off in the window. It has not yet been tested with a real SafeNet token.
+
+## OpenSC
+
+[OpenSC](https://github.com/OpenSC/OpenSC) is the free PKCS#11 driver for smart cards and tokens: Feitian's **ePass2003**, PIV cards and YubiKeys, OpenPGP cards, CardOS, Gemalto IDPrime, SmartCard-HSM, MyEID and several national ID cards (the list is OpenSC's `internal_card_drivers`, in `src/libopensc/ctx.c`). All of it is served, not only the ePass2003.
+
+- **Built in, not downloaded.** OpenSC is LGPL 2.1, so the manifest builds it from the release tarball (0.27.1, pinned by sha256), right after pcsc-lite, which it uses to reach the readers. Its files are in Tessera's `/app` tree: `opensc-pkcs11.so` and `libopensc.so` in `/app/lib`, the command-line tools in `/app/bin`. They also go in the release tarball, so FlatPark's package (which unpacks that tree to `/app/extra/tessera`) has them too. `pkcs11-register`, which adds OpenSC to the browsers' NSS databases by itself, is left out.
+- **`driver.toml`** names the module by a path relative to its own folder (`../../../opensc-pkcs11.so`), which resolves to `/app/lib/opensc-pkcs11.so` in Tessera's Flatpak and to `/app/extra/tessera/lib/opensc-pkcs11.so` in FlatPark's. A leading `./` in an `env` value is the driver's folder too.
+- **Configuration.** `OPENSC_CONF` points at `flatpak/drivers/opensc/opensc.conf`, installed next to `driver.toml`, so OpenSC never reads `/app/etc` (which FlatPark's package does not have). It keeps OpenSC's defaults. Card contents are cached as OpenSC does by default, in the sandbox's `~/.var/app/io.github.pedrohqb.Tessera/cache/opensc`.
+- **SafeNet's cards.** OpenSC's `idprime` driver knows the cards SafeNet's driver serves (IDPrime, eToken 5110). With both on, the same token would show twice. `driver.toml` has a `[when_on.safenet.env]` section: while SafeNet is on, `OPENSC_CONF` is `opensc-without-idprime.conf`, which lists every OpenSC card driver but `idprime`. Switch SafeNet off and OpenSC serves those cards. The list follows OpenSC's; it must be checked when OpenSC is updated.
+- **Duplicates in general.** A token two of Tessera's drivers serve (found by the holder's certificate, issuer and serial number, not the CA chain both may carry) gets a warning in the window and in `tessera status`. So does a token the apps see more often through the system's p11-kit server than Tessera serves it: the system has a driver of its own for it, typically its OpenSC (Fedora and Bluefin ship it, registered with p11-kit). Then Tessera's OpenSC should be switched off.
+- **No slots.** With no reader connected (an ePass2003 is its own reader, so unplugged means none), OpenSC lists no slot at all. The `cryptoki` crate then asks again with an empty buffer, and through p11-kit's RPC that answers `CKR_BUFFER_TOO_SMALL`, which it retried without end: the listing hung until its time limit and supervision would have stopped the driver. Tessera now asks for the count first (`status.rs`, `slot_count`). No other driver had shown it, because they all keep at least one slot.
+- **Tools.** OpenSC has no windowed tools; the command-line ones run with `flatpak run io.github.pedrohqb.Tessera opensc TOOL [ARGS]` (`pkcs15-tool --change-pin`, `--unblock-pin`, `--list-certificates`, `opensc-tool --list-readers`, `pkcs11-tool --list-slots`…), with the driver's configuration; `pkcs11-tool` gets the module unless `--module` is given.
+- **Debugging.** `flatpak run --env=OPENSC_DEBUG=3 io.github.pedrohqb.Tessera`: OpenSC writes its log to standard error, which goes to the driver's log (`data/tessera/logs/opensc.log` in Tessera's folder).
+- **Not yet tested with a real token.** Checked so far: the configuration files (`opensc-tool -D` with each one, against OpenSC 0.25), and the driver served by `tessera serve` with no reader, listed and published.
 
 ## SerproID
 
