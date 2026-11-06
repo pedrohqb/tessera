@@ -255,6 +255,32 @@ extern "C" {
     fn signal(signum: i32, handler: usize) -> usize;
 }
 
+/// OpenSC's command-line tools (its src/tools/Makefile.am, bin_PROGRAMS,
+/// as built here: no npa-tool without OpenPACE, no pkcs11-register).
+const OPENSC_TOOLS: &[&str] = &[
+    "opensc-tool",
+    "opensc-explorer",
+    "opensc-asn1",
+    "pkcs15-tool",
+    "pkcs15-crypt",
+    "pkcs11-tool",
+    "cardos-tool",
+    "eidenv",
+    "openpgp-tool",
+    "iasecc-tool",
+    "egk-tool",
+    "goid-tool",
+    "dtrust-tool",
+    "cryptoflex-tool",
+    "pkcs15-init",
+    "netkey-tool",
+    "piv-tool",
+    "westcos-tool",
+    "sc-hsm-tool",
+    "dnie-tool",
+    "gids-tool",
+];
+
 /// `tessera opensc TOOL [ARGS]`: one of OpenSC's command-line tools
 /// (pkcs15-tool, pkcs11-tool, opensc-tool…), built into Tessera next to its
 /// binary, with the configuration its driver uses. pkcs11-tool gets the
@@ -274,10 +300,11 @@ fn opensc_tool(args: &[String]) -> ExitCode {
     let bin = std::env::current_exe()
         .ok()
         .and_then(|e| e.parent().map(|p| p.join(tool)));
-    let Some(bin) = bin.filter(|b| {
-        !tool.contains('/') && tool != "tessera" && !tool.starts_with('.') && b.is_file()
-    }) else {
-        eprintln!("tessera: no OpenSC tool named {tool}");
+    let Some(bin) = bin.filter(|b| OPENSC_TOOLS.contains(&tool.as_str()) && b.is_file()) else {
+        eprintln!(
+            "tessera: no OpenSC tool named {tool}; the tools are: {}",
+            OPENSC_TOOLS.join(", ")
+        );
         return ExitCode::FAILURE;
     };
     let disabled = settings::Settings::load().disabled_drivers;
@@ -296,7 +323,10 @@ fn opensc_tool(args: &[String]) -> ExitCode {
     }
     cmd.args(&args[1..]).envs(opensc.env_with(&on));
     match cmd.status() {
-        Ok(s) => ExitCode::from(s.code().unwrap_or(1) as u8),
+        Ok(s) => {
+            use std::os::unix::process::ExitStatusExt;
+            ExitCode::from(s.code().or(s.signal().map(|n| 128 + n)).unwrap_or(1) as u8)
+        }
         Err(e) => {
             eprintln!("tessera: {}: {e}", bin.display());
             ExitCode::FAILURE

@@ -157,6 +157,13 @@ modules:
   # for `tessera opensc TOOL` (PIN change, listings).
   - name: opensc
     config-opts:
+      # Required, so that a missing header fails the build instead of
+      # silently dropping the drivers that need them (epass2003 needs both).
+      - --enable-openssl
+      - --enable-sm
+      # Its p11-kit module file would go to the SDK's read-only /usr; it is
+      # not used (Tessera publishes the module its own way) and is cleaned up.
+      - --enable-p11_system_config_modules=/app/share/p11-kit/modules
       - --disable-strict
       - --disable-notify
       - --disable-man
@@ -177,6 +184,7 @@ modules:
       - /share/man
       - /share/bash-completion
       - /share/applications
+      - /share/p11-kit
       # Adds OpenSC to the browsers' NSS databases by itself; Tessera does
       # that its own way.
       - /bin/pkcs11-register

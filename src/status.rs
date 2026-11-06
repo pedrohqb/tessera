@@ -213,14 +213,22 @@ fn slot_count(module: &str, token_present: bool) -> Option<u64> {
     }
 }
 
+/// Set by the parent for a listing that may find no slot (one of
+/// Tessera's own servers): ask for the count first. Through p11-kit-client
+/// that takes a second connection, so a second load of the driver, which
+/// the system's server (always with slots) is spared.
+const COUNT_FIRST: &str = "TESSERA_COUNT_FIRST";
+
 /// The module's slots (all, or with a token), without cryptoki's endless
-/// retry on a module with none (see slot_count).
+/// retry on a module with none (see slot_count). `count_first` false skips
+/// the check.
 fn slots(
     ctx: &Pkcs11,
     module: &str,
     token_present: bool,
+    count_first: bool,
 ) -> cryptoki::error::Result<Vec<cryptoki::slot::Slot>> {
-    if slot_count(module, token_present) == Some(0) {
+    if count_first && slot_count(module, token_present) == Some(0) {
         return Ok(vec![]);
     }
     if token_present {
@@ -263,7 +271,7 @@ pub fn probe_module(module: &str) -> i32 {
                     Ok(i) => eprintln!("probe: library: {i:?}"),
                     Err(e) => eprintln!("probe: C_GetInfo: {e}"),
                 }
-                match slots(&ctx, module, false) {
+                match slots(&ctx, module, false, true) {
                     Ok(slots) => {
                         eprintln!("probe: {} slot(s)", slots.len());
                         for s in slots {
@@ -315,7 +323,7 @@ pub fn probe_sign(module: &str) -> i32 {
         eprintln!("sign: C_Initialize failed: {e}");
         return 2;
     }
-    for slot in slots(&ctx, module, true).unwrap_or_default() {
+    for slot in slots(&ctx, module, true, true).unwrap_or_default() {
         let Ok(info) = ctx.get_token_info(slot) else {
             continue;
         };
@@ -413,7 +421,8 @@ pub fn list_tokens_in_process(with_certs: bool) -> Result<String, String> {
     ctx.initialize(CInitializeArgs::new(CInitializeFlags::OS_LOCKING_OK))
         .map_err(|e| e.to_string())?;
     let mut out = Vec::new();
-    for (slot_index, slot) in slots(&ctx, &module, false)
+    let count_first = std::env::var_os(COUNT_FIRST).is_some();
+    for (slot_index, slot) in slots(&ctx, &module, false, count_first)
         .map_err(|e| e.to_string())?
         .into_iter()
         .enumerate()
@@ -483,6 +492,12 @@ fn tokens_at(
     cmd.arg("list-tokens");
     if !with_certs {
         cmd.arg("--no-certificates");
+    }
+    // One of Tessera's own servers may have no slot at all (see
+    // slot_count). The system's always has some (its trust store), and is
+    // spared the extra connection the count takes.
+    if socket != paths::host_p11kit_socket() {
+        cmd.env(COUNT_FIRST, "1");
     }
     let mut child = cmd
         .env(
@@ -657,7 +672,12 @@ pub fn same_token_twice(tokens: &[Token]) -> Vec<(String, String, String)> {
                     .iter()
                     .any(|d| c.issuer == d.issuer && c.serial == d.serial && !c.serial.is_empty())
             });
-            if a.driver != b.driver && shared {
+            // A card with several PINs shows as several slots of the same
+            // driver: one warning per pair of drivers is enough.
+            let known = out.iter().any(|(_, x, y): &(String, String, String)| {
+                (x == &a.driver && y == &b.driver) || (x == &b.driver && y == &a.driver)
+            });
+            if a.driver != b.driver && shared && !known {
                 let name = if a.label.is_empty() {
                     &a.model
                 } else {
@@ -784,6 +804,12 @@ mod duplicate_tests {
             token(
                 "OpenSC",
                 "Pedro (User)",
+                vec![cert("01", true), cert("aa", false)],
+            ),
+            // The same card's second PIN: a second slot of OpenSC's.
+            token(
+                "OpenSC",
+                "Pedro (Sign)",
                 vec![cert("01", true), cert("aa", false)],
             ),
             // Another token with the same CA chain only: not the same.

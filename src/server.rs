@@ -8,6 +8,7 @@
 //! driver's `library_path`.
 
 use anyhow::{bail, Context, Result};
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
@@ -66,12 +67,16 @@ struct Instance {
     name: String,
     child: Option<Child>,
     failure: Option<String>,
+    /// The environment its server was started with (driver.env_with).
+    env: BTreeMap<String, String>,
 }
 
 #[derive(Default)]
 pub struct Server {
     instances: Vec<Instance>,
     failure: Option<String>,
+    /// The drivers given to start(), for `settle`.
+    drivers: Vec<Driver>,
 }
 
 fn log_path(id: &str) -> PathBuf {
@@ -88,7 +93,7 @@ pub fn socket_answers(socket: &Path) -> bool {
     UnixStream::connect(socket).is_ok()
 }
 
-fn spawn(driver: &Driver, on: &[String]) -> Result<Child> {
+fn spawn(driver: &Driver, env: &BTreeMap<String, String>) -> Result<Child> {
     let socket = paths::driver_socket(&driver.id);
     if socket.exists() {
         if socket_answers(&socket) {
@@ -119,7 +124,7 @@ fn spawn(driver: &Driver, on: &[String]) -> Result<Child> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(log);
-    cmd.envs(driver.env_with(on));
+    cmd.envs(env);
     // Each connection is served by `tessera remote` instead of
     // `p11-kit remote` (see remote.rs).
     match crate::remote::private_dir() {
@@ -166,13 +171,18 @@ impl Server {
         fs::create_dir_all(paths::log_dir())?;
         drivers::prepare_dirs(drivers);
         let mut conflict = false;
-        let on: Vec<String> = drivers
+        self.drivers = drivers.to_vec();
+        let wanted: Vec<&Driver> = drivers
             .iter()
             .filter(|d| d.available() && !disabled.contains(&d.id))
-            .map(|d| d.id.clone())
             .collect();
-        for d in drivers.iter().filter(|d| on.contains(&d.id)) {
-            let (child, failure) = match spawn(d, &on) {
+        // The drivers whose environment depends on others (OpenSC on
+        // SafeNet's) start last, with the set that actually started.
+        let (plain, dependent): (Vec<&Driver>, Vec<&Driver>) =
+            wanted.into_iter().partition(|d| d.when_on.is_empty());
+        for d in plain.into_iter().chain(dependent) {
+            let env = d.env_with(&self.running());
+            let (child, failure) = match spawn(d, &env) {
                 Ok(c) => (Some(c), None),
                 Err(e) => {
                     let msg = format!("{e:#}");
@@ -185,12 +195,51 @@ impl Server {
                 name: d.name.clone(),
                 child,
                 failure,
+                env,
             });
         }
         if conflict {
             bail!("conflict");
         }
         Ok(())
+    }
+
+    /// Start again, with the right environment, every running driver whose
+    /// environment depends on which others run (`when_on`), after one of
+    /// those stopped or came back: OpenSC leaves IDPrime cards to SafeNet
+    /// only while SafeNet's server runs.
+    fn settle(&mut self) {
+        let running = self.running();
+        for i in 0..self.instances.len() {
+            if self.instances[i].child.is_none() {
+                continue;
+            }
+            let Some(d) = self
+                .drivers
+                .iter()
+                .find(|d| d.id == self.instances[i].id && !d.when_on.is_empty())
+                .cloned()
+            else {
+                continue;
+            };
+            let env = d.env_with(&running);
+            if env == self.instances[i].env {
+                continue;
+            }
+            let inst = &mut self.instances[i];
+            if let Some(child) = inst.child.take() {
+                stop_child(child);
+                let _ = fs::remove_file(paths::driver_socket(&inst.id));
+            }
+            match spawn(&d, &env) {
+                Ok(c) => {
+                    inst.child = Some(c);
+                    inst.failure = None;
+                }
+                Err(e) => inst.failure = Some(format!("{e:#}")),
+            }
+            inst.env = env;
+        }
     }
 
     /// Number of drivers whose server runs, and of those switched on.
@@ -220,35 +269,44 @@ impl Server {
             }
             inst.failure = Some(reason.to_string());
         }
+        self.settle();
     }
 
     /// Start one driver's server again (after it stopped answering once).
     pub fn restart_driver(&mut self, driver: &Driver) {
-        // The drivers switched on: the same set start() was given.
-        let on: Vec<String> = self.instances.iter().map(|i| i.id.clone()).collect();
+        // Without its own server: the others that run.
+        let others: Vec<String> = self
+            .running()
+            .into_iter()
+            .filter(|id| id != &driver.id)
+            .collect();
+        let env = driver.env_with(&others);
         for inst in self.instances.iter_mut().filter(|i| i.id == driver.id) {
             if let Some(child) = inst.child.take() {
                 stop_child(child);
                 let _ = fs::remove_file(paths::driver_socket(&inst.id));
             }
-            match spawn(driver, &on) {
+            match spawn(driver, &env) {
                 Ok(c) => {
                     inst.child = Some(c);
                     inst.failure = None;
                 }
                 Err(e) => inst.failure = Some(format!("{e:#}")),
             }
+            inst.env = env.clone();
         }
+        self.settle();
     }
 
     /// The overall state: Running when every driver's server runs.
     pub fn poll(&mut self) -> State {
-        let mut failures = Vec::new();
+        let mut exited = false;
         for inst in self.instances.iter_mut() {
             if let Some(child) = inst.child.as_mut() {
                 match child.try_wait() {
-                    Ok(None) => continue,
+                    Ok(None) => {}
                     Ok(Some(status)) => {
+                        exited = true;
                         inst.child = None;
                         let tail = log_tail(&inst.id);
                         inst.failure = Some(if tail.is_empty() {
@@ -258,11 +316,18 @@ impl Server {
                         });
                     }
                     Err(e) => {
+                        exited = true;
                         inst.child = None;
                         inst.failure = Some(e.to_string());
                     }
                 }
             }
+        }
+        if exited {
+            self.settle();
+        }
+        let mut failures = Vec::new();
+        for inst in &self.instances {
             if let Some(f) = &inst.failure {
                 if f == "conflict" {
                     return State::Conflict;
