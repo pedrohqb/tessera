@@ -94,6 +94,12 @@ finish-args:
   # own icon without access to the apps' folders.
   - --filesystem=xdg-data/flatpak/appstream:ro
   - --filesystem=/var/lib/flatpak/appstream:ro
+  # Read-only: which Flatpak apps are installed (each app's folder in the
+  # user and system installations), for the rows that depend on it: the
+  # Thunderbird ESR and old-ID rows, and whether the Chromium or Evolution
+  # Flatpak shares ~/.pki/nssdb with the native apps. Nothing is written.
+  - --filesystem=xdg-data/flatpak/app:ro
+  - --filesystem=/var/lib/flatpak/app:ro
   # Read-only: whether `flatpak override --user` already gave an app the
   # p11-kit socket, to show it in the window.
   - --filesystem=xdg-data/flatpak/overrides:ro

@@ -80,15 +80,22 @@ Supervision runs in the service, with or without the window (`supervise` in `src
 | `--filesystem=xdg-run/p11-kit/pkcs11` | Checking whether the apps see Tessera's tokens through the system server (see [Apps](apps.md)) |
 | `--filesystem=xdg-data/flatpak/overrides:ro` | Showing whether step 1 of each app has already been done |
 | `--filesystem=xdg-data/flatpak/appstream:ro` and `/var/lib/flatpak/appstream:ro` | Showing each app with its own icon, installed or not: the AppStream data Flatpak keeps for each remote (Flathub, FlatPark) has the icons of every app in it |
+| `--filesystem=xdg-data/flatpak/app:ro` and `/var/lib/flatpak/app:ro` | Knowing which Flatpak apps are installed: the Thunderbird ESR and old-ID rows show only then, and the native Chromium-based browsers, Evolution and LibreOffice are not set up in `~/.pki/nssdb` when the Chromium or Evolution Flatpak, which reads it too, is installed. Nothing is written |
 | `--filesystem=~/.var/app/org.gnome.Papers/config/mozilla:create`, `~/.var/app/org.kde.okular/config/mozilla:create` | The own NSS database of Papers and of Okular |
 | `--filesystem=~/.var/app/org.mozilla.firefox/config/mozilla/firefox` and `.../.mozilla/firefox` | Registering the module in the Firefox profiles |
 | `--filesystem=~/.pki/nssdb` and, for Chromium, Brave, Chrome and Edge, `~/.var/app/<browser>/data/pki/nssdb` and `~/.var/app/<browser>/.pki/nssdb` | Registering the module in the NSS database of the Chromium-based browsers (the new one, since Chromium 146, and the old one) |
-| `--filesystem=~/.mozilla/firefox`, `xdg-config/mozilla/firefox` and `xdg-data/pki/nssdb` | The native apps (see [Apps](apps.md#native-apps)): the native Firefox's profiles and the database the native Chromium-based browsers share since Chromium 146 |
+| `--filesystem=~/.var/app/org.mozilla.thunderbird/.thunderbird` and `.../config/thunderbird`, the same for `org.mozilla.thunderbird_esr`, and `~/.var/app/org.mozilla.Thunderbird/.thunderbird` | Registering the module in the Thunderbird profiles |
+| `--filesystem=~/.var/app/org.gnome.Evolution/data/pki/nssdb` | Evolution's own database, when it has no `~/.pki/nssdb`: only removing a duplicate module |
+| `--filesystem=~/.var/app/org.libreoffice.LibreOffice/config/libreoffice` and `.../data` | LibreOffice's certificate path (`CertDir` in `registrymodifications.xcu`) and the empty NSS database it points to |
+| `--filesystem=~/.var/app/io.github.intoolswetrust.JSignPdf/config` | JSignPdf's `jsignpdf/pkcs11.cfg` |
+| `--filesystem=~/.mozilla/firefox`, `xdg-config/mozilla/firefox` and `xdg-data/pki/nssdb` | The native apps (see [Apps](apps.md#native-apps)): the native Firefox's profiles and the database the native Chromium-based browsers (and Evolution) share since Chromium 146 |
 | `--filesystem=~/.pjeoffice-pro` | The native PJeOffice Pro's list of A3 libraries (`list.a3`) |
+| `--filesystem=~/.thunderbird` and `xdg-config/thunderbird` | The native Thunderbird's profiles |
+| `--filesystem=xdg-config/libreoffice` | The native LibreOffice's certificate path (`CertDir`) |
 | `--talk-name=org.kde.StatusNotifierWatcher` | The tray icon |
 | `--persist=.config/serproid` | SerproID's certificate folder and log stay in Tessera's own data |
 
-The browser folders do not get `:create`. The browser creates its own database the first time it runs, and Tessera does not create folders for browsers that are not installed.
+The app folders do not get `:create`. The app creates its own folders the first time it runs, and Tessera does not create folders for apps that are not installed. A folder that did not exist when Tessera started stays invisible to it until it restarts.
 
 ## Security
 

@@ -106,11 +106,14 @@ pub(super) fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
         },
         Setup::LibreOffice => {
             let profile = libreoffice::flatpak_profile();
-            if libreoffice::cert_dir(&profile).is_none() {
+            // Tessera sees the app's folders only if they were there when it
+            // started (its sandbox mounts what exists).
+            let db_parent = libreoffice::flatpak_db().parent().map(|p| p.is_dir());
+            if libreoffice::cert_dir(&profile).is_none() || db_parent != Some(true) {
                 return Err(format!(
                     "{}: {}",
                     app.name,
-                    t("open the app once, then try again")
+                    t("open the app once, then restart Tessera and try again")
                 ));
             }
             if libreoffice::running(&profile) {
@@ -118,10 +121,20 @@ pub(super) fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
                     "{}: {} ({})",
                     app.name,
                     t("close the app first, then try again"),
-                    t("if it is closed, a crash may have left the file .lock in its profile")
+                    t("if it is closed, a crash may have left the file .lock in its settings folder")
                 ));
             }
             let db = libreoffice::flatpak_db();
+            if let Some(Some(dir)) = libreoffice::cert_dir(&profile) {
+                // A certificate path the user chose is kept.
+                if std::path::Path::new(&dir) != db && std::path::Path::new(&dir).is_dir() {
+                    return Err(format!(
+                        "{}: {} ({dir})",
+                        app.name,
+                        t("it already has a certificate path of its own, which Tessera keeps. To use Tessera's, clear it in Tools → Options → Security → Certificate Path, then try again")
+                    ));
+                }
+            }
             nss::set_up_poppler_db(&db).map_err(|e| format!("{}: {e:#}", db.display()))?;
             libreoffice::set_cert_dir(&profile, &db)?;
             Ok(step2_done(app))
@@ -203,7 +216,7 @@ pub(super) fn update_app(r: &AppRows) {
             Setup::Poppler => t("Makes the certificate database the app reads when signing"),
             Setup::LibreOffice => t("Close LibreOffice first: makes a certificate database of its own and sets it as its certificate path"),
             Setup::JSignPdf => t("Close JSignPdf first: writes its pkcs11.cfg with p11-kit and the slot of Tessera's tokens (needs the token plugged in and the system connection)"),
-            _ => t("An older Tessera added a module that makes the browser ask for the PIN twice. Close the browser first"),
+            _ => t("An older Tessera added a module that makes the app ask for the PIN twice. Close the app first"),
         });
     }
     // JSignPdf's slot may change: Set up stays available.

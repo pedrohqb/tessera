@@ -216,6 +216,19 @@ pub fn host_data_home() -> PathBuf {
     host_xdg("XDG_DATA_HOME", ".local/share")
 }
 
+/// Is this Flatpak app installed, for the user or for the system? Its folder
+/// in ~/.var/app counts too (it is there once the app has run). In Tessera's
+/// sandbox the install folders are visible read-only (see the manifest).
+pub fn flatpak_installed(id: &str) -> bool {
+    [
+        host_data_home().join("flatpak/app"),
+        PathBuf::from("/var/lib/flatpak/app"),
+        home().join(".var/app"),
+    ]
+    .iter()
+    .any(|d| d.join(id).is_dir())
+}
+
 /// The host's p11-kit server socket, as `--filesystem=xdg-run/p11-kit/pkcs11`
 /// shows it inside a sandbox.
 pub fn host_p11kit_socket() -> PathBuf {

@@ -227,10 +227,9 @@ pub const APPS: [&ClientApp; 14] = [
 ];
 
 /// Is the app's row shown? Thunderbird's ESR and old ID only when they are
-/// installed (their folder is there).
+/// installed.
 pub fn shown(app: &ClientApp) -> bool {
-    ![THUNDERBIRD_ESR.id, THUNDERBIRD_OLD.id].contains(&app.id)
-        || paths::home().join(".var/app").join(app.id).is_dir()
+    ![THUNDERBIRD_ESR.id, THUNDERBIRD_OLD.id].contains(&app.id) || paths::flatpak_installed(app.id)
 }
 
 /// The apps whose package already reaches the system's p11-kit server.

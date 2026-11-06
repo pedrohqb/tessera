@@ -14,8 +14,9 @@
 //! changes when the system's modules or readers change; the row then shows
 //! step 2 as missing again, and "Set up" writes the new one.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use crate::i18n::t;
 use crate::paths;
 
 pub const FLATPAK_ID: &str = "io.github.intoolswetrust.JSignPdf";
@@ -73,6 +74,14 @@ pub fn is_set_up(text: &str, current: Option<usize>) -> bool {
 /// Write the file, keeping any other one as pkcs11.cfg.before-tessera.
 pub fn set_up(slot_index: usize) -> Result<(), String> {
     let dir = config_dir();
+    // Tessera sees the app's config folder only if it was there when
+    // Tessera started (its sandbox mounts what exists).
+    if !dir.parent().is_some_and(Path::is_dir) {
+        return Err(format!(
+            "JSignPdf: {}",
+            t("open the app once, then restart Tessera and try again")
+        ));
+    }
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let file = config_file();
     if let Ok(old) = std::fs::read_to_string(&file) {

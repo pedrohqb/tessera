@@ -180,7 +180,8 @@ pub fn chromium_nssdb() -> Option<PathBuf> {
     .find(|d| d.is_dir())
 }
 
-/// The Chromium and Evolution Flatpaks may read the real ~/.pki/nssdb too:
+/// The Chromium and Evolution Flatpaks, when installed, may read the real
+/// ~/.pki/nssdb too:
 /// p11-kit-proxy.so there would make them list each token twice (they
 /// already see them through their root-certificates module), and ask for
 /// the PIN twice.
@@ -188,7 +189,7 @@ fn shared_with_chromium_flatpak(db: &std::path::Path) -> bool {
     db == paths::home().join(".pki/nssdb")
         && [apps::CHROMIUM.id, apps::EVOLUTION.id]
             .iter()
-            .any(|id| paths::home().join(".var/app").join(id).is_dir())
+            .any(|id| paths::flatpak_installed(id))
 }
 
 /// The databases poppler may open: every *default* Firefox profile with a
@@ -482,6 +483,7 @@ fn libreoffice_state() -> State {
     match db {
         Some(d) if nss::has_p11kit(&d) => State::Ready,
         Some(d) if nss::uses_sysinit(&d) => State::BySystem,
+        Some(d) if shared_with_chromium_flatpak(&d) => State::SharedWithFlatpak,
         _ => State::ToDo,
     }
 }
@@ -555,7 +557,7 @@ pub fn set_up(app: &NativeApp) -> Result<String, String> {
             "{}: {} ({})",
             t(app.name),
             t("close the app first, then try again"),
-            t("if it is closed, a crash may have left the file .lock in its profile")
+            t("if it is closed, a crash may have left the file .lock in its settings folder")
         ));
     }
     let dbs = databases(app);
@@ -768,11 +770,12 @@ mod tests {
         assert!(matches!(state(&LIBREOFFICE), State::ToDo));
         fs::write(mine.join("pkcs11.txt"), proxy).unwrap();
         assert!(matches!(state(&LIBREOFFICE), State::Ready));
-        // While it runs (its .lock), Set up waits.
-        fs::write(lo.join(".lock"), b"").unwrap();
+        // While it runs (its .lock, next to the profile), Set up waits.
+        let lock = lo.parent().unwrap().join(".lock");
+        fs::write(&lock, b"").unwrap();
         fs::remove_file(mine.join("pkcs11.txt")).unwrap();
         assert!(set_up(&LIBREOFFICE).is_err());
-        fs::remove_file(lo.join(".lock")).unwrap();
+        fs::remove_file(&lock).unwrap();
         fs::write(mine.join("pkcs11.txt"), proxy).unwrap();
 
         // Fedora and its family: their NSS loads p11-kit in every database.
