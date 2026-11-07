@@ -43,7 +43,7 @@ Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pe
 | MX Linux 25 | funciona com o p11-kit do repositório de teste do MX (MX Package Installer → MX Test Repo) |
 | **Debian 12 e 13, LMDE 6 e 7, Ubuntu 24.04, Linux Mint 22** | **não funciona:** use o [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br) |
 
-O que decide é a versão do p11-kit do sistema: a assinatura precisa da 0.25.6 ou mais nova. Veja [por que](FAQ.md#o-pin-é-pedido-mas-a-assinatura-falha-por-quê).
+O que decide é a versão do p11-kit do sistema: a assinatura precisa da 0.25.6 ou mais nova. Veja [por quê](FAQ.md#o-pin-é-pedido-mas-a-assinatura-falha-por-quê).
 
 ---
 
