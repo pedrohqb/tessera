@@ -240,6 +240,41 @@ pub fn user_override(app_id: &str) -> PathBuf {
     home().join(".local/share/flatpak/overrides").join(app_id)
 }
 
+/// The icon an installed Flatpak app exports (its own, full colour), read
+/// from the app's files: Tessera sees the installations' app folders (for
+/// flatpak_installed), not always the exported icons a desktop theme would
+/// find (Evolution's, under KDE with a theme that has only a 16 px one).
+pub fn flatpak_export_icon(app_id: &str) -> Option<PathBuf> {
+    if !app_id.contains('.') {
+        return None;
+    }
+    for base in [
+        host_data_home().join("flatpak/app"),
+        PathBuf::from("/var/lib/flatpak/app"),
+    ] {
+        let icons = base
+            .join(app_id)
+            .join("current/active/export/share/icons/hicolor");
+        for (size, ext) in [
+            ("scalable", "svg"),
+            ("512x512", "png"),
+            ("256x256", "png"),
+            ("128x128", "png"),
+            ("64x64", "png"),
+            ("48x48", "png"),
+        ] {
+            let icon = icons
+                .join(size)
+                .join("apps")
+                .join(format!("{app_id}.{ext}"));
+            if std::fs::File::open(&icon).is_ok() {
+                return Some(icon);
+            }
+        }
+    }
+    None
+}
+
 /// An app's icon from the AppStream data Flatpak keeps for each remote
 /// (Flathub, FlatPark…), which has the icons of every app in the remote,
 /// installed or not: what software centers show.

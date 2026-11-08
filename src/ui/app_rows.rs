@@ -490,8 +490,8 @@ fn readable_icon(theme: &gtk::IconTheme, name: &str) -> bool {
 /// Is this file the app's full-colour icon? A theme may hold only a
 /// monochrome (`-symbolic`) one, which GTK hands out for the plain name too,
 /// or only the small sizes of a panel theme (16 to 24 px): either looks
-/// broken at 32 px next to the others, and Flatpak's AppStream copy (the
-/// app's own icon) is better.
+/// broken at 32 px next to the others, and the icon the Flatpak app exports
+/// (or Flatpak's AppStream copy of it) is better.
 fn usable_icon_file(path: &std::path::Path) -> bool {
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
     if stem.ends_with("-symbolic") {
@@ -515,7 +515,9 @@ fn themed_icon(names: &[&str], fallback: &str) -> gtk::Image {
         if theme.as_ref().is_some_and(|t| readable_icon(t, n)) {
             Some(gtk::Image::from_icon_name(n))
         } else {
-            paths::appstream_icon(n).map(gtk::Image::from_file)
+            paths::flatpak_export_icon(n)
+                .or_else(|| paths::appstream_icon(n))
+                .map(gtk::Image::from_file)
         }
     });
     let image = match found {
