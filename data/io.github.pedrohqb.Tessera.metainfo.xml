@@ -19,9 +19,9 @@
       <li>Shows the card readers, the inserted tokens and their certificates</li>
       <li>OpenSC built in, for Feitian ePass2003, PIV cards and YubiKeys, OpenPGP cards and the many others OpenSC supports</li>
       <li>The vendors' drivers are extensions, installed for the token at hand: SafeSign IC (GD Burti), SafeNet Authentication Client and SerproID, each downloaded from its vendor at install time and checked against pinned checksums; others can publish theirs the same way</li>
-      <li>Says which driver a connected token needs, with the command that installs it</li>
+      <li>Says which driver a connected token needs, with its page in the app store and the command that installs it</li>
       <li>Opens the drivers' tools, such as SafeSign's Token Administration and the SerproID app</li>
-      <li>Sets up Firefox, Chromium, Google Chrome, Microsoft Edge, Brave, Thunderbird, Evolution, LibreOffice, Papers, Okular and JSignPdf to use the tokens, and shows the command that lets them reach Tessera</li>
+      <li>Sets up Firefox, Chromium, Google Chrome, Microsoft Edge, Brave, Thunderbird, Evolution, LibreOffice, Papers, Okular, JSignPdf and Master PDF Editor to use the tokens, and shows the command that lets them reach Tessera</li>
       <li>Publishes a driver only while it answers, so a driver that hangs cannot hang the apps</li>
       <li>Keeps running in the background with an icon in the tray, and can start at login</li>
     </ul>
@@ -50,6 +50,18 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.3.0" date="2026-11-08">
+      <description>
+        <p>Drivers as extensions, OpenSC built in, and more apps.</p>
+        <ul>
+          <li>The vendors' drivers (SafeSign IC, SafeNet Authentication Client, SerproID) are now extensions, installed only for the tokens at hand, from the app store or the command line. The window says which one a connected token needs.</li>
+          <li>OpenSC is built in, for Feitian ePass2003, PIV cards, YubiKeys, OpenPGP cards and the many others it supports. It leaves the GD Burti to SafeSign, and the cards SafeNet serves to SafeNet.</li>
+          <li>New apps: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor and Assinador SERPRO. With several tokens plugged in, JSignPdf's row picks which one it opens.</li>
+          <li>A driver with no token no longer hides the other drivers' tokens from the apps, which also ends a false warning that the system's p11-kit server was off.</li>
+          <li>Restart Tessera, in the menu and on an app's row, for an app opened for the first time, or a driver installed, after Tessera started. The refresh button checks the apps at once.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-11-02">
       <description>
         <p>Debian, Ubuntu and their derivatives.</p>
