@@ -23,6 +23,7 @@
 - [Eu usava o SafeSign, o SafeNet ou o SerproID instalado no sistema. Preciso fazer algo?](#eu-usava-o-safesign-o-safenet-ou-o-serproid-instalado-no-sistema-preciso-fazer-algo)
 - [O JSignPdf não acha mais o certificado.](#o-jsignpdf-não-acha-mais-o-certificado)
 - [Como troco ou desbloqueio o PIN de um token do OpenSC (ePass2003)?](#como-troco-ou-desbloqueio-o-pin-de-um-token-do-opensc-epass2003)
+- [Meu token GD Burti (ou cartão SafeSign) trava ou some.](#meu-token-gd-burti-ou-cartão-safesign-trava-ou-some)
 - [Fechei a janela. O Tessera continua rodando?](#fechei-a-janela-o-tessera-continua-rodando)
 - [Aparece um aviso no topo da janela dizendo que a assinatura não funciona.](#aparece-um-aviso-no-topo-da-janela-dizendo-que-a-assinatura-não-funciona)
 
@@ -125,6 +126,10 @@ flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --unblock-pin
 
 O primeiro pede o PIN atual e o novo; o segundo, o PUK e o novo PIN. `opensc pkcs15-tool --list-certificates` lista os certificados, e `opensc opensc-tool --list-readers`, as leitoras. Erre o PIN com cuidado: depois de algumas tentativas o token bloqueia, e sem o PUK só a autoridade certificadora resolve.
 
+### Meu token GD Burti (ou cartão SafeSign) trava ou some.
+
+O OpenSC não sabe ler o token GD Burti e, quando tenta, o token trava, também para o SafeSign. O OpenSC do Tessera já deixa de lado os tokens GD Burti (os leitores "StarSign"). Se você usa um **cartão** SafeSign numa leitora comum, ou o problema continuar, desligue o OpenSC na lista de drivers da janela e tire e ponha o token. No sistema, o mesmo vale para o OpenSC instalado pela distribuição (o Fedora e o Bluefin o trazem).
+
 ### Fechei a janela. O Tessera continua rodando?
 
 Sim: os tokens continuam disponíveis, e um ícone na bandeja mostra o resumo. No GNOME, o ícone depende da extensão AppIndicator, que o Bluefin e o Aurora já trazem. **Sair**, pelo menu ☰ ou pela bandeja, desliga o Tessera, e os tokens deixam de aparecer nos aplicativos. Para o Tessera abrir sozinho ao entrar na sessão, use o menu ☰ → **Iniciar automaticamente no login**; para tirar o ícone, ☰ → **Mostrar ícone na bandeja**.
@@ -176,6 +181,7 @@ Abra uma [issue](https://github.com/pedrohqb/tessera/issues/new/choose) com o mo
 - [I used SafeSign, SafeNet or SerproID installed on the system. Do I need to do anything?](#i-used-safesign-safenet-or-serproid-installed-on-the-system-do-i-need-to-do-anything)
 - [JSignPdf no longer finds the certificate.](#jsignpdf-no-longer-finds-the-certificate)
 - [How do I change or unblock the PIN of an OpenSC token (ePass2003)?](#how-do-i-change-or-unblock-the-pin-of-an-opensc-token-epass2003)
+- [My GD Burti token (or SafeSign card) hangs or disappears.](#my-gd-burti-token-or-safesign-card-hangs-or-disappears)
 - [I closed the window. Is Tessera still running?](#i-closed-the-window-is-tessera-still-running)
 - [A warning at the top of the window says signing does not work.](#a-warning-at-the-top-of-the-window-says-signing-does-not-work)
 
@@ -277,6 +283,10 @@ flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --unblock-pin
 ```
 
 The first asks for the current PIN and the new one; the second, for the PUK and the new PIN. `opensc pkcs15-tool --list-certificates` lists the certificates, and `opensc opensc-tool --list-readers` the readers. Be careful with wrong PINs: after a few tries the token locks, and without the PUK only the certificate authority can help.
+
+### My GD Burti token (or SafeSign card) hangs or disappears.
+
+OpenSC cannot read GD Burti tokens, and when it tries, the token hangs, for SafeSign too. Tessera's OpenSC already leaves GD Burti tokens alone (the "StarSign" readers). If you use a SafeSign **card** in an ordinary reader, or the problem persists, switch OpenSC off in the window's list of drivers and unplug the token and plug it in again. The same goes for an OpenSC installed by the distribution (Fedora and Bluefin ship it).
 
 ### I closed the window. Is Tessera still running?
 
