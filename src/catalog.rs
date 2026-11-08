@@ -94,18 +94,21 @@ pub fn install_command(k: &Known) -> String {
     format!("flatpak install{scope} flatpark {}", k.extension)
 }
 
-/// Is Tessera's Flatpak in the user installation (Some(true)), the system's
-/// (Some(false)), or not a Flatpak (None)? /.flatpak-info's app-path says.
+/// Is Tessera's Flatpak in the user installation (Some(true)), the default
+/// system one (Some(false)), or elsewhere: another installation, or not a
+/// Flatpak (None)? /.flatpak-info's app-path says.
 fn tessera_installation() -> Option<bool> {
     let info = std::fs::read_to_string("/.flatpak-info").ok()?;
-    let path = info
-        .lines()
-        .find_map(|l| l.strip_prefix("app-path="))?
-        .to_string();
-    if path.starts_with("/var/lib/flatpak/") {
-        Some(false)
-    } else if path.contains("/.local/share/flatpak/") {
+    let path = info.lines().find_map(|l| l.strip_prefix("app-path="))?;
+    installation_of(path, &crate::paths::host_data_home())
+}
+
+fn installation_of(app_path: &str, user_data: &std::path::Path) -> Option<bool> {
+    let p = std::path::Path::new(app_path);
+    if p.starts_with(user_data.join("flatpak")) {
         Some(true)
+    } else if p.starts_with("/var/lib/flatpak") {
+        Some(false)
     } else {
         None
     }
@@ -146,6 +149,24 @@ mod tests {
         // OpenSC's own (ePass2003) and unknown ones: nothing to install.
         assert_eq!(id("Feitian ePass2003 00 00", &[0x3B, 0x9F, 0x95]), None);
         assert_eq!(id("Generic USB Smart Card Reader 00 00", &[]), None);
+    }
+
+    #[test]
+    fn the_installation_comes_from_the_app_path() {
+        let home = std::path::Path::new("/home/a/.local/share");
+        let user =
+            "/home/a/.local/share/flatpak/app/io.github.pedrohqb.Tessera/x86_64/stable/abc/files";
+        assert_eq!(installation_of(user, home), Some(true));
+        let custom = std::path::Path::new("/data/xdg");
+        assert_eq!(
+            installation_of("/data/xdg/flatpak/app/x/files", custom),
+            Some(true)
+        );
+        assert_eq!(
+            installation_of("/var/lib/flatpak/app/x/files", home),
+            Some(false)
+        );
+        assert_eq!(installation_of("/opt/flatpak/app/x/files", home), None);
     }
 
     #[test]

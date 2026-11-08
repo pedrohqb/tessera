@@ -297,7 +297,10 @@ pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]
                     .card_present
                     .then(|| catalog::for_reader(&r.name, &r.atr))
                     .flatten()
-                    .filter(|k| !installed.iter().any(|id| id == k.id));
+                    .filter(|k| !installed.iter().any(|id| id == k.id))
+                    // Another driver (the built-in OpenSC, for IDPrime
+                    // cards) may already serve it.
+                    .filter(|_| !status::served_in_reader(&snap.tokens, &r.name));
                 if let Some(k) = need {
                     row.set_subtitle(&format!(
                         "{state} · {}: {}. {}",

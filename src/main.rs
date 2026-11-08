@@ -91,6 +91,7 @@ fn print_status() -> ExitCode {
                     .then(|| catalog::for_reader(&r.name, &r.atr))
                     .flatten()
                     .filter(|k| !ds.iter().any(|d| d.id == k.id))
+                    .filter(|_| !status::served_in_reader(&snap.tokens, &r.name))
                 {
                     println!(
                         "    looks like a token for {}, not installed: {}",

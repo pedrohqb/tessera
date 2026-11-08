@@ -52,9 +52,13 @@ cargo test
 The Flatpak package:
 
 ```sh
-python3 scripts/pin-drivers.py      # checks the sha256 values and fills in the sizes
+python3 scripts/pin-drivers.py      # checks the extensions' sha256 values and fills in the sizes
 flatpak-builder --user --install-deps-from=flathub --force-clean --install \
-  build-dir flatpak/io.github.pedrohqb.Tessera.yml
+  --default-branch=stable build-dir flatpak/io.github.pedrohqb.Tessera.yml
+# a driver extension, against the app just installed (branch stable, as the
+# extensions' runtime-version says):
+flatpak-builder --user --force-clean --install --default-branch=stable \
+  build-ext flatpak/extensions/SafeSign/io.github.pedrohqb.Tessera.Driver.SafeSign.yml
 ```
 
 The manifest uses the `org.gnome.Platform` 51 runtime, Rust from the `rust-stable` extension, and builds pcsc-lite 2.5.3 (only the client library, `--libdir=lib`), because the runtime does not have it. The pcsc-lite protocol is compatible with the system's `pcscd`.

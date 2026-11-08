@@ -19,10 +19,15 @@ pub struct Settings {
 
 impl Settings {
     pub fn load() -> Self {
-        fs::read_to_string(paths::settings_file())
+        let mut s: Self = fs::read_to_string(paths::settings_file())
             .ok()
             .and_then(|t| toml::from_str(&t).ok())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        // Driver ids are lowercase (an extension's folder may not be).
+        for id in &mut s.disabled_drivers {
+            *id = id.to_lowercase();
+        }
+        s
     }
 
     pub fn save(&self) {

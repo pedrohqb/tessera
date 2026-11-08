@@ -28,13 +28,13 @@ grep -rlI '/usr/share/serproid-desktop' usr 2>/dev/null | while read -r f; do
     sed -i "s|/usr/share/serproid-desktop|$final/usr/share/serproid-desktop|g" "$f"
 done
 
-lib=$(find usr -name 'libserproidp11.so' \( -type f -o -type l \) | head -n1)
+lib=$(find usr -name 'libserproidp11.so' \( -type f -o -type l \) | sort | head -n1)
 [ -n "$lib" ] || { log "libserproidp11.so not found in the package"; exit 1; }
 ln -sf "$lib" libserproidp11.so
 ln -sf "$(basename "$lib")" "$(dirname "$lib")/libneoidp11.so"
 
 # The desktop app: take its Exec line and point it at this copy.
-desktop=$(find usr -name 'serproid*.desktop' | head -n1)
+desktop=$(find usr -name 'serproid*.desktop' | sort | head -n1)
 if [ -n "$desktop" ]; then
     exec_line=$(sed -n 's/^Exec=//p' "$desktop" | head -n1 | sed 's/ %[fFuU]//g')
     prog=${exec_line%% *}

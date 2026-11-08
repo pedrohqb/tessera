@@ -60,6 +60,10 @@ pub struct Token {
     /// `slotListIndex` (see jsignpdf.rs).
     #[serde(default)]
     pub slot_index: usize,
+    /// The slot's description, which for most drivers (OpenSC, SafeNet)
+    /// names the card reader the token is in.
+    #[serde(default)]
+    pub slot: String,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -440,6 +444,10 @@ pub fn list_tokens_in_process(with_certs: bool) -> Result<String, String> {
             // An empty slot some drivers keep for initializing a new token.
             continue;
         }
+        let slot_name = ctx
+            .get_slot_info(slot)
+            .map(|s| clean(s.slot_description()))
+            .unwrap_or_default();
         let mut token = Token {
             driver: String::new(),
             label: clean(info.label()),
@@ -448,6 +456,7 @@ pub fn list_tokens_in_process(with_certs: bool) -> Result<String, String> {
             serial: clean(info.serial_number()),
             certificates: vec![],
             slot_index,
+            slot: slot_name,
         };
         if let Some(session) = with_certs.then(|| ctx.open_ro_session(slot).ok()).flatten() {
             let handles = session
@@ -664,6 +673,17 @@ fn served_twice(ours: &[(String, String)], seen: &[(String, String)]) -> Vec<(St
     out
 }
 
+/// Does a token Tessera serves sit in this reader? Drivers that name the
+/// slot after its reader (OpenSC, SafeNet) say so; for the others, any token
+/// at all counts, so a reader is only flagged when nothing is served.
+pub fn served_in_reader(tokens: &[Token], reader: &str) -> bool {
+    let base = reader.trim();
+    tokens.iter().any(|t| {
+        let slot = t.slot.trim();
+        slot.is_empty() || slot.starts_with(base) || base.starts_with(slot) || slot.contains(base)
+    })
+}
+
 /// Tokens from different drivers that hold the same certificate: the same
 /// token, served by two of Tessera's drivers (OpenSC and the vendor's, say),
 /// which the apps would list twice. Each pair once: (token, driver, other
@@ -796,6 +816,7 @@ mod duplicate_tests {
             serial: String::new(),
             certificates: certs,
             slot_index: 0,
+            slot: String::new(),
         }
     }
 
@@ -833,6 +854,30 @@ mod duplicate_tests {
                 "OpenSC".to_string()
             )]
         );
+    }
+
+    #[test]
+    fn a_reader_with_a_served_token_is_known() {
+        let mut t = token("OpenSC", "IDPrime", vec![]);
+        t.slot = "Generic USB Smart Card Reader 00 00".into();
+        assert!(served_in_reader(
+            &[t.clone()],
+            "Generic USB Smart Card Reader 00 00"
+        ));
+        assert!(!served_in_reader(
+            &[t.clone()],
+            "SafeNet eToken 5100 [eToken 5110 SC] 00 00"
+        ));
+        assert!(!served_in_reader(
+            &[],
+            "Generic USB Smart Card Reader 00 00"
+        ));
+        // A driver that does not name its slot after the reader: any token counts.
+        t.slot = String::new();
+        assert!(served_in_reader(
+            &[t],
+            "Generic USB Smart Card Reader 00 00"
+        ));
     }
 
     #[test]

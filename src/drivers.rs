@@ -181,7 +181,7 @@ fn load_one(dir: &Path) -> Result<Driver> {
         when_on: d
             .when_on
             .into_iter()
-            .map(|(other, w)| (other, env_map(dir, w.env)))
+            .map(|(other, w)| (other.to_lowercase(), env_map(dir, w.env)))
             .collect(),
     })
 }
