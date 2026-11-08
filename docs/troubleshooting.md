@@ -22,6 +22,10 @@
 | "System connection" red | `p11-kit-server.socket` off | `systemctl --user enable --now p11-kit-server.socket` (on Debian and Ubuntu, the user service in [usage](usage.md); the window's copy button gives it); the row recovers on its own within 15 s, without restarting Tessera; `tessera status` shows the same result |
 | The app sees no token at all | step 1 is missing, or the app was opened before step 1 or before the driver was published | Step 1, then close and reopen the app |
 | Tessera sees the token, the app does not | the driver has not responded yet (not published) or the app was started before publication | Check the driver's state in the window; reopen the app |
+| "System connection" red, or a token missing in the apps, only while a driver has no token (OpenSC with no card, say) | p11-kit stops listing at a module of Tessera's without a token (a bug in its RPC; [History](history.md) item 43) | Fixed in Tessera: the drivers without a token are listed last, updated within a few seconds of a token going in or out. Press refresh (top left) to check at once |
+| An app's step 2 says to open the app and restart Tessera | the app's folder did not exist when Tessera started, and its sandbox does not see it | Open the app once, then **Restart Tessera** (the button on the row, or the menu) |
+| A driver extension installed, but still "Not installed" | extensions are mounted when Tessera starts | **Restart Tessera** (menu) |
+| JSignPdf: "No private key was found" | the keystore type is still JKS, or the PIN was not typed | Keystore type **PKCS11** (Tessera's **Set up** chooses it), the PIN in **Keystore password**, then **Load keys** (see [Apps](apps.md#jsignpdf)) |
 | Driver "Stopped: No answer 3 times in a row" | the driver hangs (for example, with no token) | **Restart**, or switch the driver off if it is not used |
 | Duplicate certificates in Papers | `p11-kit-client.so` registered in Papers' database | **Set up** again (the current version removes the registration) |
 | SerproID: phone asks, approving gives "Ops!", and the request repeats | corrupted mechanism parameters (versions before the fix) | Update Tessera |

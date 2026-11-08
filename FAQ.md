@@ -80,11 +80,11 @@ O servidor p11-kit do sistema está desligado, e os aplicativos em Flatpak não 
 
 ### O aplicativo não vê o token.
 
-Confira se ele aparece como **Pronto** na lista do Tessera e se foi aberto de novo depois do passo 1. O aplicativo precisa estar fechado quando você aperta **Configurar**. Se o PIN é pedido mas a assinatura falha, veja a [primeira pergunta](#o-pin-é-pedido-mas-a-assinatura-falha-por-quê).
+Confira se ele aparece como **Pronto** na lista do Tessera e se foi aberto de novo depois do passo 1. O aplicativo precisa estar fechado quando você aperta **Configurar**. Se o passo 2 pedir para abrir o aplicativo e reiniciar o Tessera, é porque o aplicativo foi aberto pela primeira vez depois que o Tessera abriu, e o Tessera ainda não enxerga a pasta dele: use o botão **Reiniciar o Tessera** da linha. Se o PIN é pedido mas a assinatura falha, veja a [primeira pergunta](#o-pin-é-pedido-mas-a-assinatura-falha-por-quê).
 
 ### O token não aparece no Tessera.
 
-Veja primeiro se o driver dele está instalado: os drivers dos fabricantes são extensões à parte (tabela no [README](README.md)). Com o token conectado, se faltar o driver, a linha do leitor diz qual instalar, com o comando pronto para copiar; depois de instalar, saia do Tessera pelo menu e abra de novo. Se o driver já estiver lá, tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**. Confira também se o serviço de cartões está ligado (`sudo systemctl enable --now pcscd.socket`).
+Veja primeiro se o driver dele está instalado: os drivers dos fabricantes são extensões à parte (tabela no [README](README.md)). Com o token conectado, se faltar o driver, a linha do leitor diz qual instalar, com o comando pronto para copiar; depois de instalar, use **Reiniciar o Tessera** no menu. Se o driver já estiver lá, tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**. Confira também se o serviço de cartões está ligado (`sudo systemctl enable --now pcscd.socket`).
 
 ### O token aparece duas vezes, ou o navegador pede o PIN duas vezes.
 
@@ -111,9 +111,13 @@ Sim: retire a indicação da biblioteca do fornecedor dos bancos de certificados
 
 Se não for mais usar os pacotes do fornecedor, pode também desinstalá-los do sistema.
 
+### O JSignPdf diz "Nenhuma chave privada foi encontrada".
+
+No painel **Certificado**, à esquerda, o **Tipo de keystore** deve ser **PKCS11** (o **Configurar** do Tessera já o escolhe; feche o JSignPdf antes). Digite o PIN do token em **Palavra-passe do keystore**, aperte **Carregar chaves**, escolha o certificado em **Alias da chave** e assine; deixe vazios **Ficheiro de keystore** e **Palavra-passe da chave**. Sem o PIN, o token não mostra a chave.
+
 ### O JSignPdf não acha mais o certificado.
 
-O JSignPdf abre um único slot do servidor p11-kit, e o Tessera grava a posição do slot do token quando você aperta **Configurar**. Se o token mudar de leitora, ou se o sistema ganhar ou perder algum módulo, essa posição muda. Feche o JSignPdf, conecte o token e aperte **Configurar** de novo na linha dele. No JSignPdf, o tipo de keystore deve ser **PKCS11**.
+O JSignPdf abre um único slot do servidor p11-kit, e o Tessera grava a posição do slot do token quando você aperta **Configurar**. Se o token mudar de leitora, ou se o sistema ganhar ou perder algum módulo, essa posição muda. Feche o JSignPdf, conecte o token e aperte **Configurar** de novo na linha dele.
 
 ### Como troco ou desbloqueio o PIN de um token do OpenSC (ePass2003)?
 
@@ -238,11 +242,11 @@ The system's p11-kit server is off, and Flatpak apps do not see the tokens. Run 
 
 ### An app does not see the token.
 
-Check that it shows as **Ready** in Tessera's list, and that it was opened again after step 1. The app must be closed when you press **Set up**. If the PIN is asked but signing fails, see the [first question](#the-pin-is-asked-but-signing-fails-why).
+Check that it shows as **Ready** in Tessera's list, and that it was opened again after step 1. The app must be closed when you press **Set up**. If step 2 asks you to open the app and restart Tessera, the app was first opened after Tessera started, and Tessera does not see its folder yet: use the row's **Restart Tessera** button. If the PIN is asked but signing fails, see the [first question](#the-pin-is-asked-but-signing-fails-why).
 
 ### The token does not appear in Tessera.
 
-First check that its driver is installed: the vendors' drivers are separate extensions (table in the [README](README.md)). With the token plugged in, if its driver is missing, the reader's row says which one to install, with the command ready to copy; after installing, quit Tessera from its menu and open it again. If the driver is there, unplug the token and plug it in again. If a driver shows as "Stopped", press **Restart**. Also check that the smart card service is on (`sudo systemctl enable --now pcscd.socket`).
+First check that its driver is installed: the vendors' drivers are separate extensions (table in the [README](README.md)). With the token plugged in, if its driver is missing, the reader's row says which one to install, with the command ready to copy; after installing, use **Restart Tessera** in the menu. If the driver is there, unplug the token and plug it in again. If a driver shows as "Stopped", press **Restart**. Also check that the smart card service is on (`sudo systemctl enable --now pcscd.socket`).
 
 ### The token shows twice, or the browser asks for the PIN twice.
 
@@ -269,9 +273,13 @@ Yes: remove the vendor library's entry from the browsers' certificate databases.
 
 If you will not use the vendor packages anymore, you can also uninstall them from the system.
 
+### JSignPdf says "No private key was found".
+
+In the **Certificate** panel, on the left, **Keystore type** must be **PKCS11** (Tessera's **Set up** chooses it; close JSignPdf first). Type the token's PIN in **Keystore password**, press **Load keys**, pick the certificate under **Key alias** and sign; leave **Keystore file** and **Key password** empty. Without the PIN, the token does not show its key.
+
 ### JSignPdf no longer finds the certificate.
 
-JSignPdf opens a single slot of the p11-kit server, and Tessera writes the position of the token's slot when you press **Set up**. If the token moves to another reader, or the system gains or loses a module, that position changes. Close JSignPdf, plug in the token and press **Set up** again on its row. In JSignPdf, the keystore type must be **PKCS11**.
+JSignPdf opens a single slot of the p11-kit server, and Tessera writes the position of the token's slot when you press **Set up**. If the token moves to another reader, or the system gains or loses a module, that position changes. Close JSignPdf, plug in the token and press **Set up** again on its row.
 
 ### How do I change or unblock the PIN of an OpenSC token (ePass2003)?
 

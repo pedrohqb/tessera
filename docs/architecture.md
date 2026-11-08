@@ -88,7 +88,8 @@ Supervision runs in the service, with or without the window (`supervise` in `src
 | `--filesystem=~/.var/app/org.mozilla.thunderbird/.thunderbird` and `.../config/thunderbird`, the same for `org.mozilla.thunderbird_esr`, and `~/.var/app/org.mozilla.Thunderbird/.thunderbird` | Registering the module in the Thunderbird profiles |
 | `--filesystem=~/.var/app/org.gnome.Evolution/data/pki/nssdb` | Evolution's own database, when it has no `~/.pki/nssdb`: only removing a duplicate module |
 | `--filesystem=~/.var/app/org.libreoffice.LibreOffice/config/libreoffice` and `.../data` | LibreOffice's certificate path (`CertDir` in `registrymodifications.xcu`) and the empty NSS database it points to |
-| `--filesystem=~/.var/app/io.github.intoolswetrust.JSignPdf/config` | JSignPdf's `jsignpdf/pkcs11.cfg` |
+| `--filesystem=~/.var/app/io.github.intoolswetrust.JSignPdf/config` | JSignPdf's `jsignpdf/pkcs11.cfg` and its keystore type (`jsignpdf/config.properties`) |
+| `--filesystem=~/.var/app/net.code_industry.MasterPDFEditor/config` | Master PDF Editor's PKCS#11 provider (`Code Industry/Master PDF Editor 5.conf`) |
 | `--filesystem=~/.mozilla/firefox`, `xdg-config/mozilla/firefox` and `xdg-data/pki/nssdb` | The native apps (see [Apps](apps.md#native-apps)): the native Firefox's profiles and the database the native Chromium-based browsers (and Evolution) share since Chromium 146 |
 | `--filesystem=~/.pjeoffice-pro` | The native PJeOffice Pro's list of A3 libraries (`list.a3`) |
 | `--filesystem=~/.thunderbird` and `xdg-config/thunderbird` | The native Thunderbird's profiles |
@@ -96,7 +97,7 @@ Supervision runs in the service, with or without the window (`supervise` in `src
 | `--talk-name=org.kde.StatusNotifierWatcher` | The tray icon |
 | `--persist=.config/serproid` | SerproID's certificate folder and log stay in Tessera's own data |
 
-The app folders do not get `:create`. The app creates its own folders the first time it runs, and Tessera does not create folders for apps that are not installed. A folder that did not exist when Tessera started stays invisible to it until it restarts.
+The app folders do not get `:create`. The app creates its own folders the first time it runs, and Tessera does not create folders for apps that are not installed. A folder that did not exist when Tessera started stays invisible to it until it restarts; so does a driver extension installed since. For that, the menu has **Restart Tessera**, and an app's step 2 offers it when the app is installed but its folder is not seen: Tessera starts again through the Flatpak portal (`Spawn`), in a sandbox mounted afresh, and the new instance waits for the old one to leave the session bus before taking its place.
 
 ## Security
 

@@ -20,6 +20,7 @@ mod drivers;
 mod i18n;
 mod jsignpdf;
 mod libreoffice;
+mod masterpdf;
 mod native;
 mod nss;
 mod paths;
@@ -142,7 +143,7 @@ fn print_status() -> ExitCode {
             apps::host_server_command()
         ),
         status::HostView::WithoutTessera => {
-            "apps do NOT see Tessera's tokens (server off)".to_string()
+            "apps do NOT see Tessera's tokens: what answers there does not list them (the system's server is probably off, with Flatpak's own in its place)".to_string()
         }
         status::HostView::Sees(n, twice) if twice.is_empty() => {
             format!("on; apps see {n} of {} token(s)", ours.len())
@@ -223,7 +224,7 @@ pub fn check_drivers(
             srv.restart_driver(d);
         }
     }
-    apps::write_host_modules(ds, &snap.ok).map_err(|e| format!("{e:#}"))
+    apps::write_host_modules(ds, &snap.ok, &snap.with_tokens).map_err(|e| format!("{e:#}"))
 }
 
 fn serve() -> ExitCode {
@@ -242,7 +243,7 @@ fn serve() -> ExitCode {
         return ExitCode::FAILURE;
     }
     // Nothing is published until each driver has answered once.
-    let _ = apps::write_host_modules(&ds, &[]);
+    let _ = apps::write_host_modules(&ds, &[], &[]);
     eprintln!("tessera: serving in {}", paths::socket_dir().display());
     let mut last = usize::MAX;
     let mut health = Health::default();

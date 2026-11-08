@@ -79,6 +79,8 @@ pub struct Snapshot {
     pub errors: Vec<String>,
     /// Ids of the drivers that answered.
     pub ok: Vec<String>,
+    /// Ids of the drivers that answered with at least one token.
+    pub with_tokens: Vec<String>,
     /// Ids of the drivers that did not answer in time.
     pub timed_out: Vec<String>,
 }
@@ -735,6 +737,7 @@ pub fn snapshot(drivers: &[(String, String)]) -> Snapshot {
         tokens: Vec::new(),
         errors: Vec::new(),
         ok: Vec::new(),
+        with_tokens: Vec::new(),
         timed_out: Vec::new(),
     };
     for h in handles {
@@ -743,6 +746,9 @@ pub fn snapshot(drivers: &[(String, String)]) -> Snapshot {
         };
         match r {
             Ok(t) => {
+                if !t.is_empty() {
+                    snap.with_tokens.push(id.clone());
+                }
                 snap.tokens.extend(t);
                 snap.ok.push(id);
             }

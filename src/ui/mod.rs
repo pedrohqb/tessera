@@ -4,6 +4,7 @@
 //! supervise.rs.
 
 mod app_rows;
+mod restart;
 mod supervise;
 mod window;
 
@@ -75,7 +76,8 @@ impl Hub {
         }
         // Nothing is published to the host until each driver has answered
         // once (see refresh): a driver that hangs would hang every app.
-        *self.host.borrow_mut() = apps::write_host_modules(&ds, &[]).map_err(|e| format!("{e:#}"));
+        *self.host.borrow_mut() =
+            apps::write_host_modules(&ds, &[], &[]).map_err(|e| format!("{e:#}"));
         *self.drivers.borrow_mut() = ds;
         // Check what the apps see again once the drivers are back.
         *self.host_checked.borrow_mut() = None;
@@ -88,7 +90,7 @@ impl Hub {
     fn shut_down(&self) {
         self.generation.set(self.generation.get() + 1);
         self.server.borrow_mut().stop();
-        let _ = apps::write_host_modules(&self.drivers.borrow(), &[]);
+        let _ = apps::write_host_modules(&self.drivers.borrow(), &[], &[]);
         self.tray.borrow_mut().take();
     }
 
@@ -211,6 +213,25 @@ fn setup_actions(app: &adw::Application, hub: &Rc<Hub>) {
     }
     app.add_action(&about);
 
+    // Start again, in a sandbox mounted afresh (see restart.rs).
+    let restart_action = gio::SimpleAction::new("restart", None);
+    {
+        let (hub, app2) = (hub.clone(), app.clone());
+        restart_action.connect_activate(move |_, _| {
+            let hub = hub.clone();
+            restart::restart(&app2, move |e| {
+                let win = hub.win.borrow().clone();
+                if let Some(win) = win {
+                    win.alert(
+                        t("Could not restart Tessera"),
+                        &format!("{} ({e})", t("Quit it from the menu and open it again")),
+                    );
+                }
+            });
+        });
+    }
+    app.add_action(&restart_action);
+
     let quit = gio::SimpleAction::new("quit", None);
     {
         let (hub, app2) = (hub.clone(), app.clone());
@@ -304,6 +325,16 @@ pub fn run() -> ExitCode {
             }
         });
     }
-    let code = app.run();
+    // Started by restart.rs: let the instance that started it leave first.
+    let args: Vec<String> = std::env::args().collect();
+    let restarted = args.iter().any(|a| a == restart::RESTARTED);
+    let args: Vec<String> = args
+        .into_iter()
+        .filter(|a| a != restart::RESTARTED)
+        .collect();
+    if restarted {
+        restart::wait_for_previous();
+    }
+    let code = app.run_with_args(&args);
     ExitCode::from(code.get())
 }

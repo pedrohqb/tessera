@@ -52,7 +52,7 @@ The tokens' certificates then appear in File → Digital Signatures, and the PIN
 
 ## JSignPdf
 
-`io.github.intoolswetrust.JSignPdf` (Flathub). JSignPdf is Java: its PKCS#11 keystore is Java's SunPKCS11 (or JSignPdf's fork of it), set up by one file, `pkcs11.cfg`, in its config folder (`~/.var/app/io.github.intoolswetrust.JSignPdf/config/jsignpdf`), read once at startup.
+`io.github.intoolswetrust.JSignPdf` (Flathub). JSignPdf is Java: its PKCS#11 keystore is Java's SunPKCS11 (or JSignPdf's fork of it), set up by one file, `pkcs11.cfg`, in its config folder (`~/.var/app/io.github.intoolswetrust.JSignPdf/config/jsignpdf`), read once at startup. That file only adds the PKCS11 keystore type: JSignPdf still opens its default, JKS (a file), until **Keystore type** says PKCS11, a choice it keeps in `config.properties` in the same folder.
 
 1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 io.github.intoolswetrust.JSignPdf`
 2. Close JSignPdf, plug in the token and press **Set up**. Tessera writes:
@@ -61,16 +61,18 @@ The tokens' certificates then appear in File → Digital Signatures, and the PIN
    library=/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so
    slotListIndex=N
    ```
-   SunPKCS11 opens **one** slot, by default the first of all the slots, and on the system's p11-kit server the first ones are p11-kit's trust store, with no keys. So Tessera asks the system's server for its slots and writes the position of the first one holding one of Tessera's tokens. That position changes if the system's modules or the readers change: the button stays available to write it again. A `pkcs11.cfg` that was there before is kept as `pkcs11.cfg.before-tessera`. Open JSignPdf once before, then start (or restart) Tessera: its sandbox only sees the app's config folder if it existed when Tessera started.
+   SunPKCS11 opens **one** slot, by default the first of all the slots, and on the system's p11-kit server the first ones are p11-kit's trust store, with no keys. So Tessera asks the system's server for its slots and writes the position of the first one holding one of Tessera's tokens. That position changes if the system's modules or the readers change: the button stays available to write it again. A `pkcs11.cfg` that was there before is kept as `pkcs11.cfg.before-tessera`.
 
-In JSignPdf, choose the keystore type **PKCS11**. Not yet tested with a real token.
+   It also sets `keystore.type=PKCS11` in `config.properties`, leaving the rest of the file as it was (the file as it was is kept as `config.properties.before-tessera`). JSignPdf writes that file again when it closes, which is why it must be closed first. Open JSignPdf once before, then start (or restart) Tessera: its sandbox only sees the app's config folder if it existed when Tessera started.
+
+To sign: open the PDF, type the token's PIN in **Keystore password** (in Portuguese, "Palavra-passe do keystore"), press **Load keys**, pick the certificate under **Key alias** and press **Sign**. Leave **Keystore file** and **Key password** empty. Tested with the GD Burti (SafeSign extension). Without the PIN, or with the keystore type left at JKS, JSignPdf says only "No private key was found"
 
 ## Master PDF Editor
 
-`net.code_industry.MasterPDFEditor` (Flathub). It loads one PKCS#11 library, chosen in Tools → Settings → Certificates → "PKCS#11 provider". Its settings are a Qt file (`~/.var/app/net.code_industry.MasterPDFEditor/config/Code Industry/Master PDF Editor 5.conf`), but the key that field writes is not known, so step 2 is **by hand**:
+`net.code_industry.MasterPDFEditor` (Flathub). It loads one PKCS#11 library, chosen in Tools → Settings → Certificates → "PKCS#11 provider", and keeps it in its settings, a Qt file (`~/.var/app/net.code_industry.MasterPDFEditor/config/Code Industry/Master PDF Editor 5.conf`), as `pkcs11-helper-provider=` under `[General]` (seen in a user's file).
 
 1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 net.code_industry.MasterPDFEditor`
-2. In Master PDF Editor, set the PKCS#11 provider to `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` (the row has a button to copy it).
+2. Close Master PDF Editor and press **Set up**: Tessera writes `pkcs11-helper-provider=/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`, leaving the rest of the file as it was (the file as it was before Tessera's first change is kept as `Master PDF Editor 5.conf.before-tessera`). Master PDF Editor writes that file again when it closes, which is why it must be closed first; it must also have been opened once, before Tessera started, so the file exists and Tessera sees it. The row still shows where the setting is, and the path to copy, for doing it by hand.
 
 Not yet tested with a real token. The certificates of p11-kit's trust store may show in the signing list next to the token's.
 

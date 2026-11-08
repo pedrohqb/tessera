@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::process::Command;
 use std::rc::Rc;
 
-use super::app_rows::{apps_group, AppRows, NativeRows};
+use super::app_rows::{apps_group, update_apps, AppRows, NativeRows};
 use super::supervise::{supervise, update_status};
 use super::Hub;
 use crate::apps;
@@ -260,8 +260,8 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
         ),
         (Ok(_), Some(status::HostView::WithoutTessera)) => (
             run_once(
-                "The apps do not see Tessera's tokens: the system's p11-kit server is off. Run once in a terminal:",
-                "The apps do not see Tessera's tokens: the system's p11-kit server is off. Copy the command with the button on the right and run it once in a terminal.",
+                "The apps do not see Tessera's tokens: what answers at the system connection does not list them (the system's p11-kit server is probably off, and Flatpak's own answers in its place). Run once in a terminal:",
+                "The apps do not see Tessera's tokens: what answers at the system connection does not list them (the system's p11-kit server is probably off, and Flatpak's own answers in its place). Copy the command with the button on the right and run it once in a terminal.",
             ),
             true,
         ),
@@ -559,7 +559,7 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
                 t("Not installed"),
                 k.vendor,
                 t(k.tokens),
-                t("Install it from the app store (an add-on on Tessera's page) or FlatPark's page (button), or with the command (copy button)")
+                t("Install it from the app store (an add-on on Tessera's page) or FlatPark's page (button), or with the command (copy button); then restart Tessera (menu)")
             ),
             "application-x-addon-symbolic",
         );
@@ -582,6 +582,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         Some("app.autostart"),
     );
     menu.append(Some(t("Show an icon in the tray")), Some("app.tray"));
+    menu.append(Some(t("Restart Tessera")), Some("app.restart"));
     menu.append(Some(t("About Tessera")), Some("app.about"));
     menu.append(Some(t("Quit")), Some("app.quit"));
     header.pack_end(
@@ -668,7 +669,12 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         let (hub, w) = (hub.clone(), Rc::downgrade(&win));
         refresh_button.connect_clicked(move |_| {
             if let Some(win) = w.upgrade() {
+                // Everything again: the tokens, what the apps see through
+                // the system (now, not at the next 15 s check) and each
+                // app's steps.
                 win.last.borrow_mut().clear();
+                *hub.host_checked.borrow_mut() = None;
+                update_apps(&win);
                 refresh(&hub, &win);
             }
         });

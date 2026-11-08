@@ -10,7 +10,7 @@ use crate::apps::{self, ClientApp, Setup};
 use crate::i18n::t;
 use crate::nss;
 use crate::paths;
-use crate::{jsignpdf, libreoffice, native, status};
+use crate::{jsignpdf, libreoffice, masterpdf, native, status};
 
 /// The app's own icon (see themed_icon), else Tessera's copy of it, else a
 /// generic one.
@@ -42,10 +42,32 @@ pub(super) fn step2_needed(app: &ClientApp) -> bool {
         }
         // Whether the slot is still the right one takes a look at the
         // system's server, too slow for here: Set up stays available.
-        Setup::JSignPdf => !std::fs::read_to_string(jsignpdf::config_file())
-            .is_ok_and(|t| jsignpdf::is_set_up(&t, None)),
+        Setup::JSignPdf => !jsignpdf::ready(None),
+        Setup::MasterPdf => !std::fs::read_to_string(masterpdf::config_file())
+            .is_ok_and(|t| masterpdf::is_set_up(&t)),
         Setup::ByHand | Setup::None => false,
     }
+}
+
+/// Is step 2 waiting for a folder of the app that Tessera does not see:
+/// the app is installed, but its profile or settings are not there? Either
+/// it was never opened, or it was first opened after Tessera started (the
+/// sandbox mounts only what existed then): open it once, then restart
+/// Tessera.
+pub(super) fn needs_restart(app: &ClientApp) -> bool {
+    let missing = match app.setup {
+        Setup::Profiles(_) => apps::app_profiles(app).is_empty(),
+        Setup::LibreOffice => {
+            libreoffice::cert_dir(&libreoffice::flatpak_profile()).is_none()
+                || libreoffice::flatpak_db().parent().map(|p| p.is_dir()) != Some(true)
+        }
+        Setup::JSignPdf => !jsignpdf::config_dir()
+            .parent()
+            .is_some_and(std::path::Path::is_dir),
+        Setup::MasterPdf => !masterpdf::config_file().is_file(),
+        Setup::Poppler | Setup::Chromium | Setup::ByHand | Setup::None => false,
+    };
+    missing && paths::flatpak_installed(app.id)
 }
 
 pub(super) fn app_subtitle(app: &ClientApp) -> String {
@@ -151,6 +173,10 @@ pub(super) fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
             jsignpdf::set_up(index)?;
             Ok(step2_done(app))
         }
+        Setup::MasterPdf => {
+            masterpdf::set_up()?;
+            Ok(step2_done(app))
+        }
         Setup::ByHand | Setup::None => Ok(String::new()),
     }
 }
@@ -163,6 +189,7 @@ pub(super) struct AppRows {
     pub(super) copy: gtk::Button,
     step2: adw::ActionRow,
     pub(super) button: gtk::Button,
+    restart: gtk::Button,
     pub(super) manual: Option<adw::ActionRow>,
 }
 
@@ -205,22 +232,30 @@ pub(super) fn update_app(r: &AppRows) {
         r.step2.set_title(&format!("{title} ✓"));
         r.step2.set_subtitle(match app.setup {
             Setup::Profiles(_) => t("Done: Tessera's module is in every profile"),
-            Setup::JSignPdf => t("Done: JSignPdf's pkcs11.cfg names p11-kit and the slot of Tessera's tokens. Set up again if the token moves to another reader; in JSignPdf, choose the keystore type PKCS11"),
+            Setup::JSignPdf => t("Done: JSignPdf opens Tessera's tokens (keystore type PKCS11). To sign, type the token's PIN in “Keystore password” and press “Load keys”. Set up again if the token moves to another reader"),
             Setup::LibreOffice => t("Done: LibreOffice uses a certificate database of its own (Tools → Options → Security → Certificate Path)"),
+            Setup::MasterPdf => t("Done: Master PDF Editor's PKCS#11 provider is p11-kit (Tools → Settings → Certificates)"),
             _ => t("Done: the app has its own certificate database"),
         });
+    } else if needs_restart(app) {
+        r.step2.set_title(title);
+        r.step2.set_subtitle(t("Open the app once, so it makes its settings, then restart Tessera: it sees an app's folders only if they were there when it started"));
     } else {
         r.step2.set_title(title);
         r.step2.set_subtitle(match app.setup {
             Setup::Profiles(_) => t("Close the app first: adds the module to every profile"),
             Setup::Poppler => t("Makes the certificate database the app reads when signing"),
             Setup::LibreOffice => t("Close LibreOffice first: makes a certificate database of its own and sets it as its certificate path"),
-            Setup::JSignPdf => t("Close JSignPdf first: writes its pkcs11.cfg with p11-kit and the slot of Tessera's tokens (needs the token plugged in and the system connection)"),
+            Setup::MasterPdf => t("Close Master PDF Editor first: sets p11-kit as its PKCS#11 provider (Tools → Settings → Certificates)"),
+            Setup::JSignPdf => t("Close JSignPdf first: writes its pkcs11.cfg (p11-kit and the slot of Tessera's tokens) and chooses the keystore type PKCS11 in its settings (needs the token plugged in and the system connection)"),
             _ => t("An older Tessera added a module that makes the app ask for the PIN twice. Close the app first"),
         });
     }
     // JSignPdf's slot may change: Set up stays available.
-    r.button.set_visible(!s2 || app.setup == Setup::JSignPdf);
+    let restart = !s2 && needs_restart(app);
+    r.button
+        .set_visible((!s2 || app.setup == Setup::JSignPdf) && !restart);
+    r.restart.set_visible(restart);
     if let Some(m) = &r.manual {
         m.set_visible(!s2 || app.setup == Setup::ByHand);
     }
@@ -282,6 +317,13 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
         });
     }
     step2.add_suffix(&button);
+    let restart = gtk::Button::builder()
+        .label(t("Restart Tessera"))
+        .action_name("app.restart")
+        .valign(gtk::Align::Center)
+        .visible(false)
+        .build();
+    step2.add_suffix(&restart);
     row.add_row(&step2);
 
     let manual = app.by_hand.map(|how| {
@@ -293,7 +335,7 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
         // Set after use-markup is off: in the builder the title may come
         // first, and GTK then reads its "&" as markup.
         manual.set_title(t(how));
-        if app.setup == Setup::ByHand {
+        if matches!(app.setup, Setup::ByHand | Setup::MasterPdf) {
             manual.add_suffix(&copy_button(win, paths::CLIENT_MODULE.to_string()));
         }
         row.add_row(&manual);
@@ -306,6 +348,7 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
         copy,
         step2,
         button,
+        restart,
         manual,
     };
     update_app(&rows);

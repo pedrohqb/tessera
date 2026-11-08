@@ -38,8 +38,11 @@ pub enum Setup {
     /// p11-kit-client.so and the slot of Tessera's tokens in its pkcs11.cfg:
     /// see jsignpdf.rs.
     JSignPdf,
-    /// By hand in the app's settings (Master PDF Editor, whose settings key
-    /// is not known): the row shows where, and the module's path.
+    /// p11-kit-client.so as the PKCS#11 provider in its settings file: see
+    /// masterpdf.rs.
+    MasterPdf,
+    /// By hand in the app's settings: the row shows where, and the module's
+    /// path.
     ByHand,
     /// Nothing: the app's package already does it (PJeOffice Pro).
     None,
@@ -172,17 +175,16 @@ pub const JSIGNPDF: ClientApp = ClientApp {
     by_hand: None,
 };
 /// Master PDF Editor (Flathub, Qt 6 build) loads one PKCS#11 library,
-/// chosen in Tools → Settings → Certificates → "PKCS#11 provider". Its
-/// settings file is ~/.var/app/<id>/config/Code Industry/Master PDF Editor
-/// 5.conf, but the key that field writes is not known, so step 2 is by hand.
+/// chosen in Tools → Settings → Certificates → "PKCS#11 provider": see
+/// masterpdf.rs. The row also shows where, for doing it by hand.
 pub const MASTERPDF: ClientApp = ClientApp {
-    id: "net.code_industry.MasterPDFEditor",
+    id: crate::masterpdf::FLATPAK_ID,
     name: "Master PDF Editor",
     icon: "x-office-document-symbolic",
     bundled_icon: None,
-    setup: Setup::ByHand,
+    setup: Setup::MasterPdf,
     by_hand: Some(
-        "By hand in Master PDF Editor: Tools → Settings → Certificates → PKCS#11 provider, file:",
+        "Or by hand in Master PDF Editor: Tools → Settings → Certificates → PKCS#11 provider, file:",
     ),
 };
 pub const PJEOFFICE: ClientApp = ClientApp {
@@ -332,9 +334,26 @@ fn host_module_name(id: &str) -> String {
     format!("tessera-{id}.module")
 }
 
-fn host_module_contents(d: &Driver) -> String {
+/// A driver without a token is listed after every other module. Through
+/// p11-kit's RPC, a module whose slot list is empty answers
+/// C_GetSlotList(CK_TRUE, buffer, &0) with CKR_BUFFER_TOO_SMALL (the
+/// server sends a NULL array for a 0-length one, which the client then
+/// takes for a buffer too small). The system's p11-kit server walks the
+/// modules in order with p11_kit_iter, which stops at the first error: every
+/// module after an empty one of Tessera's was missing for the apps (OpenSC
+/// with no card hid the GD Burti's token, say). p11-kit orders the modules by
+/// `priority:`, highest first (0 when unset; its trust module has 1), then by
+/// name; with -1 the empty ones come last, where they cut nothing off.
+pub const EMPTY_PRIORITY: &str = "-1";
+
+fn host_module_contents(d: &Driver, has_token: bool) -> String {
+    let priority = if has_token {
+        String::new()
+    } else {
+        format!("priority: {EMPTY_PRIORITY}\n")
+    };
     format!(
-        "# Written by Tessera ({}): {}, served from its sandbox.\nremote: unix:path={}\n",
+        "# Written by Tessera ({}): {}, served from its sandbox.\nremote: unix:path={}\n{priority}",
         paths::APP_ID,
         d.name,
         paths::driver_socket(&d.id).display()
@@ -342,8 +361,13 @@ fn host_module_contents(d: &Driver) -> String {
 }
 
 /// Write one host module file per running driver and remove Tessera's stale
-/// ones. Returns how many are in place.
-pub fn write_host_modules(drivers: &[Driver], running: &[String]) -> Result<usize> {
+/// ones; those of `with_tokens` (ids) come first for the apps, the others
+/// last (see EMPTY_PRIORITY). Returns how many are in place.
+pub fn write_host_modules(
+    drivers: &[Driver],
+    running: &[String],
+    with_tokens: &[String],
+) -> Result<usize> {
     let dir = paths::host_modules_dir();
     fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
     let wanted: Vec<&Driver> = drivers.iter().filter(|d| running.contains(&d.id)).collect();
@@ -358,7 +382,7 @@ pub fn write_host_modules(drivers: &[Driver], running: &[String]) -> Result<usiz
     }
     for d in &wanted {
         let path = dir.join(host_module_name(&d.id));
-        let body = host_module_contents(d);
+        let body = host_module_contents(d, with_tokens.contains(&d.id));
         if fs::read_to_string(&path).ok().as_deref() != Some(body.as_str()) {
             fs::write(&path, body).with_context(|| format!("writing {}", path.display()))?;
         }
@@ -369,6 +393,29 @@ pub fn write_host_modules(drivers: &[Driver], running: &[String]) -> Result<usiz
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A driver with a token keeps p11-kit's default place; one without
+    /// goes after every other module (EMPTY_PRIORITY).
+    #[test]
+    fn empty_drivers_come_last() {
+        let d = Driver {
+            id: "opensc".into(),
+            name: "OpenSC".into(),
+            vendor: String::new(),
+            description: String::new(),
+            module: "/x.so".into(),
+            tools: vec![],
+            create_dirs: vec![],
+            library_path: vec![],
+            env: Default::default(),
+            when_on: Default::default(),
+        };
+        let with = host_module_contents(&d, true);
+        assert!(with.contains("remote: unix:path="));
+        assert!(!with.contains("priority"));
+        let without = host_module_contents(&d, false);
+        assert!(without.ends_with("\npriority: -1\n"), "{without}");
+    }
 
     #[test]
     fn server_command_by_distribution() {

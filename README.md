@@ -154,9 +154,8 @@ A seção **Aplicativos** tem duas abas, **Flatpak** e **Nativos**. Cada aplicat
 | Aplicativo | Passos |
 |---|---|
 | PJeOffice Pro e Assinador SERPRO ([FlatPark](https://flatpark.org)) | nenhum |
-| Firefox, Thunderbird, Papers, Okular, LibreOffice e JSignPdf | passo 1 e passo 2 |
+| Firefox, Thunderbird, Papers, Okular, LibreOffice, JSignPdf e Master PDF Editor | passo 1 e passo 2 |
 | Chromium, Chrome, Edge, Brave e Evolution | só o passo 1 |
-| Master PDF Editor | passo 1; o passo 2 é à mão, nas configurações dele (a janela mostra onde e o caminho) |
 
 #### Aplicativos nativos
 
@@ -191,7 +190,7 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 
 ### A fazer
 
-- **Testar com token real** o driver OpenSC (ePass2003) e os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor e Assinador SERPRO.
+- **Testar com token real** o driver OpenSC (ePass2003) e os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice, Master PDF Editor e Assinador SERPRO (o JSignPdf já foi testado).
 - **Publicar no FlatPark** as extensões dos drivers (SafeSign, SafeNet e SerproID) e testar a instalação de cada uma, com a indicação de qual instalar.
 
 ---
@@ -347,9 +346,8 @@ The **Apps** section has two tabs, **Flatpak** and **Native**. Each app shows wh
 | App | Steps |
 |---|---|
 | PJeOffice Pro and Assinador SERPRO ([FlatPark](https://flatpark.org)) | none |
-| Firefox, Thunderbird, Papers, Okular, LibreOffice and JSignPdf | step 1 and step 2 |
+| Firefox, Thunderbird, Papers, Okular, LibreOffice, JSignPdf and Master PDF Editor | step 1 and step 2 |
 | Chromium, Chrome, Edge, Brave and Evolution | step 1 only |
-| Master PDF Editor | step 1; step 2 by hand, in its settings (the window shows where, and the path) |
 
 #### Native apps
 
@@ -382,7 +380,7 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 
 ### To do
 
-- **Test with a real token** the OpenSC driver (ePass2003) and the apps added last: Thunderbird, Evolution, LibreOffice, JSignPdf, Master PDF Editor and Assinador SERPRO.
+- **Test with a real token** the OpenSC driver (ePass2003) and the apps added last: Thunderbird, Evolution, LibreOffice, Master PDF Editor and Assinador SERPRO (JSignPdf has been tested).
 - **Publish on FlatPark** the driver extensions (SafeSign, SafeNet and SerproID) and test installing each, with the window's hint of which one to install.
 
 ### Documentation, support and license
