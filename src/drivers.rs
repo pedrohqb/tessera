@@ -1,20 +1,22 @@
 //! Token drivers: PKCS#11 modules described by a `driver.toml`.
 //!
-//! Each driver lives in its own directory, `<drivers dir>/<id>/driver.toml`,
-//! whether it is bundled with Tessera or installed as a Flatpak extension.
-//! Paths in the file are absolute, or relative to that directory.
+//! Each driver lives in its own directory, `<drivers dir>/<id>/driver.toml`:
+//! OpenSC, bundled with Tessera, and the drivers installed as Flatpak
+//! extensions (flatpak/extensions), each mounted in its own folder. Paths in
+//! the file are absolute, or relative to that directory. The id is the
+//! folder's name, lowercased.
 //!
 //! ```toml
 //! name = "SafeSign IC"
 //! vendor = "A.E.T. Europe"
 //! description = "GD Burti and other SafeSign tokens"
-//! module = "/app/extra/drivers/safesign/usr/lib/libaetpkss.so"
+//! module = "extra/libaetpkss.so"
 //!
-//! library_path = ["/app/extra/drivers/safesign/usr/lib"]   # optional
+//! library_path = ["extra/usr/lib"]   # optional
 //!
 //! [[tools]]
 //! name = "Token Administration"
-//! exec = ["/app/extra/drivers/safesign/tokenadmin"]
+//! exec = ["extra/tokenadmin"]
 //! ```
 //!
 //! `library_path` is put in LD_LIBRARY_PATH for the process that loads the
@@ -149,9 +151,12 @@ fn load_one(dir: &Path) -> Result<Driver> {
     let text = fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
     let d: DriverFile =
         toml::from_str(&text).with_context(|| format!("parsing {}", file.display()))?;
+    // Lowercased: an extension's folder is named after its id
+    // (io.github.pedrohqb.Tessera.Driver.SafeNet → SafeNet), the built-in
+    // drivers' are lowercase, and settings and sockets use the id.
     let id = dir
         .file_name()
-        .map(|s| s.to_string_lossy().into_owned())
+        .map(|s| s.to_string_lossy().to_lowercase())
         .unwrap_or_default();
     let tools = d
         .tools

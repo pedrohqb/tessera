@@ -15,6 +15,7 @@
 //!   tessera nss-remove-module DIR  (internal) remove the module Tessera registered
 
 mod apps;
+mod catalog;
 mod drivers;
 mod i18n;
 mod jsignpdf;
@@ -61,6 +62,14 @@ fn print_status() -> ExitCode {
         };
         println!("  {} [{}] {} ({state})", d.name, d.id, d.module.display());
     }
+    for k in catalog::missing(&ds) {
+        println!(
+            "  {} [{}] not installed: {}",
+            k.name,
+            k.id,
+            catalog::install_command(k)
+        );
+    }
     let snap = status::snapshot(&answering);
     println!("\nReaders:");
     match &snap.readers {
@@ -73,6 +82,22 @@ fn print_status() -> ExitCode {
                     ""
                 };
                 println!("  {}{present}", r.name);
+                if !r.atr.is_empty() {
+                    let atr: Vec<String> = r.atr.iter().map(|b| format!("{b:02X}")).collect();
+                    println!("    ATR {}", atr.join(" "));
+                }
+                if let Some(k) = r
+                    .card_present
+                    .then(|| catalog::for_reader(&r.name, &r.atr))
+                    .flatten()
+                    .filter(|k| !ds.iter().any(|d| d.id == k.id))
+                {
+                    println!(
+                        "    looks like a token for {}, not installed: {}",
+                        k.name,
+                        catalog::install_command(k)
+                    );
+                }
             }
         }
         status::Readers::NoService(e) => println!("  pcscd not reachable: {e}"),

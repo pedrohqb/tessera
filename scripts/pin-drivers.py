@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Download each vendor driver listed in the Flatpak manifest, check that its
-sha256 matches the pinned one, and write its size into the manifest.
+"""Download each vendor file pinned in the driver extensions' manifests
+(flatpak/extensions/*/io.github.pedrohqb.Tessera.Driver.*.yml, between
+BEGIN and END MANAGED EXTRA-DATA), check that its sha256 matches the pinned
+one, and write its size into the manifest.
 
 A mismatch means the vendor changed the file at the same URL: nothing is
 written, and the script fails, so the new file can be reviewed before the pin
 is updated by hand.
 
 Usage: scripts/pin-drivers.py [--check]
-  --check   only verify; fail if a size in the manifest is wrong
+  --check   only verify; fail if a size in a manifest is wrong
 """
 import hashlib
 import re
@@ -15,8 +17,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
-MANIFEST = Path(__file__).resolve().parent.parent / "flatpak" / "io.github.pedrohqb.Tessera.yml"
-BLOCK = re.compile(r"(# BEGIN DRIVERS\n)(.*?)(\s*# END DRIVERS)", re.S)
+ROOT = Path(__file__).resolve().parent.parent
+MANIFESTS = sorted((ROOT / "flatpak" / "extensions").glob("*/io.github.pedrohqb.Tessera.Driver.*.yml"))
+BLOCK = re.compile(r"(# BEGIN MANAGED EXTRA-DATA\n)(.*?)(\s*# END MANAGED EXTRA-DATA)", re.S)
 ENTRY = re.compile(
     r"(filename: (?P<name>\S+).*?url: (?P<url>\S+)\s+sha256: (?P<sha>[0-9a-f]{64})\s+size: )(?P<size>\d+)",
     re.S,
@@ -33,12 +36,11 @@ def fetch(url):
     return h.hexdigest(), size
 
 
-def main():
-    check = "--check" in sys.argv
-    text = MANIFEST.read_text()
+def pin(manifest, check):
+    text = manifest.read_text()
     block = BLOCK.search(text)
     if not block:
-        sys.exit("DRIVERS block not found in the manifest")
+        sys.exit(f"{manifest.name}: MANAGED EXTRA-DATA block not found")
     body, failed = block.group(2), False
 
     def update(m):
@@ -49,16 +51,24 @@ def main():
             failed = True
             return m.group(0)
         status = "ok" if int(m["size"]) == size else f"size {m['size']} -> {size}"
-        print(f"{m['name']}: sha256 ok, {size} bytes ({status})")
+        print(f"{manifest.parent.name}/{m['name']}: sha256 ok, {size} bytes ({status})")
         if check and int(m["size"]) != size:
             failed = True
         return m.group(1) + str(size)
 
     new_body = ENTRY.sub(update, body)
+    if not failed and not check:
+        manifest.write_text(text[: block.start(2)] + new_body + text[block.end(2):])
+    return failed
+
+
+def main():
+    check = "--check" in sys.argv
+    if not MANIFESTS:
+        sys.exit("no driver extension manifests found")
+    failed = [m.name for m in MANIFESTS if pin(m, check)]
     if failed:
-        sys.exit(1)
-    if not check:
-        MANIFEST.write_text(text[: block.start(2)] + new_body + text[block.end(2):])
+        sys.exit(f"failed: {', '.join(failed)}")
 
 
 if __name__ == "__main__":

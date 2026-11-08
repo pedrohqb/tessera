@@ -17,6 +17,8 @@ use crate::paths;
 pub struct Reader {
     pub name: String,
     pub card_present: bool,
+    /// The card's ATR, when there is a card.
+    pub atr: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -97,23 +99,27 @@ pub fn readers() -> Readers {
         .iter()
         .map(|n| pcsc::ReaderState::new(n.clone(), pcsc::State::UNAWARE))
         .collect();
-    let present = if ctx
+    let present: Vec<(bool, Vec<u8>)> = if ctx
         .get_status_change(std::time::Duration::from_millis(0), &mut states)
         .is_ok()
     {
         states
             .iter()
-            .map(|s| s.event_state().contains(pcsc::State::PRESENT))
+            .map(|s| {
+                let card = s.event_state().contains(pcsc::State::PRESENT);
+                (card, if card { s.atr().to_vec() } else { vec![] })
+            })
             .collect()
     } else {
-        vec![false; names.len()]
+        vec![(false, vec![]); names.len()]
     };
     let list = names
         .iter()
         .zip(present)
-        .map(|(n, card_present)| Reader {
+        .map(|(n, (card_present, atr))| Reader {
             name: n.to_string_lossy().into_owned(),
             card_present,
+            atr,
         })
         .collect();
     Readers::Ok(list)

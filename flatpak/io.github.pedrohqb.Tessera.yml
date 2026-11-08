@@ -10,9 +10,10 @@ separate-locales: false
 finish-args:
   - --share=ipc
   - --socket=wayland
-  # x11, not fallback-x11: the vendors' tools (SerproID's JavaFX app,
-  # SafeSign's Token Administration) draw only through X11, which needs the
-  # X socket (XWayland) even when Tessera itself is on Wayland.
+  # x11, not fallback-x11: the vendors' tools that come with their driver
+  # extensions (SerproID's JavaFX app, SafeSign's Token Administration) draw
+  # only through X11, which needs the X socket (XWayland) even when Tessera
+  # itself is on Wayland. Extensions have no permissions of their own.
   - --socket=x11
   - --device=dri
   # The token drivers talk to the host's pcscd, which owns the USB readers.
@@ -206,7 +207,6 @@ modules:
     build-commands:
       - cargo build --release --locked
       - install -Dm755 target/release/tessera /app/bin/tessera
-      - install -Dm755 flatpak/apply_extra.sh /app/bin/apply_extra
       - install -Dm644 data/io.github.pedrohqb.Tessera.desktop /app/share/applications/io.github.pedrohqb.Tessera.desktop
       - install -Dm644 data/io.github.pedrohqb.Tessera.metainfo.xml /app/share/metainfo/io.github.pedrohqb.Tessera.metainfo.xml
       - install -Dm644 data/icons/io.github.pedrohqb.Tessera.svg /app/share/icons/hicolor/scalable/apps/io.github.pedrohqb.Tessera.svg
@@ -217,8 +217,7 @@ modules:
       - install -Dm644 data/app-icons/tessera-app-papers.svg /app/share/icons/hicolor/scalable/apps/tessera-app-papers.svg
       # The window's icons for desktops whose theme lacks them (Plasma).
       - sh flatpak/fallback-icons.sh
-      - for d in safesign safenet serproid opensc; do install -Dm644 flatpak/drivers/$d/driver.toml /app/lib/tessera/drivers/$d/driver.toml; done
-      - install -Dm644 -t /app/lib/tessera/drivers/opensc flatpak/drivers/opensc/opensc.conf flatpak/drivers/opensc/opensc-without-idprime.conf
+      - install -Dm644 -t /app/lib/tessera/drivers/opensc flatpak/drivers/opensc/driver.toml flatpak/drivers/opensc/opensc.conf flatpak/drivers/opensc/opensc-without-idprime.conf
       - mkdir -p /app/lib/tessera/extensions
     sources:
       - type: dir
@@ -228,49 +227,3 @@ modules:
           - .flatpak-builder
           - build-dir
           - repo
-      # Vendor drivers, downloaded from the vendors at install time and
-      # checked against these sha256 sums (the same pins as distrobox-adv-br).
-      # Sizes are filled in by scripts/pin-drivers.py.
-      # BEGIN DRIVERS
-      - type: extra-data
-        filename: safesign.deb
-        only-arches: [x86_64]
-        url: https://assets.ctfassets.net/zuadwp3l2xby/6vGICRnQgQ8TkcHTgcouIr/5acf96dcbc0364aa9228606d3969ef97/SafeSignICStandardLinux4.5.0.0-AET.000ub2404x86_64.deb
-        sha256: 7742e21e3141e51e307d7613b4046886bc7c4aa203835dcf5c43cd348f2a1b91
-        size: 0
-      # SafeSign's Token Administration from the vendor's RHEL 10 package
-      # (no wxWidgets needed), as the AUR package does; the PKCS#11 libraries
-      # come from the Ubuntu package above.
-      - type: extra-data
-        filename: safesign.rpm
-        only-arches: [x86_64]
-        url: https://assets.ctfassets.net/zuadwp3l2xby/3b4YS8ts1cuD4BnUoQGZXl/93f644f03cc226b2adab290be11c6cd5/SafeSignICStandardLinux4.5.0.0-AET.000redhat10x86_64.rpm
-        sha256: 2f5ea4622fda213c9bfc8bf4da51dac09983a349326f9275309565dbdb123378
-        size: 0
-      # GDBM, which libaetpkss.so needs and the runtime lacks (the AUR
-      # package depends on gdbm), from Ubuntu 24.04.
-      - type: extra-data
-        filename: gdbm.deb
-        only-arches: [x86_64]
-        url: https://archive.ubuntu.com/ubuntu/pool/main/g/gdbm/libgdbm6t64_1.23-5.1build1_amd64.deb
-        sha256: 18d6d74a5c038b458d95ba0c0909e0f086cd50bb9a0fee32697902724fc5645e
-        size: 34440
-      - type: extra-data
-        filename: gdbm-compat.deb
-        only-arches: [x86_64]
-        url: https://archive.ubuntu.com/ubuntu/pool/main/g/gdbm/libgdbm-compat4t64_1.23-5.1build1_amd64.deb
-        sha256: fb8564afd7b7d74d55207070ba50339478e22d29a39ec740dc482f069ac7ee65
-        size: 6710
-      - type: extra-data
-        filename: safenet.zip
-        only-arches: [x86_64]
-        url: https://www.digicert.com/StaticFiles/Linux_SAC_10.9_GA.zip
-        sha256: 46759cfe91d736af18a49d10e4749f264022db44e04ed4caf94e1ca77d6a013e
-        size: 0
-      - type: extra-data
-        filename: serproid.deb
-        only-arches: [x86_64]
-        url: https://storagegw.estaleiro.serpro.gov.br/instalador-desktop/SerproID-2.1.6-amd64.deb
-        sha256: 0ffa9ffe5bc343cc758a12f28bd7f08aec4b6e843d1c043baf0b81572461e588
-        size: 0
-      # END DRIVERS

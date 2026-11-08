@@ -115,7 +115,10 @@ jobs:
       - name: Build
         run: |
           set +e
+          # Branch "stable", as FlatPark's: the driver extensions name it as
+          # their runtime's version.
           flatpak-builder --user --install-deps-from=flathub --force-clean \
+            --default-branch=stable \
             --repo=repo build-dir flatpak/io.github.pedrohqb.Tessera.yml > build.log 2>&1
           status=$?
           set -e
@@ -127,6 +130,47 @@ jobs:
             echo "::error title=flatpak-builder failed::$msg"
             exit $status
           fi
+      - name: Build the driver extensions
+        run: |
+          # flatpak-builder needs the parent app installed, as the
+          # extensions' runtime: the one just built.
+          flatpak remote-add --user --no-gpg-verify ci-build repo
+          flatpak install --user -y ci-build io.github.pedrohqb.Tessera
+          for m in flatpak/extensions/*/io.github.pedrohqb.Tessera.Driver.*.yml; do
+            name=$(basename "$(dirname "$m")")
+            set +e
+            flatpak-builder --user --force-clean --default-branch=stable \
+              --repo=repo "build-ext-$name" "$m" > "ext-$name.log" 2>&1
+            status=$?
+            set -e
+            tail -n 15 "ext-$name.log"
+            if [ $status -ne 0 ]; then
+              msg=$(tail -n 60 "ext-$name.log" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+              echo "::error title=extension $name failed::$msg"
+              exit $status
+            fi
+          done
+      - name: Install each extension (runs its apply_extra on the real downloads)
+        run: |
+          for m in flatpak/extensions/*/io.github.pedrohqb.Tessera.Driver.*.yml; do
+            id=$(basename "$m" .yml)
+            flatpak install --user -y ci-build "$id"
+            dir=$(flatpak info --user --show-location "$id")/files
+            name=$(basename "$(dirname "$m")")
+            python3 - "$dir" <<'EOF'
+          import sys, tomllib, pathlib
+          d = pathlib.Path(sys.argv[1])
+          t = tomllib.loads((d / "driver.toml").read_text())
+          module = d / t["module"]
+          assert module.exists(), f"{module} missing"
+          for tool in t.get("tools", []):
+              exe = d / tool["exec"][0]
+              assert exe.exists(), f"{exe} missing"
+          print("ok:", module)
+          EOF
+          done
+      - name: Test repository
+        run: |
           # A single-file bundle (flatpak build-bundle) cannot carry
           # extra-data, so the test build ships as a small Flatpak repository
           # instead, with a script that adds it as a local remote.

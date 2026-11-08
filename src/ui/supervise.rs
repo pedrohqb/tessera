@@ -62,7 +62,9 @@ pub(super) fn supervise(hub: &Rc<Hub>) {
                 // A step done in a terminal shows without restarting.
                 update_apps(&win);
             }
-            apply_snapshot(&win, snap);
+            let installed: Vec<String> =
+                hub.drivers.borrow().iter().map(|d| d.id.clone()).collect();
+            apply_snapshot(&win, snap, &installed);
         }
     });
 }

@@ -7,7 +7,7 @@ changed or unreachable, so the workflow can open an issue.
 
   check-downloads.py scripts DIR...        shell scripts: URL_X= / CHECKSUM_X= pairs
   check-downloads.py sigillum FILE         the COMPONENTES table of sigillum.sh
-  check-downloads.py flatpak MANIFEST      extra-data sources (url, sha256, size)
+  check-downloads.py flatpak MANIFEST...   extra-data sources (url, sha256, size)
 
 Only the standard library is used.
 """
@@ -120,7 +120,7 @@ def main():
         sys.exit(__doc__)
     mode, args = sys.argv[1], sys.argv[2:]
     items = {"scripts": lambda: from_scripts(args), "sigillum": lambda: from_sigillum(args[0]),
-             "flatpak": lambda: from_flatpak(args[0])}[mode]()
+             "flatpak": lambda: (i for a in args for i in from_flatpak(a))}[mode]()
     rows, failed = check(list(items))
     if not rows:
         print("Nenhum download fixado foi encontrado; confira o check-downloads.py.")

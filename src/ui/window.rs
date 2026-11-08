@@ -11,6 +11,7 @@ use super::app_rows::{apps_group, AppRows, NativeRows};
 use super::supervise::{supervise, update_status};
 use super::Hub;
 use crate::apps;
+use crate::catalog;
 use crate::drivers;
 use crate::i18n::t;
 use crate::paths;
@@ -123,10 +124,23 @@ pub(super) fn status_page_row(title: &str, subtitle: &str) -> adw::ActionRow {
 }
 
 pub(super) fn copy_button(win: &Rc<Win>, text: String) -> gtk::Button {
+    copy_button_with(
+        win,
+        text,
+        t("Copy the command that lets this app reach Tessera"),
+    )
+}
+
+/// A button that copies a driver's install command.
+pub(super) fn copy_command_button(win: &Rc<Win>, text: String) -> gtk::Button {
+    copy_button_with(win, text, t("Copy the command that installs this driver"))
+}
+
+fn copy_button_with(win: &Rc<Win>, text: String, tooltip: &str) -> gtk::Button {
     let b = gtk::Button::builder()
         .icon_name("edit-copy-symbolic")
         .valign(gtk::Align::Center)
-        .tooltip_text(t("Copy the command that lets this app reach Tessera"))
+        .tooltip_text(tooltip)
         .css_classes(["flat"])
         .build();
     let w = Rc::downgrade(win);
@@ -241,8 +255,8 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
     }
 }
 
-pub(super) fn apply_snapshot(win: &Win, snap: Snapshot) {
-    let fingerprint = format!("{snap:?}");
+pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]) {
+    let fingerprint = format!("{snap:?}{installed:?}");
     if *win.last.borrow() == fingerprint {
         return;
     }
@@ -276,8 +290,25 @@ pub(super) fn apply_snapshot(win: &Win, snap: Snapshot) {
                 } else {
                     t("Empty")
                 };
-                win.readers
-                    .add(&plain_row(&r.name, state, "media-removable-symbolic"));
+                let row = plain_row(&r.name, state, "media-removable-symbolic");
+                // A token whose vendor driver is not installed: which one,
+                // and the command that installs it.
+                let need = r
+                    .card_present
+                    .then(|| catalog::for_reader(&r.name, &r.atr))
+                    .flatten()
+                    .filter(|k| !installed.iter().any(|id| id == k.id));
+                if let Some(k) = need {
+                    row.set_subtitle(&format!(
+                        "{state} · {}: {}. {}",
+                        t("It looks like a token for the driver"),
+                        k.name,
+                        t("If it does not show under Tokens, install that driver with the command (copy button), then quit Tessera from its menu and open it again")
+                    ));
+                    row.add_css_class("warning");
+                    row.add_suffix(&copy_command_button(win, catalog::install_command(k)));
+                }
+                win.readers.add(&row);
             }
         }
     }
@@ -411,10 +442,6 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     win.drivers.clear();
     win.driver_rows.borrow_mut().clear();
     let ds = hub.drivers.borrow();
-    if ds.is_empty() {
-        win.drivers
-            .add(&status_page_row(t("No driver installed"), ""));
-    }
     for d in ds.iter() {
         let mut subtitle = String::new();
         if !d.vendor.is_empty() {
@@ -494,6 +521,19 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
                 .borrow_mut()
                 .push((d.id.clone(), row.clone(), subtitle.clone()));
         }
+    }
+    // The vendors' drivers not installed: what each is for, and the command
+    // that installs it (they are Flatpak extensions, chosen by the user).
+    for k in catalog::missing(&ds) {
+        let row = plain_row(
+            k.name,
+            &format!("{} · {} · {}", t("Not installed"), k.vendor, t(k.tokens)),
+            "application-x-addon-symbolic",
+        );
+        row.add_css_class("dim-label");
+        row.set_tooltip_text(Some(&catalog::install_command(k)));
+        row.add_suffix(&copy_command_button(win, catalog::install_command(k)));
+        win.drivers.add(&row);
     }
     drop(ds);
     update_drivers(hub, win);
