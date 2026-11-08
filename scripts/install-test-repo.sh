@@ -27,4 +27,4 @@ if [ -z "$wanted" ]; then
     echo "Drivers in this repository (install with: sh $0 NAME...):"
     for name in $available; do echo "  $name"; done
 fi
-echo "After installing a driver, quit Tessera from its menu and open it again."
+echo "After installing a driver with Tessera open, use Restart Tessera in its menu."
