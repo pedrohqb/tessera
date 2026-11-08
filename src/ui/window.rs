@@ -136,6 +136,29 @@ pub(super) fn copy_command_button(win: &Rc<Win>, text: String) -> gtk::Button {
     copy_button_with(win, text, t("Copy the command that installs this driver"))
 }
 
+/// A button that opens a driver's page on FlatPark's site, whose install
+/// button hands the extension to the app store.
+fn store_button(win: &Rc<Win>, k: &'static catalog::Known) -> gtk::Button {
+    let b = gtk::Button::builder()
+        .icon_name("web-browser-symbolic")
+        .valign(gtk::Align::Center)
+        .tooltip_text(t(
+            "Open this driver's page on FlatPark, to install it from the app store",
+        ))
+        .css_classes(["flat"])
+        .build();
+    let w = Rc::downgrade(win);
+    b.connect_clicked(move |_| {
+        let parent = w.upgrade().map(|win| win.window.clone());
+        gtk::UriLauncher::new(&catalog::store_page(k)).launch(
+            parent.as_ref(),
+            gio::Cancellable::NONE,
+            |_| {},
+        );
+    });
+    b
+}
+
 fn copy_button_with(win: &Rc<Win>, text: String, tooltip: &str) -> gtk::Button {
     let b = gtk::Button::builder()
         .icon_name("edit-copy-symbolic")
@@ -306,9 +329,10 @@ pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]
                         "{state} · {}: {}. {}",
                         t("It looks like a token for the driver"),
                         k.name,
-                        t("If it does not show under Tokens, install that driver with the command (copy button), then quit Tessera from its menu and open it again")
+                        t("If it does not show under Tokens, install that driver: from the app store or FlatPark's page (button), or with the command (copy button); then quit Tessera from its menu and open it again")
                     ));
                     row.add_css_class("warning");
+                    row.add_suffix(&store_button(win, k));
                     row.add_suffix(&copy_command_button(win, catalog::install_command(k)));
                 }
                 win.readers.add(&row);
@@ -530,11 +554,18 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     for k in catalog::missing(&ds) {
         let row = plain_row(
             k.name,
-            &format!("{} · {} · {}", t("Not installed"), k.vendor, t(k.tokens)),
+            &format!(
+                "{} · {} · {}\n{}",
+                t("Not installed"),
+                k.vendor,
+                t(k.tokens),
+                t("Install it from the app store (an add-on on Tessera's page) or FlatPark's page (button), or with the command (copy button)")
+            ),
             "application-x-addon-symbolic",
         );
         row.add_css_class("dim-label");
         row.set_tooltip_text(Some(&catalog::install_command(k)));
+        row.add_suffix(&store_button(win, k));
         row.add_suffix(&copy_command_button(win, catalog::install_command(k)));
         win.drivers.add(&row);
     }

@@ -127,13 +127,16 @@ As atualizações chegam com o `flatpak update`.
 
 #### 3. Instalar o driver do seu token
 
-Instale a extensão do seu token (tabela no início), na mesma instalação do Tessera (`--user` ou `--system`). Por exemplo, para o GD Burti:
+Instale a extensão do seu token (tabela no início) de um destes jeitos:
+
+- **Pela loja de aplicativos** (GNOME Software, Discover): na página do Tessera, em **Complementos**, ou pela página do driver no [FlatPark](https://flatpark.org/apps/io.github.pedrohqb.Tessera/), no botão de instalar. Os nomes são **SafeSign IC**, **SafeNet Authentication Client** e **SerproID**.
+- **Pelo terminal,** na mesma instalação do Tessera (`--user` ou `--system`). Por exemplo, para o GD Burti:
 
 ```bash
 flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
 ```
 
-Na dúvida, abra o Tessera com o token conectado: se faltar o driver, a linha do leitor diz qual instalar, com o comando pronto para copiar. Depois de instalar, saia do Tessera pelo menu e abra de novo.
+Na dúvida, abra o Tessera com o token conectado: se faltar o driver, a linha do leitor diz qual instalar, com um botão para a página dele no FlatPark e outro que copia o comando. Depois de instalar, saia do Tessera pelo menu e abra de novo.
 
 ---
 
@@ -319,13 +322,16 @@ Updates come with `flatpak update`.
 
 #### 3. Install your token's driver
 
-Install your token's extension (table at the top), in the same installation as Tessera (`--user` or `--system`). For a GD Burti, say:
+Install your token's extension (table at the top) in one of these ways:
+
+- **From the app store** (GNOME Software, Discover): on Tessera's page, under **Add-ons**, or from the driver's page on [FlatPark](https://flatpark.org/apps/io.github.pedrohqb.Tessera/), with its install button. The names are **SafeSign IC**, **SafeNet Authentication Client** and **SerproID**.
+- **From a terminal,** in the same installation as Tessera (`--user` or `--system`). For a GD Burti, say:
 
 ```bash
 flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
 ```
 
-If unsure, open Tessera with the token plugged in: when its driver is missing, the reader's row says which one to install, with the command ready to copy. After installing, quit Tessera from its menu and open it again.
+If unsure, open Tessera with the token plugged in: when its driver is missing, the reader's row says which one to install, with a button to its FlatPark page and another that copies the command. After installing, quit Tessera from its menu and open it again.
 
 ### Usage
 

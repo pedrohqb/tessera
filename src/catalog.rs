@@ -83,6 +83,12 @@ pub fn for_reader(name: &str, atr: &[u8]) -> Option<&'static Known> {
     })
 }
 
+/// The driver's page on FlatPark's site (its install button opens the app
+/// store; the store also lists it as an add-on on Tessera's page).
+pub fn store_page(k: &Known) -> String {
+    format!("https://flatpark.org/apps/{}/", k.extension)
+}
+
 /// The command that installs a driver, in the installation Tessera itself
 /// is in (an extension of a user installation's app goes there too).
 pub fn install_command(k: &Known) -> String {
