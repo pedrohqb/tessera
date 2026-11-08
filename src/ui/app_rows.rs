@@ -3,6 +3,7 @@
 
 use adw::prelude::*;
 use gtk::{gio, glib};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::window::{copy_button, plain_row, Win};
@@ -87,7 +88,10 @@ pub(super) fn step2_done(app: &ClientApp) -> String {
 }
 
 /// The NSS work of step 2, in a child process. Returns a line for the user.
-pub(super) fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
+pub(super) fn set_up_nss(
+    app: &'static ClientApp,
+    token: Option<jsignpdf::TokenId>,
+) -> Result<String, String> {
     match app.setup {
         Setup::Poppler => nss::set_up_poppler_db(&paths::poppler_nss_dir(app.id))
             .map(|_| step2_done(app))
@@ -163,14 +167,17 @@ pub(super) fn set_up_nss(app: &'static ClientApp) -> Result<String, String> {
         }
         Setup::JSignPdf => {
             let ours = status::tessera_tokens();
-            let index = status::host_slot_index(&ours).ok_or_else(|| {
+            let index = status::host_slot_of(&ours, token.as_ref()).ok_or_else(|| {
                 format!(
                     "{}: {}",
                     app.name,
                     t("the system's p11-kit server does not list Tessera's tokens: plug in the token, check the system connection, then try again")
                 )
             })?;
-            jsignpdf::set_up(index)?;
+            // The choice counts only if the system's server lists it
+            // (host_slot_of fell back to the first token otherwise).
+            let listed = token.filter(|c| ours.contains(c));
+            jsignpdf::set_up(index, listed.as_ref())?;
             Ok(step2_done(app))
         }
         Setup::MasterPdf => {
@@ -191,6 +198,55 @@ pub(super) struct AppRows {
     pub(super) button: gtk::Button,
     restart: gtk::Button,
     pub(super) manual: Option<adw::ActionRow>,
+    /// JSignPdf: which of Tessera's tokens it opens (one slot, one token).
+    choice: Option<TokenChoice>,
+}
+
+/// A list of Tessera's tokens, shown when there is more than one.
+pub(super) struct TokenChoice {
+    drop: gtk::DropDown,
+    list: gtk::StringList,
+    items: RefCell<Vec<jsignpdf::TokenId>>,
+}
+
+impl TokenChoice {
+    fn selected(&self) -> Option<jsignpdf::TokenId> {
+        self.items
+            .borrow()
+            .get(self.drop.selected() as usize)
+            .cloned()
+    }
+}
+
+/// Offer the tokens Tessera serves now in JSignPdf's list, keeping the one
+/// picked if it is still there, else the one its file names, else the
+/// first.
+pub(super) fn set_token_choices(win: &Win, tokens: &[status::Token]) {
+    let mut items: Vec<jsignpdf::TokenId> = Vec::new();
+    let mut names: Vec<String> = Vec::new();
+    for tk in tokens {
+        let id = (tk.label.clone(), tk.serial.clone());
+        if !items.contains(&id) {
+            names.push(format!("{} · {}", tk.label, tk.driver));
+            items.push(id);
+        }
+    }
+    for r in win.app_rows.borrow().iter() {
+        let Some(c) = &r.choice else { continue };
+        if *c.items.borrow() == items {
+            continue;
+        }
+        let keep = c.selected().or_else(jsignpdf::configured_token);
+        let at = keep
+            .and_then(|k| items.iter().position(|i| *i == k))
+            .unwrap_or(0);
+        *c.items.borrow_mut() = items.clone();
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        c.list.splice(0, c.list.n_items(), &refs);
+        c.drop.set_selected(at as u32);
+        c.drop.set_visible(items.len() > 1);
+        update_app(r);
+    }
 }
 
 /// Show each step as done or to do; a step with nothing to do has no
@@ -198,7 +254,12 @@ pub(super) struct AppRows {
 /// module.
 pub(super) fn update_app(r: &AppRows) {
     let app = r.app;
-    let (s1, s2) = app_state(app);
+    let (s1, mut s2) = app_state(app);
+    // JSignPdf set up for another token than the one picked.
+    let picked = r.choice.as_ref().and_then(TokenChoice::selected);
+    let configured = jsignpdf::configured_token();
+    let switch = s2 && picked.is_some() && configured.is_some() && picked != configured;
+    s2 &= !switch;
     r.row.set_subtitle(&app_subtitle(app));
     let cmd = apps::override_command(app);
     if s1 {
@@ -228,7 +289,12 @@ pub(super) fn update_app(r: &AppRows) {
     } else {
         t("Step 2 · certificate database")
     };
-    if s2 {
+    if switch {
+        r.step2.set_title(title);
+        r.step2.set_subtitle(t(
+            "Close JSignPdf, then press Set up: it was set up for another token",
+        ));
+    } else if s2 {
         r.step2.set_title(&format!("{title} ✓"));
         r.step2.set_subtitle(match app.setup {
             Setup::Profiles(_) => t("Done: Tessera's module is in every profile"),
@@ -237,6 +303,15 @@ pub(super) fn update_app(r: &AppRows) {
             Setup::MasterPdf => t("Done: Master PDF Editor's PKCS#11 provider is p11-kit (Tools → Settings → Certificates)"),
             _ => t("Done: the app has its own certificate database"),
         });
+        if let Some((label, _)) =
+            jsignpdf::configured_token().filter(|_| app.setup == Setup::JSignPdf)
+        {
+            r.step2.set_subtitle(&format!(
+                "{}: {label}. {}",
+                t("Token JSignPdf opens"),
+                r.step2.subtitle().unwrap_or_default()
+            ));
+        }
     } else if needs_restart(app) {
         r.step2.set_title(title);
         r.step2.set_subtitle(t("Open the app once, so it makes its settings, then restart Tessera: it sees an app's folders only if they were there when it started"));
@@ -272,9 +347,16 @@ pub(super) fn update_apps(win: &Win) {
 
 pub(super) fn set_up_app(win: &Rc<Win>, app: &'static ClientApp) {
     // Registering the client module needs no running driver.
+    let token = win
+        .app_rows
+        .borrow()
+        .iter()
+        .find(|r| r.app.id == app.id)
+        .and_then(|r| r.choice.as_ref())
+        .and_then(TokenChoice::selected);
     let win = win.clone();
     glib::spawn_future_local(async move {
-        let res = gio::spawn_blocking(move || set_up_nss(app)).await;
+        let res = gio::spawn_blocking(move || set_up_nss(app, token)).await;
         match res {
             Ok(Ok(done)) => win.toast(&done),
             Ok(Err(e)) => win.alert(t("Could not set up"), &e),
@@ -316,6 +398,27 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
             }
         });
     }
+    let choice = (app.setup == Setup::JSignPdf).then(|| {
+        let list = gtk::StringList::new(&[]);
+        let drop = gtk::DropDown::builder()
+            .model(&list)
+            .valign(gtk::Align::Center)
+            .tooltip_text(t("Token JSignPdf opens"))
+            .visible(false)
+            .build();
+        let w = Rc::downgrade(win);
+        drop.connect_selected_notify(move |_| {
+            if let Some(win) = w.upgrade() {
+                update_apps(&win);
+            }
+        });
+        step2.add_suffix(&drop);
+        TokenChoice {
+            drop,
+            list,
+            items: RefCell::new(Vec::new()),
+        }
+    });
     step2.add_suffix(&button);
     let restart = gtk::Button::builder()
         .label(t("Restart Tessera"))
@@ -350,6 +453,7 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
         button,
         restart,
         manual,
+        choice,
     };
     update_app(&rows);
     rows

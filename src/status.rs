@@ -613,13 +613,27 @@ fn protocol_at(socket: &std::path::Path) -> Option<u8> {
 }
 
 /// The position, among all the slots the system's p11-kit server lists, of
-/// the first one holding one of Tessera's tokens (`ours`: label and
-/// serial). None when the server does not answer or has none of them. Must
-/// run off the main thread.
-pub fn host_slot_index(ours: &[(String, String)]) -> Option<usize> {
+/// `chosen` (label, serial) when the server lists it, else of the first one
+/// holding one of Tessera's tokens (`ours`). None when the server does not
+/// answer or has none of them. Must run off the main thread.
+pub fn host_slot_of(ours: &[(String, String)], chosen: Option<&(String, String)>) -> Option<usize> {
     let seen = tokens_at(&paths::host_p11kit_socket(), "", false).ok()?;
+    slot_of(&seen, ours, chosen)
+}
+
+fn slot_of(
+    seen: &[Token],
+    ours: &[(String, String)],
+    chosen: Option<&(String, String)>,
+) -> Option<usize> {
+    let is = |t: &Token, (l, s): &(String, String)| &t.label == l && &t.serial == s;
+    if let Some(c) = chosen {
+        if let Some(t) = seen.iter().find(|t| is(t, c)) {
+            return Some(t.slot_index);
+        }
+    }
     seen.iter()
-        .filter(|t| ours.iter().any(|(l, s)| &t.label == l && &t.serial == s))
+        .filter(|t| ours.iter().any(|o| is(t, o)))
         .map(|t| t.slot_index)
         .min()
 }
@@ -824,6 +838,30 @@ mod duplicate_tests {
             slot_index: 0,
             slot: String::new(),
         }
+    }
+
+    #[test]
+    fn the_chosen_token_has_its_own_slot() {
+        let at = |label: &str, serial: &str, i: usize| Token {
+            serial: serial.into(),
+            slot_index: i,
+            ..token("x", label, vec![])
+        };
+        let seen = vec![
+            at("System Trust", "1", 0),
+            at("OAB", "31", 2),
+            at("SerproID", "1", 3),
+        ];
+        let ours = vec![
+            ("OAB".to_string(), "31".to_string()),
+            ("SerproID".to_string(), "1".to_string()),
+        ];
+        assert_eq!(slot_of(&seen, &ours, None), Some(2));
+        assert_eq!(slot_of(&seen, &ours, Some(&ours[1])), Some(3));
+        // A choice the server does not list: the first of ours.
+        let gone = ("eToken".to_string(), "9".to_string());
+        assert_eq!(slot_of(&seen, &ours, Some(&gone)), Some(2));
+        assert_eq!(slot_of(&seen[..1], &ours, None), None);
     }
 
     #[test]

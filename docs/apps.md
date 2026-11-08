@@ -63,6 +63,8 @@ The tokens' certificates then appear in File → Digital Signatures, and the PIN
    ```
    SunPKCS11 opens **one** slot, by default the first of all the slots, and on the system's p11-kit server the first ones are p11-kit's trust store, with no keys. So Tessera asks the system's server for its slots and writes the position of the first one holding one of Tessera's tokens. That position changes if the system's modules or the readers change: the button stays available to write it again. A `pkcs11.cfg` that was there before is kept as `pkcs11.cfg.before-tessera`.
 
+   One slot is one token: with several of Tessera's tokens plugged in (the GD Burti and SerproID, say), the row shows a list to pick which one JSignPdf opens, and **Set up** writes that token's slot; the file keeps the choice in two comments. If the token picked is not the one the file was written for, the row asks for **Set up** again.
+
    It also sets `keystore.type=PKCS11` in `config.properties`, leaving the rest of the file as it was (the file as it was is kept as `config.properties.before-tessera`). JSignPdf writes that file again when it closes, which is why it must be closed first. Open JSignPdf once before, then start (or restart) Tessera: its sandbox only sees the app's config folder if it existed when Tessera started.
 
 To sign: open the PDF, type the token's PIN in **Keystore password** (in Portuguese, "Palavra-passe do keystore"), press **Load keys**, pick the certificate under **Key alias** and press **Sign**. Leave **Keystore file** and **Key password** empty. Tested with the GD Burti (SafeSign extension). Without the PIN, or with the keystore type left at JKS, JSignPdf says only "No private key was found"

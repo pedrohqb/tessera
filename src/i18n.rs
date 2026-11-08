@@ -38,6 +38,8 @@ const PT_BR: &[(&str, &str)] = &[
     ("Start automatically at login", "Iniciar automaticamente no login"),
     ("About Tessera", "Sobre o Tessera"),
     ("Restart Tessera", "Reiniciar o Tessera"),
+    ("Token JSignPdf opens", "Token que o JSignPdf abre"),
+    ("Close JSignPdf, then press Set up: it was set up for another token", "Feche o JSignPdf e aperte Configurar: ele foi configurado para outro token"),
     ("Could not restart Tessera", "Não foi possível reiniciar o Tessera"),
     ("Quit it from the menu and open it again", "Saia pelo menu e abra-o de novo"),
     ("Open the app once, so it makes its settings, then restart Tessera: it sees an app's folders only if they were there when it started", "Abra o aplicativo uma vez, para ele criar as configurações dele, e depois reinicie o Tessera: ele só enxerga as pastas de um aplicativo que já existiam quando ele abriu"),

@@ -10,9 +10,14 @@
 //! single slot: without `slotListIndex`, the first of all the slots
 //! (C_GetSlotList(CK_FALSE)), which on the system's server is p11-kit's
 //! trust store, with no keys. So Tessera writes the position of the first
-//! slot holding one of its tokens (status::host_slot_index). That position
+//! slot holding one of its tokens (status::host_slot_of). That position
 //! changes when the system's modules or readers change; the row then shows
 //! step 2 as missing again, and "Set up" writes the new one.
+//!
+//! One slot is one token: with several of Tessera's tokens plugged in, the
+//! window lets the user choose which one JSignPdf opens, and the file keeps
+//! that choice in comments (`# tessera-token-label=`, `# tessera-token-serial=`),
+//! which SunPKCS11 skips.
 //!
 //! The file only adds the PKCS11 keystore type: JSignPdf still opens its
 //! default (JKS, a file) until "Keystore type" is set to PKCS11, which it
@@ -131,14 +136,45 @@ pub fn choosing_pkcs11(text: &str) -> String {
 }
 
 /// What Tessera writes.
-pub fn config_text(slot_index: usize) -> String {
+/// A token, as (label, serial).
+pub type TokenId = (String, String);
+
+const LABEL_KEY: &str = "# tessera-token-label=";
+const SERIAL_KEY: &str = "# tessera-token-serial=";
+
+pub fn config_text(slot_index: usize, token: Option<&TokenId>) -> String {
+    let chosen = token.map_or(String::new(), |(label, serial)| {
+        // One line each, whatever the label holds.
+        let one = |s: &str| s.replace(['\n', '\r'], " ");
+        format!("{LABEL_KEY}{}\n{SERIAL_KEY}{}\n", one(label), one(serial))
+    });
     format!(
         "# Written by Tessera: its tokens through the system's p11-kit server.\n\
+         {chosen}\
          name=Tessera\n\
          library={}\n\
          slotListIndex={slot_index}\n",
         paths::CLIENT_MODULE
     )
+}
+
+/// The token the file was written for, if it says.
+pub fn chosen_token(text: &str) -> Option<TokenId> {
+    let mut label = None;
+    let mut serial = None;
+    for line in text.lines() {
+        if let Some(v) = line.strip_prefix(LABEL_KEY) {
+            label = Some(v.to_string());
+        } else if let Some(v) = line.strip_prefix(SERIAL_KEY) {
+            serial = Some(v.to_string());
+        }
+    }
+    Some((label?, serial?))
+}
+
+/// The token the current file was written for.
+pub fn configured_token() -> Option<TokenId> {
+    chosen_token(&std::fs::read_to_string(config_file()).ok()?)
 }
 
 /// The library and slotListIndex a pkcs11.cfg names.
@@ -177,7 +213,7 @@ pub fn ready(current: Option<usize>) -> bool {
 /// Write pkcs11.cfg, keeping any other one as pkcs11.cfg.before-tessera,
 /// and choose the PKCS11 keystore type in config.properties, keeping the
 /// file as it was as config.properties.before-tessera.
-pub fn set_up(slot_index: usize) -> Result<(), String> {
+pub fn set_up(slot_index: usize, token: Option<&TokenId>) -> Result<(), String> {
     let dir = config_dir();
     // Tessera sees the app's config folder only if it was there when
     // Tessera started (its sandbox mounts what exists).
@@ -196,7 +232,7 @@ pub fn set_up(slot_index: usize) -> Result<(), String> {
             std::fs::write(&keep, old).map_err(|e| format!("{}: {e}", keep.display()))?;
         }
     }
-    std::fs::write(&file, config_text(slot_index))
+    std::fs::write(&file, config_text(slot_index, token))
         .map_err(|e| format!("{}: {e}", file.display()))?;
     let main = main_config_file();
     let old = std::fs::read_to_string(&main).unwrap_or_default();
@@ -239,7 +275,19 @@ mod tests {
 
     #[test]
     fn the_config_names_the_client_and_the_slot() {
-        let text = config_text(3);
+        let text = config_text(3, None);
+        assert_eq!(chosen_token(&text), None);
+        let oab = (
+            "CERTIFICADO OAB".to_string(),
+            "31529600DC136181".to_string(),
+        );
+        let chosen = config_text(3, Some(&oab));
+        assert_eq!(chosen_token(&chosen), Some(oab));
+        assert!(is_set_up(&chosen, Some(3)));
+        assert_eq!(
+            parse(&chosen),
+            (Some(paths::CLIENT_MODULE.to_string()), Some(3))
+        );
         assert_eq!(
             parse(&text),
             (Some(paths::CLIENT_MODULE.to_string()), Some(3))

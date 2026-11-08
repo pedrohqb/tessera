@@ -113,7 +113,7 @@ Se não for mais usar os pacotes do fornecedor, pode também desinstalá-los do 
 
 ### O JSignPdf diz "Nenhuma chave privada foi encontrada".
 
-No painel **Certificado**, à esquerda, o **Tipo de keystore** deve ser **PKCS11** (o **Configurar** do Tessera já o escolhe; feche o JSignPdf antes). Digite o PIN do token em **Palavra-passe do keystore**, aperte **Carregar chaves**, escolha o certificado em **Alias da chave** e assine; deixe vazios **Ficheiro de keystore** e **Palavra-passe da chave**. Sem o PIN, o token não mostra a chave.
+No painel **Certificado**, à esquerda, o **Tipo de keystore** deve ser **PKCS11** (o **Configurar** do Tessera já o escolhe; feche o JSignPdf antes). Digite o PIN do token em **Palavra-passe do keystore**, aperte **Carregar chaves**, escolha o certificado em **Alias da chave** e assine; deixe vazios **Ficheiro de keystore** e **Palavra-passe da chave**. Sem o PIN, o token não mostra a chave. O JSignPdf abre um token por vez: com mais de um conectado, escolha qual na lista da linha do JSignPdf, no Tessera, e aperte **Configurar** (com o JSignPdf fechado).
 
 ### O JSignPdf não acha mais o certificado.
 
@@ -275,7 +275,7 @@ If you will not use the vendor packages anymore, you can also uninstall them fro
 
 ### JSignPdf says "No private key was found".
 
-In the **Certificate** panel, on the left, **Keystore type** must be **PKCS11** (Tessera's **Set up** chooses it; close JSignPdf first). Type the token's PIN in **Keystore password**, press **Load keys**, pick the certificate under **Key alias** and sign; leave **Keystore file** and **Key password** empty. Without the PIN, the token does not show its key.
+In the **Certificate** panel, on the left, **Keystore type** must be **PKCS11** (Tessera's **Set up** chooses it; close JSignPdf first). Type the token's PIN in **Keystore password**, press **Load keys**, pick the certificate under **Key alias** and sign; leave **Keystore file** and **Key password** empty. Without the PIN, the token does not show its key. JSignPdf opens one token at a time: with more than one plugged in, pick which in the list on JSignPdf's row in Tessera, and press **Set up** (with JSignPdf closed).
 
 ### JSignPdf no longer finds the certificate.
 

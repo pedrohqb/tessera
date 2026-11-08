@@ -357,6 +357,7 @@ pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]
         row.add_css_class("error");
         win.tokens.add(&row);
     }
+    super::app_rows::set_token_choices(win, &snap.tokens);
     match snap.tokens {
         tokens if tokens.is_empty() => win.tokens.add(&status_page_row(
             t("No token found"),
