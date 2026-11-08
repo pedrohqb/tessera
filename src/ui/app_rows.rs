@@ -377,10 +377,29 @@ fn readable_icon(theme: &gtk::IconTheme, name: &str) -> bool {
         gtk::IconLookupFlags::empty(),
     );
     match icon.file().and_then(|f| f.path()) {
-        Some(path) => std::fs::File::open(path).is_ok(),
+        Some(path) => usable_icon_file(&path) && std::fs::File::open(path).is_ok(),
         // In a resource, not a file.
         None => true,
     }
+}
+
+/// Is this file the app's full-colour icon? A theme may hold only a
+/// monochrome (`-symbolic`) one, which GTK hands out for the plain name too,
+/// or only the small sizes of a panel theme (16 to 24 px): either looks
+/// broken at 32 px next to the others, and Flatpak's AppStream copy (the
+/// app's own icon) is better.
+fn usable_icon_file(path: &std::path::Path) -> bool {
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    if stem.ends_with("-symbolic") {
+        return false;
+    }
+    let small = ["16", "22", "24", "16x16", "22x22", "24x24", "symbolic"];
+    !path
+        .ancestors()
+        .skip(1)
+        .take(3)
+        .filter_map(|d| d.file_name().and_then(|n| n.to_str()))
+        .any(|n| small.contains(&n) || small.iter().any(|s| n.starts_with(&format!("{s}@"))))
 }
 
 /// An app's icon, at 32 px: for each of `names` in turn, the icon theme's
@@ -528,4 +547,26 @@ pub(super) fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
     group.set_header_suffix(Some(&switcher));
     group.add(&stack);
     group
+}
+
+#[cfg(test)]
+mod tests {
+    use super::usable_icon_file;
+    use std::path::Path;
+
+    #[test]
+    fn small_and_symbolic_icons_are_passed_over() {
+        let ok = |p: &str| usable_icon_file(Path::new(p));
+        assert!(ok(
+            "/run/host/share/icons/hicolor/scalable/apps/org.gnome.Evolution.svg"
+        ));
+        assert!(ok("/usr/share/icons/hicolor/128x128/apps/firefox.png"));
+        assert!(ok("/usr/share/icons/breeze/apps/48/okular.svg"));
+        assert!(!ok(
+            "/run/host/share/icons/hicolor/symbolic/apps/org.gnome.Evolution-symbolic.svg"
+        ));
+        assert!(!ok("/usr/share/icons/hicolor/16x16/apps/evolution.png"));
+        assert!(!ok("/usr/share/icons/breeze-dark/apps/22/evolution.svg"));
+        assert!(!ok("/usr/share/icons/Papirus/24x24@2x/apps/x.svg"));
+    }
 }
