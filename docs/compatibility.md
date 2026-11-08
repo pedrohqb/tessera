@@ -16,6 +16,8 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | Whether NSS already loads p11-kit (no Set up needed) matches Tessera's verdict | Same five | A fresh NSS database, as a browser makes it, listed with `modutil`. On Fedora, NSS loads p11-kit through crypto-policies; on the other four, it does not |
 | The vendors' downloads still match their pinned SHA256 | — | Weekly workflow (`check-downloads.yml`); a mismatch opens an issue |
 | The Flatpak builds, with every icon the window uses | GNOME 51 runtime | `flatpak-builder` |
+| Each driver extension builds, installs on the real vendor downloads, and leaves its module and tools where `driver.toml` says | GNOME 51 runtime | `flatpak-builder`, then `flatpak install` (`ci.yml`) |
+| A token's reader or ATR points to the right driver extension | — | `src/catalog.rs` tests (eToken 5110, StarSign CUT S, ePass2003) |
 
 ## Tested by hand
 

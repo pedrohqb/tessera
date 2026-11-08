@@ -2,36 +2,47 @@
 
 ## How the drivers reach Tessera
 
-The vendors' drivers are not part of Tessera, because their licenses do not allow redistributing them. (OpenSC, which is free software, is: see [OpenSC](#opensc) below.) They use Flatpak's *extra-data*: at install time, Flatpak downloads each file from the vendor's site, checks the sha256 pinned in the manifest, and only then runs `flatpak/apply_extra.sh`, without network, inside the sandbox.
+Tessera's own package carries one driver, [OpenSC](#opensc), free software and built in. The vendors' drivers are not part of it: their licenses do not allow redistributing them, and each user needs only the one for their token. Each is a **Flatpak extension** of Tessera, installed by hand:
 
-| Driver | Vendor file | sha256 |
+| Extension | For | Vendor files (sha256) |
 |---|---|---|
-| SafeSign IC 4.5.0.0 (A.E.T. Europe) | `SafeSignICStandardLinux4.5.0.0-AET.000ub2404x86_64.deb` | `7742e21e…1b91` |
-| SafeSign, Token Administration | `SafeSignICStandardLinux4.5.0.0-AET.000redhat10x86_64.rpm` | `2f5ea462…3378` |
-| GDBM, for SafeSign | Ubuntu 24.04 `libgdbm6t64_1.23-5.1build1_amd64.deb` and `libgdbm-compat4t64_1.23-5.1build1_amd64.deb` | `18d6d74a…645e`, `fb8564af…ee65` |
-| SafeNet Authentication Client 10.9 (Thales) | `Linux_SAC_10.9_GA.zip` (DigiCert) | `46759cfe…013e` |
-| SerproID 2.1.6 (Serpro) | `SerproID-2.1.6-amd64.deb` | `0ffa9ffe…e588` |
+| `io.github.pedrohqb.Tessera.Driver.SafeSign` | GD Burti (G+D StarSign) and other SafeSign tokens | SafeSign IC 4.5.0.0 `SafeSignICStandardLinux4.5.0.0-AET.000ub2404x86_64.deb` (`7742e21e…1b91`) and, for Token Administration, `…redhat10x86_64.rpm` (`2f5ea462…3378`); GDBM from Ubuntu 24.04, `libgdbm6t64_1.23-5.1build1_amd64.deb` (`18d6d74a…645e`) and `libgdbm-compat4t64_1.23-5.1build1_amd64.deb` (`fb8564af…ee65`) |
+| `io.github.pedrohqb.Tessera.Driver.SafeNet` | SafeNet eToken 5100/5110, IDPrime cards | SafeNet Authentication Client 10.9, `Linux_SAC_10.9_GA.zip` from DigiCert (`46759cfe…013e`) |
+| `io.github.pedrohqb.Tessera.Driver.SerproID` | Serpro's cloud certificate | `SerproID-2.1.6-amd64.deb` (`0ffa9ffe…e588`) |
 
-The sha256 values are the same as in [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br). Flatpak also requires each file's size; `scripts/pin-drivers.py` downloads each one, checks the sha256 and fills in the size in the manifest. Continuous integration runs this script before every build, so a file replaced on the vendor's site breaks the build instead of going unnoticed.
+```bash
+flatpak install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
+```
+
+After installing one, quit Tessera from its menu and open it again: Flatpak mounts extensions when the app starts.
+
+- **The extension point** is in Tessera's manifest: `io.github.pedrohqb.Tessera.Driver`, directory `lib/tessera/extensions`, with `subdirectories`, `no-autodownload` and `autodelete`. Each extension is mounted at `/app/lib/tessera/extensions/<Name>` (`SafeSign` for `…Driver.SafeSign`), where Tessera looks for a `driver.toml`. The driver's id is the folder's name in lowercase (`safesign`). Nothing is installed with Tessera on its own: the user picks the driver, and third parties publish theirs the same way (Certisign's RemoteID, by its own developer, is one).
+- **What an extension holds** (`flatpak/extensions/<Name>/`): its manifest (`build-extension`, with Tessera as its `runtime`, branch `stable`), the vendor's files as *extra-data*, `apply_extra.sh`, `driver.toml`, an AppStream `addon` component and its icon. It has no permissions of its own: it runs in Tessera's sandbox with Tessera's.
+- **Extra-data:** at install time, Flatpak downloads each file from the vendor's site, checks the pinned sha256, and only then runs the extension's `apply_extra.sh`, without network, in the extension's `extra/` folder. The sha256 values are the same as in [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br). Flatpak also requires each file's size; `scripts/pin-drivers.py` downloads each one, checks the sha256 and fills in the size. Continuous integration runs it before every build, then builds each extension and installs it, so `apply_extra.sh` runs on the real downloads and the module it should leave is checked. A weekly workflow checks the pins again.
+- **Each driver separately:** a vendor that changes or removes a file breaks only its own extension, and a new vendor version is a new version of that extension alone.
+
+### Which one to install
+
+The window lists the drivers that are not installed, each with the command that installs it (a copy button). When a token is connected and its driver is missing, its reader says which one: the reader's name (a USB token is its own reader, named after its product: "SafeNet eToken 5100", "StarSign CUT S") or bytes of the card's ATR (IDPrime's `80 31 80 65 B0`, the eToken Java cards' `80 73 C8 21 10`, the G+D Sm@rtCafé Expert 6 and 7 of the StarSign tokens, `SCE6`/`SCE7`) point to SafeNet or SafeSign (`src/catalog.rs`). The command uses the installation Tessera is in (`--user` or `--system`, from `/.flatpak-info`). The rules are few on purpose: a wrong guess only shows a suggestion. `tessera status` prints the readers' ATRs and the same suggestions.
 
 ## The "clean" unpacking
 
-`apply_extra.sh` follows the same "cleanups" as distrobox-adv-br:
+Each `apply_extra.sh` follows the same "cleanups" as distrobox-adv-br:
 
 - only the package's files are extracted (the `.deb`'s `data.tar`, read with `bsdtar`, because the runtime has neither `dpkg` nor `ar`);
 - **no vendor script runs** (no `postinst`/`postrm`);
 - the package's `/etc` is discarded;
-- everything goes in `/app/extra/drivers/<driver>`, and nothing is written outside that folder;
-- a driver that fails to unpack does not stop the installation: it shows up in the window as "Driver files missing", and the others carry on.
+- everything goes in the extension's `extra/` folder, and nothing is written outside it; links inside it are relative, and the launchers name its final place, `/app/lib/tessera/extensions/<Name>/extra`;
+- a driver that cannot be unpacked fails its own installation, with the reason in the output; a missing optional tool (SafeSign's Token Administration, the SerproID app) is only logged.
 
-Each driver has a `driver.toml` in `/app/lib/tessera/drivers/<driver>/`. An excerpt from SerproID's:
+An excerpt from SerproID's `driver.toml` (paths relative to the extension's folder):
 
 ```toml
 name = "SerproID"
 vendor = "Serpro"
 description = "Cloud certificate; sign in with the SerproID app"
-module = "/app/extra/drivers/serproid/libserproidp11.so"
-library_path = ["/app/extra/drivers/serproid/usr/lib"]   # the driver's LD_LIBRARY_PATH
+module = "extra/libserproidp11.so"
+library_path = ["extra/usr/lib"]                         # the driver's LD_LIBRARY_PATH
 create_dirs = ["~/.config/serproid/certificados"]        # created before starting
 
 [env]                                                    # environment of the driver's server
@@ -42,14 +53,18 @@ SSL_CERT_DIR = "/etc/ssl/certs"
 
 [[tools]]                                                # buttons in the window
 name = "SerproID"
-exec = ["/app/extra/drivers/serproid/serproid"]
+exec = ["extra/serproid"]
 ```
+
+### Icons
+
+The extensions' icons, shown in FlatPark's catalog, come from the vendors where they publish one: SafeSign's is Token Administration's own (256 px, from its package), SerproID's is the official one from Serpro's [integration manual](https://neoid.estaleiro.serpro.gov.br/documentacao/suporte/icones-logomarcas-integracao/). SafeNet's Linux package only has a 32 px badge, so its extension has an icon of its own, a generic USB token in Tessera's colors, without the vendor's mark.
 
 ## SafeSign IC (GD Burti)
 
-- **Library:** `libaetpkss.so`, linked at `drivers/safesign/libaetpkss.so`.
-- **GDBM:** the library needs `libgdbm_compat.so.4`, which the GNOME runtime does not have. The symptom was the driver not loading. The two Ubuntu 24.04 GDBM packages go to `drivers/safesign/gdbm`, which is part of `library_path`. The AUR package (`safesignidentityclient`) also depends on `gdbm`.
-- **Token Administration:** the `tokenadmin` from the Ubuntu `.deb` needs wxWidgets, which the runtime does not have. The one from the RHEL 10 RPM does not, and that is the one Tessera uses, like the AUR. It runs through a launcher (`drivers/safesign/tokenadmin`) that puts the SafeSign libraries and GDBM on `LD_LIBRARY_PATH`. It needs full X11 (`--socket=x11`).
+- **Library:** `libaetpkss.so`, linked at `extra/libaetpkss.so`.
+- **GDBM:** the library needs `libgdbm_compat.so.4`, which the GNOME runtime does not have. The symptom was the driver not loading. The two Ubuntu 24.04 GDBM packages go to `extra/gdbm`, which is part of `library_path`. The AUR package (`safesignidentityclient`) also depends on `gdbm`.
+- **Token Administration:** the `tokenadmin` from the Ubuntu `.deb` needs wxWidgets, which the runtime does not have. The one from the RHEL 10 RPM does not, and that is the one Tessera uses, like the AUR. It runs through a launcher (`extra/tokenadmin`) that puts the SafeSign libraries and GDBM on `LD_LIBRARY_PATH`. It needs full X11 (`--socket=x11`).
 - **Observed behavior:** with the token connected, the first object search (`C_FindObjectsInit`) takes about 1.6 s. The OAB token has 4 certificates (the three CAs of the chain and the holder's). The driver advertises PSS with SHA-1/256/384/512, in addition to PKCS#1 v1.5.
 
 ## SafeNet Authentication Client (eToken 5100/5110, IDPrime)
@@ -81,7 +96,7 @@ SerproID is a cloud certificate. The driver (`libserproidp11.so`) does not talk 
 1. **The certificates folder must exist,** even if empty: `~/.config/serproid/certificados`. Without it, the SerproID app closes. distrobox-adv-br does the same. Tessera creates it (`create_dirs`) before starting the driver and before opening the app.
 2. **The configuration folder:** the driver reads `serproid/certificados` and `serproid/ambiente` and writes `serproid/serproid.log` in the user's configuration folder. Flatpak sets `XDG_CONFIG_HOME` to the app's own configuration folder, so the driver and the app would look in different places. `driver.toml` sets `XDG_CONFIG_HOME=~/.config`, and the manifest has `--persist=.config/serproid`, which keeps that folder in `~/.var/app/io.github.pedrohqb.Tessera/.config/serproid`.
 3. **CA certificates:** the bundled OpenSSL looks for the roots in `/usr/lib/ssl`, the Debian location, which the runtime does not have. `SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt` and `SSL_CERT_DIR=/etc/ssl/certs`.
-4. **The app:** the startup script and the app's configuration use absolute paths (`cd /usr/share/serproid-desktop; ./jre/bin/java …`). `apply_extra.sh` replaces these paths, only in the text files, with the copy in `/app/extra/drivers/serproid`. The app is JavaFX and only draws through X11 (the error was `Unable to open DISPLAY`).
+4. **The app:** the startup script and the app's configuration use absolute paths (`cd /usr/share/serproid-desktop; ./jre/bin/java …`). `apply_extra.sh` replaces these paths, only in the text files, with the copy in `/app/lib/tessera/extensions/SerproID/extra`. The app is JavaFX and only draws through X11 (the error was `Unable to open DISPLAY`).
 5. **`libneoidp11.so`:** the module is also offered under this name, as in distrobox-adv-br, because some signers look for it that way.
 
 ### The four quirks that break signing

@@ -25,10 +25,11 @@ src/
                 ~/.var/app/io.github.pedrohqb.Tessera/config/tessera/settings.toml
   i18n.rs       translation table for Brazilian Portuguese
 flatpak/
-  io.github.pedrohqb.Tessera.yml   the manifest (permissions, pcsc-lite, extra-data)
-  apply_extra.sh                   unpacks the drivers at installation
+  io.github.pedrohqb.Tessera.yml   the manifest (permissions, pcsc-lite, OpenSC, extension point)
   fallback-icons.sh                Adwaita icons for desktops whose theme lacks them (Plasma)
-  drivers/<driver>/driver.toml     the description of each driver
+  drivers/opensc/                  the built-in driver: driver.toml and OpenSC's configurations
+  extensions/<Name>/               each vendor driver's extension: manifest (extra-data),
+                                   apply_extra.sh, driver.toml, metainfo, icon
 data/          .desktop, metainfo, icons (normal and symbolic), screenshot;
                app-icons/: the free-software icons of some apps, for when they are not installed
 scripts/       pin-drivers.py, install-test-repo.sh, sign-test.py
@@ -108,7 +109,7 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 
 ## Adding a driver
 
-A driver is a folder with a `driver.toml` (the format is in [Drivers](drivers.md)). The ones that come with Tessera live in `flatpak/drivers/` and in `apply_extra.sh`. A third-party driver can come as a Flatpak extension `io.github.pedrohqb.Tessera.Driver.<Name>`, mounted at `/app/lib/tessera/extensions/<Name>/`, without changing Tessera. For a new driver, it is worth checking:
+A driver is a folder with a `driver.toml` (the format is in [Drivers](drivers.md)). OpenSC, built in, lives in `flatpak/drivers/opensc`. Every other driver is a Flatpak extension `io.github.pedrohqb.Tessera.Driver.<Name>`, mounted at `/app/lib/tessera/extensions/<Name>/`, without changing Tessera: the vendors' ones are in `flatpak/extensions/`, and anyone can publish one the same way (FlatPark's [extension guide](https://github.com/flatpark/flatpark/blob/main/docs/packagers/extensions.md)). To have the window suggest it for its tokens, add it to `src/catalog.rs`. For a new driver, it is worth checking:
 
 - whether it loads on its own (`probe-module`) and through p11-kit (`list-tokens` with a server at hand);
 - whether it signs directly and through p11-kit, with `sign-test.py` (valid PSS, and not PKCS#1 v1.5);

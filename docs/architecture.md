@@ -102,7 +102,7 @@ The app folders do not get `:create`. The app creates its own folders the first 
 
 What Tessera protects against, what it does not, and why.
 
-**Downloads.** The vendor drivers come from the vendors' own sites over HTTPS, at install time, and Flatpak checks each file against the SHA256 pinned in the manifest: a file changed on the way, or on the vendor's site, makes the installation fail. FlatPark's package pins Tessera's own release tarball the same way. A weekly workflow (`check-downloads.yml`) opens an issue if a vendor's file stops matching.
+**Downloads.** The vendor drivers, each a separate extension installed only by those who need it, come from the vendors' own sites over HTTPS, at install time, and Flatpak checks each file against the SHA256 pinned in the extension's manifest: a file changed on the way, or on the vendor's site, makes the installation fail. FlatPark's package pins Tessera's own release tarball the same way. A weekly workflow (`check-downloads.yml`) opens an issue if a vendor's file stops matching.
 
 **No network path.** Everything between the apps and the drivers goes through Unix sockets under `$XDG_RUNTIME_DIR` (`/run/user/<uid>`), a folder only the user (and root) can open; p11-kit also creates its sockets without access for group and others. Nothing listens on a network port, so nobody on another machine, and no other user of the same machine, can reach a token through Tessera.
 
@@ -112,6 +112,6 @@ What Tessera protects against, what it does not, and why.
 
 **Sandboxed apps.** A Flatpak app reaches the tokens only after step 1 (`--filesystem=xdg-run/p11-kit/pkcs11`), which the user grants per app. An app without it does not see the system's p11-kit server, and so no token.
 
-**The drivers.** The vendors' drivers are closed source. They run inside Tessera's sandbox, one process per connection, with Tessera's permissions only (the list above): they do not see the home folder, and nothing of theirs is installed on the system. A native install, by contrast, runs the vendors' install scripts as root and loads their libraries into every app that uses the token.
+**The drivers.** The vendors' drivers are closed source. They run inside Tessera's sandbox, one process per connection, with Tessera's permissions only (the list above; a Flatpak extension has none of its own): they do not see the home folder, and nothing of theirs is installed on the system. A native install, by contrast, runs the vendors' install scripts as root and loads their libraries into every app that uses the token.
 
 **Tessera's own reach.** Tessera writes to other apps' certificate databases (the `pkcs11.txt` of the Firefox profiles and of the Chromium-based browsers' NSS databases, PJeOffice Pro's `list.a3`) and to `~/.config/pkcs11/modules`. Only Tessera's own entries are added or removed, and other programs' modules are never touched, but a compromised Tessera could register a module of its choice there. That is why its permissions are listed above one by one, why each one is limited to the folder it needs, and why none of the browser folders gets `:create`.

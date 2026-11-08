@@ -47,11 +47,11 @@ With `TESSERA_REMOTE_TRACE=1` in the environment of a driver's server, `tessera 
 flatpak run --command=sh io.github.pedrohqb.Tessera -c '
 export LD_PRELOAD=libgcc_s.so.1 XDG_CONFIG_HOME=$HOME/.config \
   SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt SSL_CERT_DIR=/etc/ssl/certs \
-  LD_LIBRARY_PATH=/app/extra/drivers/serproid/usr/lib \
+  LD_LIBRARY_PATH=/app/lib/tessera/extensions/SerproID/extra/usr/lib \
   P11_KIT_PRIVATEDIR=$XDG_DATA_HOME/tessera/libexec TESSERA_REMOTE_TRACE=1
 S=$XDG_RUNTIME_DIR/tessera/teste; rm -f $S
 /usr/libexec/p11-kit/p11-kit-server --foreground --name $S \
-  --provider /app/extra/drivers/serproid/libserproidp11.so pkcs11: 2>$XDG_CACHE_HOME/trace.log &
+  --provider /app/lib/tessera/extensions/SerproID/extra/libserproidp11.so pkcs11: 2>$XDG_CACHE_HOME/trace.log &
 P=$!; sleep 1
 P11_KIT_SERVER_ADDRESS=unix:path=$S tessera list-tokens
 kill $P'
@@ -83,8 +83,8 @@ cd ~/Downloads   # where sign-test.py is
 flatpak run --command=env io.github.pedrohqb.Tessera \
   LD_PRELOAD=libgcc_s.so.1 XDG_CONFIG_HOME=$HOME/.config \
   SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt SSL_CERT_DIR=/etc/ssl/certs \
-  LD_LIBRARY_PATH=/app/extra/drivers/serproid/usr/lib \
-  python3 - /app/extra/drivers/serproid/libserproidp11.so random < sign-test.py
+  LD_LIBRARY_PATH=/app/lib/tessera/extensions/SerproID/extra/usr/lib \
+  python3 - /app/lib/tessera/extensions/SerproID/extra/libserproidp11.so random < sign-test.py
 ```
 
 | Option | What it changes |

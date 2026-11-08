@@ -37,7 +37,15 @@ flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatp
 flatpak --user install flatpark io.github.pedrohqb.Tessera
 ```
 
-The FlatPark package (`registry/io.github.pedrohqb.Tessera` in [flatpark/flatpark](https://github.com/flatpark/flatpark)) installs the `tessera-x86_64.tar.gz` of each GitHub release, unmodified, and the same vendor drivers with the same pins as Tessera's own manifest. Its `apply_extra.sh` is this repository's plus the unpacking of that tarball.
+Then the driver for the token, if it is not one OpenSC (built in) serves; the window shows which one and the command:
+
+```sh
+flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign   # GD Burti and other SafeSign tokens
+flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeNet    # SafeNet eToken 5100/5110, IDPrime
+flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SerproID   # Serpro's cloud certificate
+```
+
+The FlatPark package (`registry/io.github.pedrohqb.Tessera` in [flatpark/flatpark](https://github.com/flatpark/flatpark)) installs the `tessera-x86_64.tar.gz` of each GitHub release, unmodified. Each driver extension has its own entry there, built from `flatpak/extensions/<Name>`, with the same pins.
 
 ## Installing the published release directly
 
@@ -47,23 +55,23 @@ Each release (tag `vX.Y.Z`) publishes on [Releases](https://github.com/pedrohqb/
 mkdir -p ~/Downloads/tessera && cd ~/Downloads/tessera
 curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/tessera-repo.tar.gz
 tar -xzf tessera-repo.tar.gz
-./install-test-repo.sh
+./install-test-repo.sh SafeSign      # or: SafeNet, SerproID, all, or none for Tessera alone
 ```
 
 The GNOME runtime comes from Flathub, which must be configured.
 
 ## Installing the test build
 
-Each push to `main` produces, in continuous integration, the `tessera-x86_64` artifact. It contains `tessera-repo.tar.gz`, a small Flatpak repository. A standalone `.flatpak` bundle does not work, because it does not carry the drivers' extra-data: the installation fails with "Extra data missing in detached metadata".
+Each push to `main` produces, in continuous integration, the `tessera-x86_64` artifact. It contains `tessera-repo.tar.gz`, a small Flatpak repository. A standalone `.flatpak` bundle does not work, because it does not carry the driver extensions' extra-data: the installation fails with "Extra data missing in detached metadata". The repository holds Tessera and the three driver extensions; `install-test-repo.sh` installs Tessera and the drivers named after it (`all` for every one).
 
 ```sh
 mkdir -p ~/Downloads/tessera-teste && cd ~/Downloads/tessera-teste
 unzip ~/Downloads/tessera-x86_64.zip
 tar -xzf tessera-repo.tar.gz
-./install-test-repo.sh
+./install-test-repo.sh all
 ```
 
-The script adds the folder as the local repository `tessera-test` and installs or updates Tessera. During installation, Flatpak downloads the vendors' drivers and checks each sha256.
+The script adds the folder as the local repository `tessera-test` and installs or updates Tessera and the drivers asked for. While a driver installs, Flatpak downloads the vendor's files and checks each sha256. The window's install commands name the `flatpark` remote; with the test build, use `tessera-test` instead.
 
 After updating, quit Tessera (menu → **Quit**) and open it again.
 

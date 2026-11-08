@@ -83,7 +83,7 @@ Confira se ele aparece como **Pronto** na lista do Tessera e se foi aberto de no
 
 ### O token não aparece no Tessera.
 
-Tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**. Confira também se o serviço de cartões está ligado (`sudo systemctl enable --now pcscd.socket`).
+Veja primeiro se o driver dele está instalado: os drivers dos fabricantes são extensões à parte (tabela no [README](README.md)). Com o token conectado, se faltar o driver, a linha do leitor diz qual instalar, com o comando pronto para copiar; depois de instalar, saia do Tessera pelo menu e abra de novo. Se o driver já estiver lá, tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**. Confira também se o serviço de cartões está ligado (`sudo systemctl enable --now pcscd.socket`).
 
 ### O token aparece duas vezes, ou o navegador pede o PIN duas vezes.
 
@@ -145,7 +145,7 @@ Saia do Tessera (menu ☰ → **Sair**) e rode:
 flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 ```
 
-Numa instalação de sistema, troque `--user` por `--system`. A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --user --reset <aplicativo>`, que também apaga outras permissões que você tenha dado ao aplicativo.
+Numa instalação de sistema, troque `--user` por `--system`. As extensões de driver saem junto com o Tessera. A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --user --reset <aplicativo>`, que também apaga outras permissões que você tenha dado ao aplicativo.
 
 ### Existe outro "Tessera" no Flathub?
 
@@ -236,7 +236,7 @@ Check that it shows as **Ready** in Tessera's list, and that it was opened again
 
 ### The token does not appear in Tessera.
 
-Unplug it and plug it in again. If a driver shows as "Stopped", press **Restart**. Also check that the smart card service is on (`sudo systemctl enable --now pcscd.socket`).
+First check that its driver is installed: the vendors' drivers are separate extensions (table in the [README](README.md)). With the token plugged in, if its driver is missing, the reader's row says which one to install, with the command ready to copy; after installing, quit Tessera from its menu and open it again. If the driver is there, unplug the token and plug it in again. If a driver shows as "Stopped", press **Restart**. Also check that the smart card service is on (`sudo systemctl enable --now pcscd.socket`).
 
 ### The token shows twice, or the browser asks for the PIN twice.
 
@@ -298,7 +298,7 @@ Quit Tessera (☰ menu → **Quit**) and run:
 flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 ```
 
-For a system-wide install, use `--system` instead of `--user`. Each app's step 1 permission is undone with `flatpak override --user --reset <app>`, which also removes any other permission you gave the app.
+For a system-wide install, use `--system` instead of `--user`. The driver extensions go with it. Each app's step 1 permission is undone with `flatpak override --user --reset <app>`, which also removes any other permission you gave the app.
 
 ### Is there another "Tessera" on Flathub?
 
