@@ -79,6 +79,11 @@ impl Hub {
         // once (see refresh): a driver that hangs would hang every app.
         *self.host.borrow_mut() =
             apps::write_host_modules(&ds, &[], &[]).map_err(|e| format!("{e:#}"));
+        // Before anything is served, so no app opens a token with the
+        // system's OpenSC in the meantime.
+        if let Err(e) = apps::set_host_opensc_off(apps::opensc_on(&ds, &disabled)) {
+            eprintln!("tessera: the system's OpenSC: {e:#}");
+        }
         *self.drivers.borrow_mut() = ds;
         // Check what the apps see again once the drivers are back.
         *self.host_checked.borrow_mut() = None;
@@ -92,6 +97,7 @@ impl Hub {
         self.generation.set(self.generation.get() + 1);
         self.server.borrow_mut().stop();
         let _ = apps::write_host_modules(&self.drivers.borrow(), &[], &[]);
+        let _ = apps::set_host_opensc_off(false);
         self.tray.borrow_mut().take();
     }
 

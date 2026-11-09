@@ -390,6 +390,70 @@ pub fn write_host_modules(
     Ok(wanted.len())
 }
 
+/// The system's own OpenSC, if it has one, is switched off for the system's
+/// p11-kit while Tessera's OpenSC is on. Tessera's serves the same cards and
+/// leaves alone the tokens OpenSC hangs (the GD Burti's StarSign, see
+/// flatpak/drivers/opensc); the system's would open those, and show the
+/// others twice. p11-kit reads a module's file in the user's folder first,
+/// and takes from the system's file of the same name only what the user's
+/// does not set: a user's file whose `enable-in:` names no real program
+/// turns the module off everywhere (p11-kit-proxy.so in native apps, and
+/// the system's p11-kit server, through which Flatpak apps reach it),
+/// without touching the system's file. Fedora and Arch name it
+/// opensc.module, Debian and Ubuntu opensc-pkcs11.module; a file for a
+/// module the system does not have does nothing.
+const HOST_OPENSC_FILES: [&str; 2] = ["opensc.module", "opensc-pkcs11.module"];
+
+/// The first line of Tessera's files: only files that start with it are
+/// changed or removed (a file of the user's own is left as it is).
+const HOST_OPENSC_MARK: &str =
+    "# Written by Tessera (io.github.pedrohqb.Tessera): the system's OpenSC is off while Tessera's own serves the same cards.";
+
+fn host_opensc_contents() -> String {
+    format!(
+        "{HOST_OPENSC_MARK}\n# Removed when Tessera quits or its OpenSC is switched off.\nenable-in: tessera-serves-opensc\n"
+    )
+}
+
+/// Is Tessera's OpenSC on (installed, and not switched off)?
+pub fn opensc_on(drivers: &[Driver], disabled: &[String]) -> bool {
+    drivers
+        .iter()
+        .any(|d| d.id == "opensc" && d.available() && !disabled.contains(&d.id))
+}
+
+/// Switch the system's OpenSC off (`off`) or back on, through Tessera's own
+/// files only.
+pub fn set_host_opensc_off(off: bool) -> Result<()> {
+    set_host_opensc_off_in(&paths::host_modules_dir(), off)
+}
+
+fn set_host_opensc_off_in(dir: &std::path::Path, off: bool) -> Result<()> {
+    if off {
+        fs::create_dir_all(dir).with_context(|| format!("creating {}", dir.display()))?;
+    }
+    for name in HOST_OPENSC_FILES {
+        let path = dir.join(name);
+        let ours = match fs::read_to_string(&path) {
+            Ok(text) => text.starts_with(HOST_OPENSC_MARK),
+            Err(_) if !path.exists() => true,
+            Err(_) => false,
+        };
+        if !ours {
+            continue;
+        }
+        if off {
+            let body = host_opensc_contents();
+            if fs::read_to_string(&path).ok().as_deref() != Some(body.as_str()) {
+                fs::write(&path, body).with_context(|| format!("writing {}", path.display()))?;
+            }
+        } else if path.exists() {
+            fs::remove_file(&path).with_context(|| format!("removing {}", path.display()))?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -449,5 +513,31 @@ mod tests {
              Restart=on-failure\n[Install]\nWantedBy=default.target\n"
         );
         let _ = fs::remove_dir_all(&home);
+    }
+
+    /// The system's OpenSC goes off through Tessera's own files, which go
+    /// away again; a file of the user's own is never changed.
+    #[test]
+    fn the_systems_opensc_is_switched_off_and_on() {
+        let dir = std::env::temp_dir().join(format!("tessera-opensc-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        set_host_opensc_off_in(&dir, true).unwrap();
+        for name in HOST_OPENSC_FILES {
+            let text = fs::read_to_string(dir.join(name)).unwrap();
+            assert!(text.starts_with(HOST_OPENSC_MARK));
+            assert!(text.contains("\nenable-in: tessera-serves-opensc\n"));
+        }
+        set_host_opensc_off_in(&dir, false).unwrap();
+        assert!(HOST_OPENSC_FILES.iter().all(|n| !dir.join(n).exists()));
+        // The user's own file stays as it is, on and off.
+        let mine = "# mine\nmodule: /opt/opensc-pkcs11.so\n";
+        fs::write(dir.join("opensc.module"), mine).unwrap();
+        set_host_opensc_off_in(&dir, true).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("opensc.module")).unwrap(), mine);
+        assert!(dir.join("opensc-pkcs11.module").exists());
+        set_host_opensc_off_in(&dir, false).unwrap();
+        assert_eq!(fs::read_to_string(dir.join("opensc.module")).unwrap(), mine);
+        assert!(!dir.join("opensc-pkcs11.module").exists());
+        let _ = fs::remove_dir_all(&dir);
     }
 }

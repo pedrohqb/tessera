@@ -280,6 +280,9 @@ fn serve() -> ExitCode {
     }
     // Nothing is published until each driver has answered once.
     let _ = apps::write_host_modules(&ds, &[], &[]);
+    if let Err(e) = apps::set_host_opensc_off(apps::opensc_on(&ds, &disabled)) {
+        eprintln!("tessera: the system's OpenSC: {e:#}");
+    }
     eprintln!("tessera: serving in {}", paths::socket_dir().display());
     let mut last = usize::MAX;
     let mut health = Health::default();
