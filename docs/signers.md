@@ -36,7 +36,7 @@ site ─► browser extension ─► (native messaging) ─► start ─► vend
 
 ### What the extensions hold
 
-`flatpak/extensions/<Name>/`: the manifest (`build-extension`, with Tessera as its runtime, branch `stable`), the vendor's package as extra-data, `apply_extra.sh`, `start`, `signer.toml`, an AppStream `addon` component and an icon (a generic one, without the vendor's mark). The extension point is in Tessera's manifest: `io.github.pedrohqb.Tessera.Signer`, directory `lib/tessera/signers`, with `subdirectories`, `no-autodownload` and `autodelete`.
+`flatpak/extensions/<Name>/`: the manifest (`build-extension`, with Tessera as its runtime, branch `stable`), the vendor's package as extra-data, `apply_extra.sh`, `start`, `signer.toml`, an AppStream `addon` component and the vendor's icon, the one its browser extension shows (the Linux packages carry none), which FlatPark lists and the extension installs as `icon.png`: Tessera's window shows it next to the signer, and, for a signer not installed, the one in Flatpak's AppStream data, if any. The extension point is in Tessera's manifest: `io.github.pedrohqb.Tessera.Signer`, directory `lib/tessera/signers`, with `subdirectories`, `no-autodownload` and `autodelete`.
 
 `apply_extra.sh` takes only the program (and Certisign's dialogs): not the package's native messaging manifests, which name `/opt`, nor its maintainer scripts, which only copy and remove those manifests and the user's data folder.
 

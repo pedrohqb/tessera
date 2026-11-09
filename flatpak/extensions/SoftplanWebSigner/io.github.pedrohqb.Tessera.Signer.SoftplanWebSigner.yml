@@ -26,6 +26,9 @@ modules:
       - mkdir -p ${FLATPAK_DEST}/lib
       - ln -s /usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so ${FLATPAK_DEST}/lib/libaetpkss.so.3
       - install -Dm644 io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
+      # The vendor's icon (from its browser extension), shown in Tessera's
+      # window next to the signer.
+      - install -Dm644 io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner.png ${FLATPAK_DEST}/icon.png
     sources:
       # websigner.softplan.com.br sends an incomplete certificate chain (no
       # intermediate), which Flatpak's downloader rejects. The site is a
@@ -49,3 +52,5 @@ modules:
         path: apply_extra.sh
       - type: file
         path: io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner.metainfo.xml
+      - type: file
+        path: io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner.png

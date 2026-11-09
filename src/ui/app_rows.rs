@@ -520,7 +520,7 @@ fn usable_icon_file(path: &std::path::Path) -> bool {
 /// An app's icon, at 32 px: for each of `names` in turn, the icon theme's
 /// (the desktop's or Tessera's own copy) or the one in Flatpak's AppStream
 /// data (every app of each remote, installed or not); else `fallback`.
-fn themed_icon(names: &[&str], fallback: &str) -> gtk::Image {
+pub(super) fn themed_icon(names: &[&str], fallback: &str) -> gtk::Image {
     let theme = gtk::gdk::Display::default().map(|d| gtk::IconTheme::for_display(&d));
     let found = names.iter().find_map(|n| {
         if theme.as_ref().is_some_and(|t| readable_icon(t, n)) {

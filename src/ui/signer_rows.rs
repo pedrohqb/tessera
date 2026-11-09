@@ -5,12 +5,27 @@
 use adw::prelude::*;
 use std::rc::Rc;
 
-use super::app_rows::app_icon;
+use super::app_rows::{app_icon, themed_icon};
 use super::window::{copy_button_with, plain_row, store_button_for, Win};
 use crate::apps;
 use crate::catalog;
 use crate::i18n::t;
 use crate::signers::{self, Browser, Signer};
+
+/// A signer's icon, at 32 px: the vendor's, which an installed extension
+/// carries, else the one in Flatpak's AppStream data (FlatPark lists the
+/// extension with it), else a generic one.
+fn signer_icon(file: Option<std::path::PathBuf>, extension: &str) -> gtk::Image {
+    match file {
+        Some(f) => {
+            let image = gtk::Image::from_file(f);
+            image.set_pixel_size(32);
+            image.set_size_request(32, 32);
+            image
+        }
+        None => themed_icon(&[extension], "application-x-addon-symbolic"),
+    }
+}
 
 /// One signer's row in one browser's row.
 struct SignerRow {
@@ -82,6 +97,7 @@ fn browser_row(win: &Rc<Win>, b: &'static Browser, installed: &[Signer]) -> Brow
     let mut rows = vec![];
     for s in installed {
         let r = adw::ActionRow::builder().use_markup(false).build();
+        r.add_prefix(&signer_icon(s.icon(), &s.extension()));
         let cmd = signers::command(s, b);
         r.set_tooltip_text(Some(&cmd));
         let copy = copy_button_with(
@@ -141,8 +157,9 @@ pub(super) fn signers_group(win: &Rc<Win>) -> adw::PreferencesGroup {
                 t(k.used_by),
                 t("Install it from the app store (an add-on on Tessera's page) or FlatPark's page (button), or with the command (copy button); then restart Tessera (menu)")
             ),
-            "application-x-addon-symbolic",
+            "",
         );
+        row.add_prefix(&signer_icon(None, &ext));
         row.add_css_class("dim-label");
         row.set_tooltip_text(Some(&install));
         row.add_suffix(&store_button_for(

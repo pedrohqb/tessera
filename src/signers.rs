@@ -72,6 +72,11 @@ impl Signer {
     pub fn extension(&self) -> String {
         format!("{EXTENSION_PREFIX}{}", self.folder)
     }
+
+    /// The vendor's icon, which the extension carries as icon.png.
+    pub fn icon(&self) -> Option<PathBuf> {
+        Some(self.dir.join("icon.png")).filter(|p| p.is_file())
+    }
 }
 
 /// Where the signer extensions are mounted in Tessera's sandbox.
