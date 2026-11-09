@@ -77,7 +77,7 @@ Não mais, quando as extensões de assinador web do Tessera chegarem ao FlatPark
 
 ### O plugin Web PKI ou WebSigner não mostra o meu token.
 
-Nos navegadores em Flatpak, confira, nesta ordem: o passo 1 do navegador (seção Aplicativos) está feito; a linha do navegador em **Assinadores web** mostra o plugin como feito; o navegador foi reiniciado depois do comando; e, nas configurações do plugin (aba "Cripto Dispositivos"), **"Dispositivos SafeSign AET"** está marcado. Essa opção vale para qualquer token do Tessera, não só para o SafeSign: é o nome que o plugin usa para carregar o p11-kit. Não marque também "Tokens SafeNet", senão cada token aparece duas vezes.
+Nos navegadores em Flatpak, confira, nesta ordem: o passo 1 do navegador (seção Aplicativos) está feito; a linha do navegador em **Assinadores web** mostra o plugin como feito; o navegador foi reiniciado depois do comando; e, nas configurações do plugin, **"Dispositivos SafeSign AET"** (aba "Cripto Dispositivos") está marcado; no WebSigner da Certisign, a opção é **"SafeSign"**. Essa opção vale para qualquer token do Tessera, não só para o SafeSign: é o nome que o plugin usa para carregar o p11-kit. Não marque também "Tokens SafeNet", senão cada token aparece duas vezes.
 
 ### A linha "Conexão com o sistema" está vermelha.
 
@@ -250,7 +250,7 @@ Not anymore, once Tessera's web signer extensions reach FlatPark: **Web PKI**, S
 
 ### The Web PKI or WebSigner plugin does not show my token.
 
-In Flatpak browsers, check, in this order: the browser's step 1 (Apps section) is done; the browser's row under **Web signers** shows the plugin as done; the browser was restarted after the command; and, in the plugin's settings ("Cripto Dispositivos" tab), **"Dispositivos SafeSign AET"** is ticked. That option works for any of Tessera's tokens, not only SafeSign: it is the name the plugin uses to load p11-kit. Do not tick "Tokens SafeNet" as well, or each token shows twice.
+In Flatpak browsers, check, in this order: the browser's step 1 (Apps section) is done; the browser's row under **Web signers** shows the plugin as done; the browser was restarted after the command; and, in the plugin's settings, **"Dispositivos SafeSign AET"** ("Cripto Dispositivos" tab) is ticked; in Certisign's WebSigner the option is **"SafeSign"**. That option works for any of Tessera's tokens, not only SafeSign: it is the name the plugin uses to load p11-kit. Do not tick "Tokens SafeNet" as well, or each token shows twice.
 
 ### The "System connection" row is red.
 

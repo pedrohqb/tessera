@@ -11,5 +11,6 @@ firefox_extensions = ["websigner@certisign.com.br"]
 persist = ".certisign-websigner"
 # Its dialogs are GTK 3, which draws on Wayland too.
 firefox_x11 = false
-# No option to tick is known yet: the program loads libeToken.so (SafeNet's
-# name, which it looks for by itself), and lib/ has that name.
+# The "SafeSign" option loads libaetpkss.so.3, which lib/ has. Its "SafeNet"
+# option (libeToken.so) finds nothing and is left alone.
+option = "SafeSign"

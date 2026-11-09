@@ -18,21 +18,21 @@ A plugin has two parts: the browser extension, which talks to the site, and a pr
 site ─► browser extension ─► (native messaging) ─► start ─► vendor's program
                                                      │ LD_LIBRARY_PATH=<extension>/lib
                                                      ▼
-                            libaetpkss.so.3 (or libeToken.so) ─► the runtime's p11-kit-client.so
+                                 libaetpkss.so.3 ─► the runtime's p11-kit-client.so
                                                      │ $XDG_RUNTIME_DIR/p11-kit/pkcs11
                                                      ▼
                                     the system's p11-kit server ─► Tessera's drivers
 ```
 
 1. **The program runs inside the browser's sandbox,** not Tessera's. Flatpak deploys the extension on the host at `<installation>/runtime/io.github.pedrohqb.Tessera.Signer.<Name>/` (`/var/lib/flatpak` for a system installation, `~/.local/share/flatpak` for a user one). The browser gets read access to that folder through its override, and runs `x86_64/stable/active/files/start` there. `active` is Flatpak's link to the current version, so an update of the extension needs nothing in the browser.
-2. **`start` puts the extension's `lib/` first** in the library search and runs the program. `lib/` has one link: the library name the plugin asks for, pointing at `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`, which is in every browser's runtime (the freedesktop one and those built on it). Anywhere else the link is dangling, and that is expected.
+2. **`start` puts the extension's `lib/` first** in the library search and runs the program. `lib/` has the library name the plugin asks for: for Web PKI and Softplan's WebSigner a link to `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so`, which is in every browser's runtime (the freedesktop one and those built on it; anywhere else the link is dangling, and that is expected); for Certisign's, a small module that wraps it (below).
 3. **The plugin loads that name,** and so p11-kit's client, which reaches the system's p11-kit server through the socket step 1 of the browser's row gives it. All of Tessera's tokens are there.
 4. **Tessera does not run the program** and has no permission for this. It reads the extension's `signer.toml` (mounted at `/app/lib/tessera/signers/<Name>`) to show what each browser needs.
 
 ### The names the plugins load
 
 - **Web PKI and Softplan WebSigner** (the same Lacuna engine, a single self-contained .NET file of about 140 MB) load `libaetpkss.so.3` when the option **"Dispositivos SafeSign AET"** is ticked in the plugin's settings ("Cripto Dispositivos" tab). It is off by default, and the plugin keeps the setting in the browser profile's extension storage, which no file or policy can set beforehand: the user ticks it once per browser profile. One name is enough, because p11-kit serves every token; with `libeToken.so` too ("Tokens SafeNet"), and both options ticked, each token would show twice.
-- **Certisign WebSigner** (an older C program, about 2 MB, GTK 3) loads the modules the extension names and, by itself, `libeToken.so` and `libeTPkcs11.so` (SafeNet's names), first by name and then from `/usr/lib`. Its `lib/` has `libeToken.so`. Which option its extension shows, if any, has not been checked yet.
+- **Certisign WebSigner** (an older C program, version 2.9.5 from 2019, about 2 MB, GTK 3) loads the modules its extension (2.18.0) names: the option **"SafeSign"** loads `libaetpkss.so.3` too, and **"SafeNet"** loads `libeToken.so`, which it also looks for in `/usr/lib`. Its `lib/` has `libaetpkss.so.3` only, and it is not a link but a small module of the extension's own (below); the SafeNet option finds nothing and does no harm.
 
 ### What the extensions hold
 
@@ -56,6 +56,12 @@ option = "Dispositivos SafeSign AET"        # what to tick once in the plugin
 ### Certisign's dialogs
 
 Certisign's program opens its dialogs from a fixed place, `/opt/certisign-websigner/res/<name>.glade` (seven files, compiled into the binary), which no browser sandbox has. `apply_extra.sh` overwrites each of those paths in the binary, in place, with `res/<name>.glade` and a NUL: shorter, so nothing else moves. `start` then runs the program from the extension's `extra/` folder, which has `res/`. The program keeps its log and data in `~/.certisign-websigner`; if it cannot write there it goes on without the log.
+
+### Certisign and the trust store
+
+Through p11-kit's client, the browser reaches the system's p11-kit server, which serves Tessera's tokens and also the system's trust store (p11-kit's trust module): a token of some 150 CA certificates, with no keys. Certisign's program crashes (SIGSEGV) while listing that token's certificates, after twenty or so, before it reaches the real tokens; its log, `~/.certisign-websigner/WebPKIForChrome.log` in the browser's folder, says `Error while trying to list p11 certs … SIGSEGV`. Reproduced outside the browser with the program, its native messaging protocol and p11-kit's trust module. Web PKI and Softplan's WebSigner, a newer engine, do not crash there.
+
+So Certisign's `libaetpkss.so.3` is `hide-trust.c`, built with the extension: a PKCS#11 module that loads `p11-kit-client.so` from the browser's runtime and hands it every call, except `C_GetSlotList`, which leaves out the slots whose token model is `p11-kit-trust` ("System Trust", "Default Trust"). The program then lists only Tessera's tokens, and asks for the PIN in its own dialog (`res/pin.glade`, which the rewritten path finds).
 
 ### The downloads
 
@@ -109,4 +115,4 @@ Native browsers need none of this: use the vendors' official packages and, in th
 
 - CI builds the three extensions, installs them (so each `apply_extra.sh` runs on the real download) and checks the start script, the program, the library link and, for Certisign, that no dialog path is left at `/opt` and that every `res/` file the binary names exists.
 - Sigillum's approach (the same programs, links and manifests, from a folder in the home) was tested on October 29, 2026 on Bluefin with a GD Burti token and a SerproID certificate: Web PKI and Softplan's WebSigner worked in Firefox, Chromium, Chrome, Edge and Brave.
-- The extensions themselves, and Certisign's WebSigner at all, are still to be tested in a browser.
+- November 9, 2026, Bluefin, Firefox and Brave (Flatpak), Tessera's test build: Web PKI and Softplan's WebSigner work. Certisign's WebSigner started, but crashed on the trust store (above) with its SafeNet option and found no library with its SafeSign option; the module that hides the trust store's slots is still to be tested in a browser.
