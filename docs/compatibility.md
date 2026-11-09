@@ -34,7 +34,7 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | KDE Plasma | a real token (type not recorded) | Native Firefox and Chromium-based browsers | Works after Set up |
 | KDE Plasma | a real token (type not recorded) | Native PJeOffice Pro (`list.a3` with p11-kit) | Works |
 | KDE Plasma | a real token (type not recorded) | Native Okular and Papers, through the native Firefox's database | Sign PDFs |
-| Arch Linux (a user's report) | SafeNet | PJeOffice Pro | Works |
+| Arch Linux (a user's report) | SafeNet | PJeOffice Pro | Works (Tessera 0.2.x, with the driver built in; the 0.3.0 extension carries the same package) |
 | openSUSE Tumbleweed | a real token (type not recorded) | Tessera from FlatPark, with `p11-kit-server` and its socket | Works |
 | openSUSE Tumbleweed | a real token (type not recorded) | Native Firefox | Shows **Set up** (openSUSE's NSS does not load p11-kit on its own, as the CI check found); sees the token after Set up |
 | Ubuntu 24.04 | — | The host's p11-kit server as a user service (Ubuntu ships no `p11-kit-server.socket`; see [usage](usage.md)) | Works (the connection only). Signing fails there as on MX Linux below, by p11-kit version (0.25.3): Ubuntu 24.04 is not supported |

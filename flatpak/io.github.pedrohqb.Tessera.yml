@@ -147,6 +147,9 @@ modules:
       - /bin
       - /sbin
       - /lib/systemd
+      # pcscd's defaults and sysusers file: the daemon is the host's.
+      - /etc
+      - /sysusers.d
       - /share/man
       - /share/doc
     sources:
@@ -180,12 +183,16 @@ modules:
       - --disable-openpace
       - --disable-autostart-items
       - --disable-readline
+      # Only the shared libraries are used; the static libopensc.a was 14 MB
+      # of the release tarball.
+      - --disable-static
       - --with-pcsc-provider=libpcsclite.so.1
       - --with-completiondir=/app/share/bash-completion/completions
     cleanup:
       - /include
       - /lib/pkgconfig
       - '*.la'
+      - '*.a'
       - /etc
       - /share/doc
       - /share/man

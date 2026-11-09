@@ -191,7 +191,7 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 ### A fazer
 
 - **Testar com token real** o driver OpenSC (ePass2003) e os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice e Assinador SERPRO (o JSignPdf e o Master PDF Editor já foram testados).
-- **Publicar no FlatPark** as extensões dos drivers (SafeSign, SafeNet e SerproID) e testar a instalação de cada uma, com a indicação de qual instalar.
+- **Testar a extensão SafeNet** com um token de verdade. O driver já funcionou quando vinha embutido no Tessera; falta confirmar o empacotamento como extensão (SafeSign e SerproID já foram testados).
 
 ---
 
@@ -381,7 +381,7 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 ### To do
 
 - **Test with a real token** the OpenSC driver (ePass2003) and the apps added last: Thunderbird, Evolution, LibreOffice and Assinador SERPRO (JSignPdf and Master PDF Editor have been tested).
-- **Publish on FlatPark** the driver extensions (SafeSign, SafeNet and SerproID) and test installing each, with the window's hint of which one to install.
+- **Test the SafeNet extension** with a real token. The driver already worked when it was built into Tessera; what is left is confirming its packaging as an extension (SafeSign and SerproID have been tested).
 
 ### Documentation, support and license
 

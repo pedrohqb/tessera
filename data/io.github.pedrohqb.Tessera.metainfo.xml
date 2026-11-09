@@ -50,6 +50,15 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.3.1" date="2026-11-09">
+      <description>
+        <p>Smaller and tidier.</p>
+        <ul>
+          <li>Tessera no longer makes folders for Papers and Okular when they are not installed.</li>
+          <li>A smaller download: the release no longer carries OpenSC's static library nor pcscd's files.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-08">
       <description>
         <p>Drivers as extensions, OpenSC built in, and more apps.</p>
