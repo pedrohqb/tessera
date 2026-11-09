@@ -218,21 +218,6 @@ modules:
         url: https://github.com/OpenSC/OpenSC/releases/download/0.27.1/opensc-0.27.1.tar.gz
         sha256: 976f4a23eaf3397a1a2c3a7aac80bf971a8c3d829c9a79f06145bfaeeae5eca7
 
-  # A small PKCS#11 module for the Certisign WebSigner extension: p11-kit's
-  # client without the trust store's slots, on which Certisign's program
-  # crashes (see extensions/CertisignWebSigner/hide-trust.c). It is built
-  # here because FlatPark builds nothing into an extension: each release
-  # carries it as an asset of its own, certisign-hide-trust-x86_64.so, which
-  # the extension downloads (extra-data) like the vendor's package.
-  - name: hide-trust
-    buildsystem: simple
-    build-commands:
-      - mkdir -p /app/lib/tessera
-      - gcc -shared -fPIC -O2 -Wall -o /app/lib/tessera/certisign-hide-trust.so hide-trust.c $(pkg-config --cflags p11-kit-1)
-    sources:
-      - type: file
-        path: extensions/CertisignWebSigner/hide-trust.c
-
   - name: tessera
     buildsystem: simple
     build-options:
