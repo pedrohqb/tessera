@@ -22,6 +22,7 @@
       <li>Says which driver a connected token needs, with its page in the app store and the command that installs it</li>
       <li>Opens the drivers' tools, such as SafeSign's Token Administration and the SerproID app</li>
       <li>Sets up Firefox, Chromium, Google Chrome, Microsoft Edge, Brave, Thunderbird, Evolution, LibreOffice, Papers, Okular, JSignPdf and Master PDF Editor to use the tokens, and shows the command that lets them reach Tessera</li>
+      <li>Brings the web signers Lacuna Web PKI, Softplan WebSigner (e-SAJ) and Certisign WebSigner, each an extension, to the Flatpak browsers, with the one command each browser needs</li>
       <li>Publishes a driver only while it answers, so a driver that hangs cannot hang the apps</li>
       <li>Keeps running in the background with an icon in the tray, and can start at login</li>
     </ul>
