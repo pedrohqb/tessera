@@ -109,7 +109,7 @@ Tessera needs these folders only to remove the old entry. Flatpak only shows it 
 `org.gnome.Papers`. Papers signs PDFs through poppler, which looks for the NSS database in this order: the most recent `*default*` profile with `cert9.db` in `$XDG_CONFIG_HOME/mozilla/firefox` (in Flatpak, `~/.var/app/org.gnome.Papers/config/mozilla/firefox`), then `~/.mozilla/firefox`, then `/etc/pkcs11/nssdb`, then `~/.pki/nssdb`.
 
 1. `flatpak override --user --filesystem=xdg-run/p11-kit/pkcs11 org.gnome.Papers`
-2. **Set up** creates an **empty** NSS database in `~/.var/app/org.gnome.Papers/config/mozilla/firefox/tessera.default`.
+2. **Set up** creates an **empty** NSS database in `~/.var/app/org.gnome.Papers/config/mozilla/firefox/tessera.default`. Open Papers once before, then start (or restart) Tessera: its sandbox only sees Papers' config folder if it existed when Tessera started.
 
 The Papers database stays empty because, when NSS opens a database, it loads the root certificates module (`libnssckbi.so`) on its own. In the Flatpak runtime, that file is `load-p11-kit-trust.so`, and the p11-kit trust module, with the `override`, points to the system server. In other words, Papers already reaches the tokens this way. With `p11-kit-client.so` registered as well, each certificate appeared **twice** in the signing window. The dedicated database keeps poppler from falling back to `~/.pki/nssdb`, which lists the roots module once more. If an earlier version of Tessera registered the module in this database, **Set up** removes it.
 

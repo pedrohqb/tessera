@@ -66,7 +66,8 @@ pub(super) fn needs_restart(app: &ClientApp) -> bool {
             .parent()
             .is_some_and(std::path::Path::is_dir),
         Setup::MasterPdf => !masterpdf::config_file().is_file(),
-        Setup::Poppler | Setup::Chromium | Setup::ByHand | Setup::None => false,
+        Setup::Poppler => !paths::poppler_config_dir(app.id).is_dir(),
+        Setup::Chromium | Setup::ByHand | Setup::None => false,
     };
     missing && paths::flatpak_installed(app.id)
 }
@@ -93,9 +94,18 @@ pub(super) fn set_up_nss(
     token: Option<jsignpdf::TokenId>,
 ) -> Result<String, String> {
     match app.setup {
-        Setup::Poppler => nss::set_up_poppler_db(&paths::poppler_nss_dir(app.id))
-            .map(|_| step2_done(app))
-            .map_err(|e| format!("{e:#}")),
+        Setup::Poppler => {
+            if !paths::poppler_config_dir(app.id).is_dir() {
+                return Err(format!(
+                    "{}: {}",
+                    app.name,
+                    t("open the app once, then restart Tessera and try again")
+                ));
+            }
+            nss::set_up_poppler_db(&paths::poppler_nss_dir(app.id))
+                .map(|_| step2_done(app))
+                .map_err(|e| format!("{e:#}"))
+        }
         Setup::Profiles(_) => {
             let profiles = apps::app_profiles(app);
             if profiles.is_empty() {

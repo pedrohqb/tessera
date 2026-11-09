@@ -144,10 +144,15 @@ pub fn p11kit_server_command() -> PathBuf {
 /// that is inside the app's own data folder, so a small NSS database there is
 /// the one the app opens.
 pub fn poppler_nss_dir(app_id: &str) -> PathBuf {
-    home()
-        .join(".var/app")
-        .join(app_id)
-        .join("config/mozilla/firefox/tessera.default")
+    poppler_config_dir(app_id).join("mozilla/firefox/tessera.default")
+}
+
+/// The app's config folder, which Flatpak makes the first time the app runs.
+/// Tessera sees it only if it was there when Tessera started, and makes the
+/// database inside it only then: outside it, a folder Tessera made would
+/// not be the app's, only one in its own sandbox.
+pub fn poppler_config_dir(app_id: &str) -> PathBuf {
+    home().join(".var/app").join(app_id).join("config")
 }
 
 /// The profile folders listed in each root's profiles.ini.
