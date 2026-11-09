@@ -207,16 +207,19 @@ jobs:
           cp -a build-dir/files dist/tessera
           rm -rf dist/tessera/include dist/tessera/lib/pkgconfig dist/tessera/lib/debug
           tar -C dist -czf tessera-x86_64.tar.gz tessera
+          # The module the Certisign WebSigner extension downloads.
+          cp build-dir/files/lib/tessera/certisign-hide-trust.so certisign-hide-trust-x86_64.so
       - uses: actions/upload-artifact@v4
         with:
           name: tessera-x86_64
           path: |
             tessera-repo.tar.gz
             tessera-x86_64.tar.gz
+            certisign-hide-trust-x86_64.so
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" tessera-repo.tar.gz tessera-x86_64.tar.gz --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" tessera-repo.tar.gz tessera-x86_64.tar.gz certisign-hide-trust-x86_64.so --title "$GITHUB_REF_NAME" --generate-notes
     permissions:
       contents: write
