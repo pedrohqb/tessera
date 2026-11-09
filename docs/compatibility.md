@@ -18,6 +18,8 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | The Flatpak builds, with every icon the window uses | GNOME 51 runtime | `flatpak-builder` |
 | Each driver extension builds, installs on the real vendor downloads, and leaves its module and tools where `driver.toml` says | GNOME 51 runtime | `flatpak-builder`, then `flatpak install` (`ci.yml`) |
 | A token's reader or ATR points to the right driver extension | — | `src/catalog.rs` tests (eToken 5110, StarSign CUT S, ePass2003) |
+| Each web signer extension builds, installs on the real vendor download, and has its start script, program and library link; Certisign's dialog paths are all rewritten | GNOME 51 runtime | `flatpak-builder`, then `flatpak install` (`ci.yml`) |
+| A browser's command for a web signer writes valid manifests in each of its folders, in `sh` (and so bash and zsh) and fish; the override shows whether it is done | — | `src/signers.rs` tests; fish by hand |
 
 ## Tested by hand
 

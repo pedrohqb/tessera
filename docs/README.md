@@ -7,6 +7,7 @@ This documentation records how Tessera works, why it is the way it is, and every
 | Document | What it contains |
 |---|---|
 | [Architecture](architecture.md) | How the tokens leave Tessera's sandbox and reach the apps; why there is no simpler shortcut; supervision of the drivers |
+| [Web signers](signers.md) | Web PKI, Softplan WebSigner and Certisign WebSigner as extensions: how the Flatpak browsers run them with Tessera's tokens, and the one command per browser |
 | [Drivers](drivers.md) | Each driver: origin, verification, "clean" unpacking, dependencies and the quirks found (above all in SerproID) |
 | [Apps](apps.md) | PJeOffice Pro, Firefox, Chromium, Chrome, Edge, Brave, Papers and Okular: what each one needs and why |
 | [Installation and usage](usage.md) | Preparing the system, installing, the window, the tray, automatic start and the command line |
@@ -19,7 +20,7 @@ This documentation records how Tessera works, why it is the way it is, and every
 
 - **For users:** install Tessera, run `systemctl --user enable --now p11-kit-server.socket` once (on Debian and Ubuntu, a user service instead: see [usage](usage.md)), and follow the two steps for each app in the window. PJeOffice Pro from FlatPark needs nothing.
 - **For maintainers of a Flatpak package that uses a token:** give the app `--filesystem=xdg-run/p11-kit/pkcs11` and load the runtime's `p11-kit-client.so`. This is what PJeOffice Pro from FlatPark already does.
-- **For those who need Web PKI or WebSigner (e-SAJ):** in Flatpak browsers, use [Sigillum](https://github.com/pedrohqb/sigillum), which installs them and connects them to Tessera's tokens; in native browsers, the vendors' official packages, with `p11-kit-proxy.so` added under the plugin's custom options (see the README).
+- **For those who need Web PKI or WebSigner (e-SAJ):** in Flatpak browsers, Tessera's web signer extensions, set up per browser with one command the window shows ([Web signers](signers.md)); until they are on FlatPark, [Sigillum](https://github.com/pedrohqb/sigillum). In native browsers, the vendors' official packages, with `p11-kit-proxy.so` added under the plugin's custom options (see the README).
 - **For those who package SerproID elsewhere:** read the SerproID section in [Drivers](drivers.md#serproid). There are four quirks that make signing fail in ways that are hard to understand.
 
 ## Status

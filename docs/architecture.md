@@ -97,6 +97,8 @@ Supervision runs in the service, with or without the window (`supervise` in `src
 | `--talk-name=org.kde.StatusNotifierWatcher` | The tray icon |
 | `--persist=.config/serproid` | SerproID's certificate folder and log stay in Tessera's own data |
 
+The web signer extensions (`io.github.pedrohqb.Tessera.Signer.<Name>`, see [Web signers](signers.md)) add no permission: Tessera only reads their `signer.toml`, and the browsers run them, with the access the user gives each browser by a command.
+
 The app folders do not get `:create`. The app creates its own folders the first time it runs, and Tessera does not create folders for apps that are not installed. A folder that did not exist when Tessera started stays invisible to it until it restarts; so does a driver extension installed since. For that, the menu has **Restart Tessera**, and an app's step 2 offers it when the app is installed but its folder is not seen: Tessera starts again through the Flatpak portal (`Spawn`), in a sandbox mounted afresh, and the new instance waits for the old one to leave the session bus before taking its place.
 
 ## Security
@@ -114,5 +116,7 @@ What Tessera protects against, what it does not, and why.
 **Sandboxed apps.** A Flatpak app reaches the tokens only after step 1 (`--filesystem=xdg-run/p11-kit/pkcs11`), which the user grants per app. An app without it does not see the system's p11-kit server, and so no token.
 
 **The drivers.** The vendors' drivers are closed source. They run inside Tessera's sandbox, one process per connection, with Tessera's permissions only (the list above; a Flatpak extension has none of its own): they do not see the home folder, and nothing of theirs is installed on the system. A native install, by contrast, runs the vendors' install scripts as root and loads their libraries into every app that uses the token.
+
+**The web signers.** Web PKI and the WebSigners are closed source too, and run in each browser's sandbox, not Tessera's, with that browser's permissions plus what their command adds: read access to the extension's own folder, a data folder in the browser's own, and, in Firefox, X11. They reach the tokens as the browser does, and ask for the PIN in their own dialog. The vendors' packages, by contrast, put their manifests in the system's browser folders and run their install scripts as root.
 
 **Tessera's own reach.** Tessera writes to other apps' certificate databases (the `pkcs11.txt` of the Firefox profiles and of the Chromium-based browsers' NSS databases, PJeOffice Pro's `list.a3`) and to `~/.config/pkcs11/modules`. Only Tessera's own entries are added or removed, and other programs' modules are never touched, but a compromised Tessera could register a module of its choice there. That is why its permissions are listed above one by one, why each one is limited to the folder it needs, and why none of the browser folders gets `:create`.

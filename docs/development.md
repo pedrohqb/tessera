@@ -9,6 +9,7 @@ src/
     mod.rs      the app: Hub (the state that outlives the window), actions, Background portal
     window.rs   the window: service, readers, tokens, drivers
     app_rows.rs the window's Apps section: each app and its steps
+    signer_rows.rs  the window's Web signers section: each Flatpak browser and its commands
     supervise.rs  supervision with or without the window, the tray and the background status
   server.rs     one p11-kit-server per driver (process group, PDEATHSIG, restart)
   remote.rs     `tessera remote`: the process that loads the driver on each connection
@@ -19,17 +20,20 @@ src/
   native.rs     the native apps: where their NSS databases are, their state, Set up
   nss.rs        NSS databases: registering p11-kit-client.so, the Papers database
   drivers.rs    discovery and reading of the driver.toml files
+  catalog.rs    the driver extensions not installed, and which one a reader needs
+  signers.rs    the web signer extensions: signer.toml, where each is on the host, the browsers' commands
   paths.rs      all the paths (with the development environment variables)
   tray.rs       the tray icon (ksni)
   settings.rs   $XDG_CONFIG_HOME/tessera/settings.toml, in the Flatpak
                 ~/.var/app/io.github.pedrohqb.Tessera/config/tessera/settings.toml
   i18n.rs       translation table for Brazilian Portuguese
 flatpak/
-  io.github.pedrohqb.Tessera.yml   the manifest (permissions, pcsc-lite, OpenSC, extension point)
+  io.github.pedrohqb.Tessera.yml   the manifest (permissions, pcsc-lite, OpenSC, extension points)
   fallback-icons.sh                Adwaita icons for desktops whose theme lacks them (Plasma)
   drivers/opensc/                  the built-in driver: driver.toml and OpenSC's configurations
   extensions/<Name>/               each vendor driver's extension: manifest (extra-data),
-                                   apply_extra.sh, driver.toml, metainfo, icon
+                                   apply_extra.sh, driver.toml, metainfo, icon; or each web
+                                   signer's: the same with start and signer.toml
 data/          .desktop, metainfo, icons (normal and symbolic), screenshot;
                app-icons/: the free-software icons of some apps, for when they are not installed
 scripts/       pin-drivers.py, install-test-repo.sh, sign-test.py
@@ -68,6 +72,7 @@ The manifest uses the `org.gnome.Platform` 51 runtime, Rust from the `rust-stabl
 | Variable | Default | Use |
 |---|---|---|
 | `TESSERA_DRIVERS_PATH` | `/app/lib/tessera/drivers:/app/lib/tessera/extensions` | where to look for `driver.toml` |
+| `TESSERA_SIGNERS_PATH` | `/app/lib/tessera/signers` | where to look for the web signers' `signer.toml` (`flatpak/extensions` works, to see the section outside Flatpak) |
 | `TESSERA_SOCKET_DIR` | `$XDG_RUNTIME_DIR/tessera` | the servers' sockets |
 | `TESSERA_HOST_MODULES` | `~/.config/pkcs11/modules` | where to write `tessera-*.module` |
 | `TESSERA_P11KIT_SERVER` | the first that exists of `/usr/libexec/p11-kit/p11-kit-server` and similar | the p11-kit helper |
@@ -102,7 +107,7 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 
 1. **Detection on each distribution:** the containers above.
 2. **Build and test:** `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, then the window test (`tests/gui/test_window.py` in an Xvfb, with the end of its output in an annotation if it fails). Clippy also checks that every `unsafe` block and `unsafe fn` carries its `// SAFETY:` or `# Safety` note (the `[lints.clippy]` table in `Cargo.toml`).
-3. **Flatpak bundle:** `pin-drivers.py`, `flatpak-builder` (with the last lines of the log in an annotation, if it fails), `flatpak build-update-repo`, and the artifacts `tessera-repo.tar.gz` (test repository with `install-test-repo.sh`) and `tessera-x86_64.tar.gz` (the whole `/app` tree, for anyone who wants to package it as extra-data).
+3. **Flatpak bundle:** `pin-drivers.py`, `flatpak-builder` (with the last lines of the log in an annotation, if it fails), then each extension (drivers and web signers) built, installed from the build's repository, so its `apply_extra.sh` runs on the real download, and its files checked, `flatpak build-update-repo`, and the artifacts `tessera-repo.tar.gz` (test repository with `install-test-repo.sh`) and `tessera-x86_64.tar.gz` (the whole `/app` tree, for anyone who wants to package it as extra-data).
 4. **With a `vX.Y.Z` tag:** creates the release on GitHub with both files.
 
 ## Publishing a release
@@ -119,6 +124,10 @@ A driver is a folder with a `driver.toml` (the format is in [Drivers](drivers.md
 - whether it signs directly and through p11-kit, with `sign-test.py` (valid PSS, and not PKCS#1 v1.5);
 - whether it needs any file or environment variable (`[env]`, `create_dirs`, `library_path`);
 - how it behaves without a token: if it hangs, supervision stops it after three attempts.
+
+## Adding a web signer
+
+A web signer is an extension `io.github.pedrohqb.Tessera.Signer.<Name>` with a `signer.toml` and a start script (see [Web signers](signers.md) and `flatpak/extensions/WebPKI`). The program must run in the browsers' runtimes (the freedesktop one), find its files relative to its start script, and load its PKCS#11 module by a name `lib/` can hold. To have the window offer it when it is not installed, add it to `KNOWN` in `src/signers.rs`. CI builds and installs every `flatpak/extensions/*/io.github.pedrohqb.Tessera.*.yml`.
 
 ## To do
 

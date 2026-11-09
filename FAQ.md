@@ -16,6 +16,7 @@
 
 **Uso**
 - [Preciso do Sigillum?](#preciso-do-sigillum)
+- [O plugin Web PKI ou WebSigner não mostra o meu token.](#o-plugin-web-pki-ou-websigner-não-mostra-o-meu-token)
 - [A linha "Conexão com o sistema" está vermelha.](#a-linha-conexão-com-o-sistema-está-vermelha)
 - [O aplicativo não vê o token.](#o-aplicativo-não-vê-o-token)
 - [O token não aparece no Tessera.](#o-token-não-aparece-no-tessera)
@@ -72,7 +73,11 @@ p11-kit server -f -n "$XDG_RUNTIME_DIR/p11-kit/pkcs11" pkcs11:
 
 ### Preciso do Sigillum?
 
-Só para o **Web PKI** e o **WebSigner** em **navegadores em Flatpak**. Nos navegadores nativos, use os pacotes oficiais dos fornecedores e acrescente o caminho do p11-kit no plugin, como explica o [README](README.md#web-pki-e-websigner). No Arch e derivados, `/lib/libp11-kit.so` também funciona: é a mesma biblioteca que `/usr/lib/p11-kit-proxy.so`.
+Não mais, quando as extensões de assinador web do Tessera chegarem ao FlatPark: o **Web PKI**, o **WebSigner** da Softplan e o da Certisign passam a ser extensões do Tessera, e a janela mostra o comando de cada navegador em Flatpak (veja o [README](README.md#web-pki-e-websigner)). Até lá, o Sigillum serve para o Web PKI e o WebSigner da Softplan. Nos navegadores nativos, nenhum dos dois é preciso: use os pacotes oficiais dos fornecedores e acrescente o caminho do p11-kit no plugin. No Arch e derivados, `/lib/libp11-kit.so` também funciona: é a mesma biblioteca que `/usr/lib/p11-kit-proxy.so`.
+
+### O plugin Web PKI ou WebSigner não mostra o meu token.
+
+Nos navegadores em Flatpak, confira, nesta ordem: o passo 1 do navegador (seção Aplicativos) está feito; a linha do navegador em **Assinadores web** mostra o plugin como feito; o navegador foi reiniciado depois do comando; e, nas configurações do plugin (aba "Cripto Dispositivos"), **"Dispositivos SafeSign AET"** está marcado. Essa opção vale para qualquer token do Tessera, não só para o SafeSign: é o nome que o plugin usa para carregar o p11-kit. Não marque também "Tokens SafeNet", senão cada token aparece duas vezes.
 
 ### A linha "Conexão com o sistema" está vermelha.
 
@@ -178,6 +183,7 @@ Abra uma [issue](https://github.com/pedrohqb/tessera/issues/new/choose) com o mo
 
 **Usage**
 - [Do I need Sigillum?](#do-i-need-sigillum)
+- [The Web PKI or WebSigner plugin does not show my token.](#the-web-pki-or-websigner-plugin-does-not-show-my-token)
 - [The "System connection" row is red.](#the-system-connection-row-is-red)
 - [An app does not see the token.](#an-app-does-not-see-the-token)
 - [The token does not appear in Tessera.](#the-token-does-not-appear-in-tessera)
@@ -234,7 +240,11 @@ p11-kit server -f -n "$XDG_RUNTIME_DIR/p11-kit/pkcs11" pkcs11:
 
 ### Do I need Sigillum?
 
-Only for **Web PKI** and **WebSigner** in **Flatpak browsers**. In native browsers, use the vendors' official packages and add the p11-kit path in the plugin, as the [README](README.md#web-pki-and-websigner) explains. On Arch and its derivatives, `/lib/libp11-kit.so` also works: it is the same library as `/usr/lib/p11-kit-proxy.so`.
+Not anymore, once Tessera's web signer extensions reach FlatPark: **Web PKI**, Softplan's **WebSigner** and Certisign's become extensions of Tessera, and the window shows the command for each Flatpak browser (see the [README](README.md#web-pki-and-websigner)). Until then, Sigillum covers Web PKI and Softplan's WebSigner. In native browsers neither is needed: use the vendors' official packages and add the p11-kit path in the plugin. On Arch and its derivatives, `/lib/libp11-kit.so` also works: it is the same library as `/usr/lib/p11-kit-proxy.so`.
+
+### The Web PKI or WebSigner plugin does not show my token.
+
+In Flatpak browsers, check, in this order: the browser's step 1 (Apps section) is done; the browser's row under **Web signers** shows the plugin as done; the browser was restarted after the command; and, in the plugin's settings ("Cripto Dispositivos" tab), **"Dispositivos SafeSign AET"** is ticked. That option works for any of Tessera's tokens, not only SafeSign: it is the name the plugin uses to load p11-kit. Do not tick "Tokens SafeNet" as well, or each token shows twice.
 
 ### The "System connection" row is red.
 

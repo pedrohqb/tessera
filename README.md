@@ -27,7 +27,7 @@ Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pe
 | Aplicativo | Para quê |
 |---|---|
 | PJeOffice Pro e Assinador SERPRO | assinar no PJe e documentos em geral |
-| Firefox, Chromium, Google Chrome, Microsoft Edge e Brave | entrar com certificado em sites como Projudi e eproc |
+| Firefox, Chromium, Google Chrome, Microsoft Edge e Brave | entrar com certificado em sites como Projudi e eproc; com os [assinadores web](#web-pki-e-websigner), assinar no e-SAJ e nos sites que usam Web PKI ou WebSigner |
 | Papers, Okular, JSignPdf e Master PDF Editor | assinar PDF e conferir assinaturas |
 | LibreOffice | assinar documentos e PDFs exportados |
 | Thunderbird e Evolution | e-mail assinado e cifrado (S/MIME) |
@@ -173,10 +173,18 @@ No Fedora e derivados, o próprio sistema já faz isso, e os aplicativos nativos
 
 #### Web PKI e WebSigner
 
-O **Lacuna Web PKI** e o **Softplan WebSigner** são exigidos por alguns tribunais, como o e-SAJ.
+O **Lacuna Web PKI**, o **Softplan WebSigner** (exigido pelo e-SAJ) e o **Certisign WebSigner** (portais de assinatura da Certisign) são plugins de navegador com um programa por trás.
 
-- **Nos navegadores em Flatpak**, use o [**Sigillum**](https://github.com/pedrohqb/sigillum), que os instala e os liga aos tokens do Tessera.
-- **Nos navegadores nativos**, não é preciso o Sigillum: use os pacotes oficiais ([Web PKI](https://get.webpkiplugin.com/) e [WebSigner](https://websigner.softplan.com.br/)). No plugin, em "Cripto Dispositivos" → "Opções personalizadas", acrescente o caminho do p11-kit da sua distribuição. As chaves "Tokens SafeNet" e "Dispositivos SafeSign AET" podem ficar desligadas.
+- **Nos navegadores em Flatpak** (Firefox, Chromium, Chrome, Edge e Brave), cada um é uma extensão do Tessera:
+
+  ```bash
+  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.WebPKI
+  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner
+  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.CertisignWebSigner
+  ```
+
+  Instale só os que usar, na mesma instalação do Tessera, e reinicie o Tessera pelo menu. A seção **Assinadores web** da janela mostra, para cada navegador, um comando para rodar uma vez no terminal (botão de copiar). Depois, reinicie o navegador, instale a extensão do plugin na loja do navegador, se ainda não tiver, e, no Web PKI e no WebSigner da Softplan, marque **"Dispositivos SafeSign AET"** uma vez nas configurações do plugin (aba "Cripto Dispositivos"). O passo 1 do navegador, na seção Aplicativos, precisa estar feito. Detalhes em [docs/signers.md](docs/signers.md). Enquanto as extensões não chegam ao FlatPark, o [Sigillum](https://github.com/pedrohqb/sigillum) faz o mesmo para o Web PKI e o WebSigner da Softplan.
+- **Nos navegadores nativos**, não é preciso nada disso: use os pacotes oficiais ([Web PKI](https://get.webpkiplugin.com/) e [WebSigner](https://websigner.softplan.com.br/)). No plugin, em "Cripto Dispositivos" → "Opções personalizadas", acrescente o caminho do p11-kit da sua distribuição. As chaves "Tokens SafeNet" e "Dispositivos SafeSign AET" podem ficar desligadas.
 
   | Distribuição | Caminho |
   |---|---|
@@ -192,6 +200,7 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 
 - **Testar com token real** o driver OpenSC (ePass2003) e os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice e Assinador SERPRO (o JSignPdf e o Master PDF Editor já foram testados).
 - **Testar a extensão SafeNet** com um token de verdade. O driver já funcionou quando vinha embutido no Tessera; falta confirmar o empacotamento como extensão (SafeSign e SerproID já foram testados).
+- **Testar os assinadores web** como extensões (Web PKI, WebSigner da Softplan e da Certisign) num navegador em Flatpak.
 
 ---
 
@@ -227,7 +236,7 @@ The tokens are available to these apps, as Flatpaks or installed from the distri
 | App | For |
 |---|---|
 | PJeOffice Pro and Assinador SERPRO | signing in PJe and documents in general |
-| Firefox, Chromium, Google Chrome, Microsoft Edge and Brave | certificate login on sites such as Projudi and eproc |
+| Firefox, Chromium, Google Chrome, Microsoft Edge and Brave | certificate login on sites such as Projudi and eproc; with the [web signers](#web-pki-and-websigner), sign on e-SAJ and on sites that use Web PKI or WebSigner |
 | Papers, Okular, JSignPdf and Master PDF Editor | signing PDFs and checking signatures |
 | LibreOffice | signing documents and exported PDFs |
 | Thunderbird and Evolution | signed and encrypted e-mail (S/MIME) |
@@ -365,10 +374,18 @@ On Fedora and its derivatives, the system itself already does this, and native a
 
 #### Web PKI and WebSigner
 
-**Lacuna Web PKI** and **Softplan WebSigner** are required by some courts (e-SAJ, for example).
+**Lacuna Web PKI**, **Softplan WebSigner** (required by e-SAJ) and **Certisign WebSigner** (Certisign's signing portals) are browser plugins with a program behind them.
 
-- **In Flatpak browsers**, use [**Sigillum**](https://github.com/pedrohqb/sigillum), which installs them and connects them to Tessera's tokens.
-- **In native browsers**, Sigillum is not needed: use the official packages ([Web PKI](https://get.webpkiplugin.com/) and [WebSigner](https://websigner.softplan.com.br/)). In the plugin, under "Cripto Dispositivos" → "Opções personalizadas", add your distribution's p11-kit path. The "Tokens SafeNet" and "Dispositivos SafeSign AET" switches can stay off.
+- **In Flatpak browsers** (Firefox, Chromium, Chrome, Edge and Brave), each is an extension of Tessera:
+
+  ```bash
+  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.WebPKI
+  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner
+  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.CertisignWebSigner
+  ```
+
+  Install only the ones you use, in the same installation as Tessera, and restart Tessera from its menu. The window's **Web signers** section shows, for each browser, a command to run once in a terminal (copy button). Then restart the browser, install the plugin's extension from the browser's store if it is not there yet and, for Web PKI and Softplan's WebSigner, tick **"Dispositivos SafeSign AET"** once in the plugin's settings ("Cripto Dispositivos" tab). The browser's step 1, in the Apps section, must be done. Details in [docs/signers.md](docs/signers.md). Until the extensions reach FlatPark, [Sigillum](https://github.com/pedrohqb/sigillum) does the same for Web PKI and Softplan's WebSigner.
+- **In native browsers**, none of this is needed: use the official packages ([Web PKI](https://get.webpkiplugin.com/) and [WebSigner](https://websigner.softplan.com.br/)). In the plugin, under "Cripto Dispositivos" → "Opções personalizadas", add your distribution's p11-kit path. The "Tokens SafeNet" and "Dispositivos SafeSign AET" switches can stay off.
 
   | Distribution | Path |
   |---|---|
@@ -382,6 +399,7 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 
 - **Test with a real token** the OpenSC driver (ePass2003) and the apps added last: Thunderbird, Evolution, LibreOffice and Assinador SERPRO (JSignPdf and Master PDF Editor have been tested).
 - **Test the SafeNet extension** with a real token. The driver already worked when it was built into Tessera; what is left is confirming its packaging as an extension (SafeSign and SerproID have been tested).
+- **Test the web signers** as extensions (Web PKI, Softplan's and Certisign's WebSigner) in a Flatpak browser.
 
 ### Documentation, support and license
 
