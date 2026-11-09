@@ -27,14 +27,18 @@ modules:
       - ln -s /usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so ${FLATPAK_DEST}/lib/libaetpkss.so.3
       - install -Dm644 io.github.pedrohqb.Tessera.Signer.WebPKI.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
     sources:
+      # Lacuna's server sends its current package whatever version the
+      # path names (it redirects to blob.lacuna.net/webpki/webpki-setup-64.deb),
+      # and keeps no older ones: a new release changes the sha256 here, and
+      # the weekly download check says so.
       # BEGIN MANAGED EXTRA-DATA
       - type: extra-data
         filename: webpki.deb
         only-arches:
           - x86_64
-        url: https://get.webpkiplugin.com/Downloads/2.16.1/setup-deb-64
-        sha256: a4ef76b1f0f5ff4489211b459d147ef0e2dea2ecad97d8f9ba2b0b283d3e3d85
-        size: 42979168
+        url: https://get.webpkiplugin.com/Downloads/2.17.0/setup-deb-64
+        sha256: cf284641bb3786dea6f3003fbcb5c0bf8b83cc9ab37975aa87ff68cdc42ac2f4
+        size: 42986816
       # END MANAGED EXTRA-DATA
       - type: file
         path: signer.toml
