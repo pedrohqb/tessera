@@ -4,7 +4,6 @@
 # to this folder). See docs/signers.md.
 name = "Certisign WebSigner"
 vendor = "Certisign"
-description = "Certisign's WebSigner browser plugin, used by Certisign's signing portals"
 host = "br.com.certisign.websigner"
 exec = "start"
 chrome_extensions = ["acfifjfajpekbmhmjppnmmjgmhjkildl"]

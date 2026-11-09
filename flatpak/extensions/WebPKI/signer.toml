@@ -4,7 +4,6 @@
 # folder). See docs/signers.md.
 name = "Lacuna Web PKI"
 vendor = "Lacuna Software"
-description = "Lacuna's Web PKI browser plugin, used by many signing sites"
 # The native messaging host: its name and the browser extensions allowed to
 # start it, as in the vendor's own manifests.
 host = "com.lacunasoftware.webpki"

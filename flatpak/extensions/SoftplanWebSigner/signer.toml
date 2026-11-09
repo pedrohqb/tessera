@@ -4,7 +4,6 @@
 # to this folder). See docs/signers.md.
 name = "Softplan WebSigner"
 vendor = "Softplan"
-description = "Softplan's WebSigner browser plugin, used by e-SAJ"
 host = "br.com.softplan.webpki"
 exec = "start"
 chrome_extensions = ["bbafmabaelnnkondpfpjmdklbmfnbmol"]

@@ -27,6 +27,7 @@ mod paths;
 mod remote;
 mod server;
 mod settings;
+mod signers;
 mod stable;
 mod status;
 mod trace;
@@ -174,7 +175,42 @@ fn print_status() -> ExitCode {
             "WARNING: on this system signing does not work (old p11-kit); see the project's documentation: https://github.com/pedrohqb/tessera#distributions"
         );
     }
+    print_signers();
     ExitCode::SUCCESS
+}
+
+/// The web signers, and in each Flatpak browser whether it is set up (else
+/// the command that does it).
+fn print_signers() {
+    let ss = signers::installed();
+    let browsers = signers::installed_browsers();
+    println!("\nWeb signers:");
+    if ss.is_empty() {
+        println!("  (none)");
+    }
+    for s in &ss {
+        println!("  {} ({}, {})", s.name, s.vendor, s.extension());
+        if browsers.is_empty() {
+            println!("    no Flatpak browser installed");
+        }
+        for b in &browsers {
+            if signers::is_set_up(s, b) {
+                println!("    {}: set up", b.app.name);
+            } else {
+                println!("    {}: run once: {}", b.app.name, signers::command(s, b));
+            }
+        }
+        if let Some(o) = &s.option {
+            println!("    in the plugin's settings, tick once: {o}");
+        }
+    }
+    for k in signers::missing(&ss) {
+        println!(
+            "  {} not installed: {}",
+            k.name,
+            catalog::install_command_of(&k.extension())
+        );
+    }
 }
 
 /// Consecutive listings without an answer before a driver is stopped.

@@ -27,12 +27,17 @@ modules:
       - ln -s /usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so ${FLATPAK_DEST}/lib/libaetpkss.so.3
       - install -Dm644 io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner.metainfo.xml -t ${FLATPAK_DEST}/share/metainfo
     sources:
+      # websigner.softplan.com.br sends an incomplete certificate chain (no
+      # intermediate), which Flatpak's downloader rejects. The site is a
+      # CloudFront distribution: its own address serves the same file
+      # (same sha256) with a valid certificate. The weekly download check
+      # notices if that address stops serving it.
       # BEGIN MANAGED EXTRA-DATA
       - type: extra-data
         filename: websigner.deb
         only-arches:
           - x86_64
-        url: https://websigner.softplan.com.br/Downloads/2.15.0/webpki-chrome-64-deb
+        url: https://d1qzl0w4epswjx.cloudfront.net/Downloads/2.15.0/webpki-chrome-64-deb
         sha256: 04fa41e962d91e4d7337f4707479437bf660f19057fac63829fb46784ee08289
         size: 47128110
       # END MANAGED EXTRA-DATA

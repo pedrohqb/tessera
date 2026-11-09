@@ -5,6 +5,7 @@
 
 mod app_rows;
 mod restart;
+mod signer_rows;
 mod supervise;
 mod window;
 

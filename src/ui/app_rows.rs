@@ -353,6 +353,7 @@ pub(super) fn update_apps(win: &Win) {
     for r in win.native_rows.borrow().iter() {
         update_native(r);
     }
+    super::signer_rows::update_signers(win);
 }
 
 pub(super) fn set_up_app(win: &Rc<Win>, app: &'static ClientApp) {

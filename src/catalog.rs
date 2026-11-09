@@ -86,24 +86,35 @@ pub fn for_reader(name: &str, atr: &[u8]) -> Option<&'static Known> {
 /// The driver's page on FlatPark's site (its install button opens the app
 /// store; the store also lists it as an add-on on Tessera's page).
 pub fn store_page(k: &Known) -> String {
-    format!("https://flatpark.org/apps/{}/", k.extension)
+    store_page_of(k.extension)
+}
+
+/// An extension's page on FlatPark's site (drivers and web signers).
+pub fn store_page_of(extension: &str) -> String {
+    format!("https://flatpark.org/apps/{extension}/")
 }
 
 /// The command that installs a driver, in the installation Tessera itself
 /// is in (an extension of a user installation's app goes there too).
 pub fn install_command(k: &Known) -> String {
+    install_command_of(k.extension)
+}
+
+/// The command that installs an extension of Tessera (a driver or a web
+/// signer), in Tessera's installation.
+pub fn install_command_of(extension: &str) -> String {
     let scope = match tessera_installation() {
         Some(true) => " --user",
         Some(false) => " --system",
         None => "",
     };
-    format!("flatpak install{scope} flatpark {}", k.extension)
+    format!("flatpak install{scope} flatpark {extension}")
 }
 
 /// Is Tessera's Flatpak in the user installation (Some(true)), the default
 /// system one (Some(false)), or elsewhere: another installation, or not a
 /// Flatpak (None)? /.flatpak-info's app-path says.
-fn tessera_installation() -> Option<bool> {
+pub fn tessera_installation() -> Option<bool> {
     let info = std::fs::read_to_string("/.flatpak-info").ok()?;
     let path = info.lines().find_map(|l| l.strip_prefix("app-path="))?;
     installation_of(path, &crate::paths::host_data_home())

@@ -8,6 +8,7 @@ use std::process::Command;
 use std::rc::Rc;
 
 use super::app_rows::{apps_group, update_apps, AppRows, NativeRows};
+use super::signer_rows::{signers_group, BrowserRows};
 use super::supervise::{supervise, update_status};
 use super::Hub;
 use crate::apps;
@@ -62,6 +63,7 @@ pub(super) struct Win {
     pub(super) driver_rows: RefCell<Vec<(String, adw::ActionRow, String)>>,
     pub(super) app_rows: RefCell<Vec<AppRows>>,
     pub(super) native_rows: RefCell<Vec<NativeRows>>,
+    pub(super) signer_rows: RefCell<Vec<BrowserRows>>,
     pub(super) last: RefCell<String>,
     pub(super) old_p11kit: adw::Banner,
 }
@@ -139,27 +141,30 @@ pub(super) fn copy_command_button(win: &Rc<Win>, text: String) -> gtk::Button {
 /// A button that opens a driver's page on FlatPark's site, whose install
 /// button hands the extension to the app store.
 fn store_button(win: &Rc<Win>, k: &'static catalog::Known) -> gtk::Button {
+    store_button_for(
+        win,
+        catalog::store_page(k),
+        t("Open this driver's page on FlatPark, to install it from the app store"),
+    )
+}
+
+/// A button that opens an extension's page on FlatPark's site.
+pub(super) fn store_button_for(win: &Rc<Win>, url: String, tooltip: &str) -> gtk::Button {
     let b = gtk::Button::builder()
         .icon_name("web-browser-symbolic")
         .valign(gtk::Align::Center)
-        .tooltip_text(t(
-            "Open this driver's page on FlatPark, to install it from the app store",
-        ))
+        .tooltip_text(tooltip)
         .css_classes(["flat"])
         .build();
     let w = Rc::downgrade(win);
     b.connect_clicked(move |_| {
         let parent = w.upgrade().map(|win| win.window.clone());
-        gtk::UriLauncher::new(&catalog::store_page(k)).launch(
-            parent.as_ref(),
-            gio::Cancellable::NONE,
-            |_| {},
-        );
+        gtk::UriLauncher::new(&url).launch(parent.as_ref(), gio::Cancellable::NONE, |_| {});
     });
     b
 }
 
-fn copy_button_with(win: &Rc<Win>, text: String, tooltip: &str) -> gtk::Button {
+pub(super) fn copy_button_with(win: &Rc<Win>, text: String, tooltip: &str) -> gtk::Button {
     let b = gtk::Button::builder()
         .icon_name("edit-copy-symbolic")
         .valign(gtk::Align::Center)
@@ -637,6 +642,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         driver_rows: RefCell::new(vec![]),
         app_rows: RefCell::new(vec![]),
         native_rows: RefCell::new(vec![]),
+        signer_rows: RefCell::new(vec![]),
         last: RefCell::new(String::new()),
         old_p11kit: old_p11kit_banner(),
     });
@@ -647,6 +653,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     page.add(&win.tokens.group);
     page.add(&win.drivers.group);
     page.add(&apps_group(&win));
+    page.add(&signers_group(&win));
 
     let view = adw::ToolbarView::new();
     view.add_top_bar(&header);

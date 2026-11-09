@@ -242,7 +242,7 @@ modules:
       # The window's icons for desktops whose theme lacks them (Plasma).
       - sh flatpak/fallback-icons.sh
       - install -Dm644 -t /app/lib/tessera/drivers/opensc flatpak/drivers/opensc/driver.toml flatpak/drivers/opensc/opensc.conf flatpak/drivers/opensc/opensc-without-idprime.conf
-      - mkdir -p /app/lib/tessera/extensions
+      - mkdir -p /app/lib/tessera/extensions /app/lib/tessera/signers
     sources:
       - type: dir
         path: ..

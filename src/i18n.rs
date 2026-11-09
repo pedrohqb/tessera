@@ -210,6 +210,24 @@ const PT_BR: &[(&str, &str)] = &[
     ("No answer 3 times in a row. Press Restart to try again, or switch it off.",
      "Sem resposta 3 vezes seguidas. Aperte Reiniciar para tentar de novo, ou desligue o driver."),
     ("Could not turn on starting at login", "Não foi possível ativar o início automático"),
+    // Web signers (signer_rows.rs)
+    ("Web signers", "Assinadores web"),
+    ("Browser plugins that sign on websites (Web PKI, WebSigner), installed as add-ons of Tessera. The Flatpak browsers run them: each needs one command, once per plugin.", "Plugins de navegador que assinam em sites (Web PKI, WebSigner), instalados como complementos do Tessera. Os navegadores em Flatpak os executam: cada um precisa de um comando, uma vez por plugin."),
+    ("Done: the browser can start it (restart the browser if it was open).", "Feito: o navegador consegue iniciá-lo (reinicie o navegador se estava aberto)."),
+    ("In the plugin's settings, tick", "Nas configurações do plugin, marque"),
+    ("once.", "uma vez."),
+    ("Run once in a terminal (copy button), then restart the browser.", "Rode uma vez num terminal (botão de copiar) e reinicie o navegador."),
+    ("First do step 1 of this browser (Apps section). Then run once in a terminal (copy button) and restart the browser.", "Primeiro faça o passo 1 deste navegador (seção Aplicativos). Depois rode uma vez num terminal (botão de copiar) e reinicie o navegador."),
+    ("Step 1 missing (Apps section)", "Falta o passo 1 (seção Aplicativos)"),
+    ("set up", "configurados"),
+    ("Copy the command that lets this browser start the signer", "Copiar o comando que deixa este navegador iniciar o assinador"),
+    ("No Flatpak browser installed", "Nenhum navegador em Flatpak instalado"),
+    ("Firefox, Chromium, Google Chrome, Microsoft Edge or Brave, from Flathub", "Firefox, Chromium, Google Chrome, Microsoft Edge ou Brave, do Flathub"),
+    ("Open this signer's page on FlatPark, to install it from the app store", "Abrir a página deste assinador no FlatPark, para instalá-lo pela loja de aplicativos"),
+    ("Copy the command that installs this signer", "Copiar o comando que instala este assinador"),
+    ("Signing sites that use the Web PKI plugin", "Sites de assinatura que usam o plugin Web PKI"),
+    ("e-SAJ and other Softplan systems", "e-SAJ e outros sistemas da Softplan"),
+    ("Certisign's signing portals", "Portais de assinatura da Certisign"),
 ];
 
 #[cfg(test)]
