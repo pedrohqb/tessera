@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Download each vendor file pinned in the driver extensions' manifests
-(flatpak/extensions/*/io.github.pedrohqb.Tessera.Driver.*.yml, between
+"""Download each vendor file pinned in the extensions' manifests (drivers and
+web signers: flatpak/extensions/*/io.github.pedrohqb.Tessera.*.yml, between
 BEGIN and END MANAGED EXTRA-DATA), check that its sha256 matches the pinned
 one, and write its size into the manifest.
 
@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MANIFESTS = sorted((ROOT / "flatpak" / "extensions").glob("*/io.github.pedrohqb.Tessera.Driver.*.yml"))
+MANIFESTS = sorted((ROOT / "flatpak" / "extensions").glob("*/io.github.pedrohqb.Tessera.*.yml"))
 BLOCK = re.compile(r"(# BEGIN MANAGED EXTRA-DATA\n)(.*?)(\s*# END MANAGED EXTRA-DATA)", re.S)
 ENTRY = re.compile(
     r"(filename: (?P<name>\S+).*?url: (?P<url>\S+)\s+sha256: (?P<sha>[0-9a-f]{64})\s+size: )(?P<size>\d+)",
@@ -65,7 +65,7 @@ def pin(manifest, check):
 def main():
     check = "--check" in sys.argv
     if not MANIFESTS:
-        sys.exit("no driver extension manifests found")
+        sys.exit("no extension manifests found")
     failed = [m.name for m in MANIFESTS if pin(m, check)]
     if failed:
         sys.exit(f"failed: {', '.join(failed)}")

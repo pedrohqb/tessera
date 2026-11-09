@@ -130,13 +130,13 @@ jobs:
             echo "::error title=flatpak-builder failed::$msg"
             exit $status
           fi
-      - name: Build the driver extensions
+      - name: Build the driver and web signer extensions
         run: |
           # flatpak-builder needs the parent app installed, as the
           # extensions' runtime: the one just built.
           flatpak remote-add --user --no-gpg-verify ci-build repo
           flatpak install --user -y ci-build io.github.pedrohqb.Tessera
-          for m in flatpak/extensions/*/io.github.pedrohqb.Tessera.Driver.*.yml; do
+          for m in flatpak/extensions/*/io.github.pedrohqb.Tessera.*.yml; do
             name=$(basename "$(dirname "$m")")
             set +e
             flatpak-builder --user --force-clean --default-branch=stable \
@@ -152,22 +152,43 @@ jobs:
           done
       - name: Install each extension (runs its apply_extra on the real downloads)
         run: |
-          for m in flatpak/extensions/*/io.github.pedrohqb.Tessera.Driver.*.yml; do
+          for m in flatpak/extensions/*/io.github.pedrohqb.Tessera.*.yml; do
             id=$(basename "$m" .yml)
             flatpak install --user -y ci-build "$id"
             dir=$(flatpak info --user --show-location "$id")/files
-            name=$(basename "$(dirname "$m")")
             python3 - "$dir" <<'EOF'
-          import sys, tomllib, pathlib
+          import os, sys, tomllib, pathlib
           d = pathlib.Path(sys.argv[1])
-          t = tomllib.loads((d / "driver.toml").read_text())
-          module = d / t["module"]
-          assert module.exists(), f"{module} missing"
-          for tool in t.get("tools", []):
-              exe = d / tool["exec"][0]
-              assert exe.exists(), f"{exe} missing"
-          print("ok:", module)
+          if (d / "driver.toml").exists():
+              t = tomllib.loads((d / "driver.toml").read_text())
+              module = d / t["module"]
+              assert module.exists(), f"{module} missing"
+              for tool in t.get("tools", []):
+                  exe = d / tool["exec"][0]
+                  assert exe.exists(), f"{exe} missing"
+              print("ok:", module)
+          else:
+              # A web signer: its start script, the program it starts and
+              # the library link the browser plugin loads.
+              t = tomllib.loads((d / "signer.toml").read_text())
+              for key in ("name", "host", "exec", "chrome_extensions", "firefox_extensions"):
+                  assert t.get(key), f"signer.toml: {key} missing"
+              start = d / t["exec"]
+              assert os.access(start, os.X_OK), f"{start} missing"
+              progs = [p.name for p in (d / "extra").iterdir() if p.is_file() and os.access(p, os.X_OK)]
+              assert progs, "extra/ has no program"
+              links = list((d / "lib").iterdir())
+              assert links and all(l.is_symlink() for l in links), "lib/ has no link"
+              print("ok:", t["name"], progs, [l.name for l in links])
           EOF
+          done
+          # The Certisign program's dialog paths, rewritten by apply_extra.
+          d=$(flatpak info --user --show-location io.github.pedrohqb.Tessera.Signer.CertisignWebSigner)/files/extra
+          if grep -qa /opt/certisign-websigner/res "$d/cswebsigner"; then
+            echo "::error::a Certisign dialog path was left unchanged"; exit 1
+          fi
+          for f in $(grep -oa 'res/[a-z_0-9]*\.glade' "$d/cswebsigner" | sort -u); do
+            test -f "$d/$f" || { echo "::error::$f missing"; exit 1; }
           done
       - name: Test repository
         run: |

@@ -127,6 +127,17 @@ add-extensions:
     subdirectories: true
     no-autodownload: true
     autodelete: true
+  # Web signers published as extensions, e.g.
+  # io.github.pedrohqb.Tessera.Signer.Foo, each mounted at
+  # /app/lib/tessera/signers/Foo with a signer.toml. Tessera only reads them
+  # (to show each browser's steps); the Flatpak browsers run them, from
+  # where Flatpak deploys the extension on the host. No permission of
+  # Tessera's is involved.
+  io.github.pedrohqb.Tessera.Signer:
+    directory: lib/tessera/signers
+    subdirectories: true
+    no-autodownload: true
+    autodelete: true
 
 modules:
   # The PC/SC client library (libpcsclite), which the runtime does not ship.

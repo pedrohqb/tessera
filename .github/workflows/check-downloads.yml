@@ -25,7 +25,7 @@ jobs:
         id: check
         run: |
           set +e
-          python3 .github/scripts/check-downloads.py flatpak flatpak/extensions/*/io.github.pedrohqb.Tessera.Driver.*.yml > report.md
+          python3 .github/scripts/check-downloads.py flatpak flatpak/extensions/*/io.github.pedrohqb.Tessera.*.yml > report.md
           echo "status=$?" >> "$GITHUB_OUTPUT"
           cat report.md >> "$GITHUB_STEP_SUMMARY"
       - name: Abrir, atualizar ou fechar a issue
