@@ -161,6 +161,12 @@ flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 
 Numa instalação de sistema, troque `--user` por `--system`. As extensões de driver saem junto com o Tessera. O Flatpak lista cada uma duas vezes e, na segunda, avisa que ela não está instalada (um **[✗]** na lista): é um defeito do próprio Flatpak, inofensivo, porque a primeira linha já a removeu. Se `flatpak list | grep Tessera.Driver` ainda mostrar alguma, remova com `flatpak uninstall --user io.github.pedrohqb.Tessera.Driver.SerproID` (o nome que aparecer). A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --user --reset <aplicativo>`, que também apaga outras permissões que você tenha dado ao aplicativo.
 
+O Tessera desliga o OpenSC do sistema com dois arquivos que continuam lá depois de desinstalar. Para religá-lo, desligue antes a chave **Desligar o OpenSC do sistema**, na seção Serviço, ou apague os arquivos depois:
+
+```bash
+rm -f ~/.config/pkcs11/modules/opensc.module ~/.config/pkcs11/modules/opensc-pkcs11.module
+```
+
 ### Existe outro "Tessera" no Flathub?
 
 Sim, um gerador de QR Code (`fr.ethal.tessera`), sem relação com este projeto. O Flatpak identifica os aplicativos pelo ID, e o deste é `io.github.pedrohqb.Tessera`: os dois não se misturam.
@@ -327,6 +333,12 @@ flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 ```
 
 For a system-wide install, use `--system` instead of `--user`. The driver extensions go with it. Flatpak lists each one twice and, the second time, warns that it is not installed (a **[✗]** in the list): a harmless defect of Flatpak itself, since the first line already removed it. If `flatpak list | grep Tessera.Driver` still shows one, remove it with `flatpak uninstall --user io.github.pedrohqb.Tessera.Driver.SerproID` (the name shown). Each app's step 1 permission is undone with `flatpak override --user --reset <app>`, which also removes any other permission you gave the app.
+
+Tessera switches the system's OpenSC off with two files that stay after uninstalling. To turn it back on, first switch off **Switch off the system's OpenSC**, in the Service section, or delete the files afterwards:
+
+```bash
+rm -f ~/.config/pkcs11/modules/opensc.module ~/.config/pkcs11/modules/opensc-pkcs11.module
+```
 
 ### Is there another "Tessera" on Flathub?
 

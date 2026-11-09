@@ -15,6 +15,11 @@ pub struct Settings {
     /// Drivers the user switched off.
     #[serde(default)]
     pub disabled_drivers: Vec<String>,
+    /// The system's own OpenSC left on: by default Tessera switches it off
+    /// for the system's p11-kit (see apps::set_host_opensc_off), from its
+    /// first start, and it stays off with Tessera closed.
+    #[serde(default)]
+    pub system_opensc_on: bool,
 }
 
 impl Settings {

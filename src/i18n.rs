@@ -228,6 +228,10 @@ const PT_BR: &[(&str, &str)] = &[
     ("Signing sites that use the Web PKI plugin", "Sites de assinatura que usam o plugin Web PKI"),
     ("e-SAJ and other Softplan systems", "e-SAJ e outros sistemas da Softplan"),
     ("Certisign's signing portals", "Portais de assinatura da Certisign"),
+    // The system's OpenSC (window.rs)
+    ("Switch off the system's OpenSC", "Desligar o OpenSC do sistema"),
+    ("Recommended. If the system has OpenSC of its own, it hangs some tokens (GD Burti) and shows the others twice; Tessera's OpenSC serves the same cards. Stays off with Tessera closed. Restart the apps that were open.", "Recomendado. Se o sistema tiver um OpenSC próprio, ele trava alguns tokens (GD Burti) e mostra os outros em dobro; o OpenSC do Tessera atende os mesmos cartões. Continua desligado com o Tessera fechado. Reinicie os aplicativos que estavam abertos."),
+    ("Could not change the system's OpenSC", "Não foi possível mudar o OpenSC do sistema"),
 ];
 
 #[cfg(test)]

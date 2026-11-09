@@ -579,6 +579,39 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     update_drivers(hub, win);
 }
 
+/// The system's own OpenSC: off by default (see apps::set_host_opensc_off),
+/// even with Tessera closed; the switch turns it back on.
+fn system_opensc_row(hub: &Rc<Hub>) -> adw::ActionRow {
+    let row = plain_row(
+        t("Switch off the system's OpenSC"),
+        t("Recommended. If the system has OpenSC of its own, it hangs some tokens (GD Burti) and shows the others twice; Tessera's OpenSC serves the same cards. Stays off with Tessera closed. Restart the apps that were open."),
+        "action-unavailable-symbolic",
+    );
+    let switch = gtk::Switch::builder()
+        .active(!hub.settings.borrow().system_opensc_on)
+        .valign(gtk::Align::Center)
+        .build();
+    let hub = hub.clone();
+    switch.connect_active_notify(move |sw| {
+        let off = sw.is_active();
+        {
+            let mut st = hub.settings.borrow_mut();
+            st.system_opensc_on = !off;
+            st.save();
+        }
+        if let Err(e) = apps::set_host_opensc_off(off) {
+            if let Some(win) = hub.win.borrow().as_ref() {
+                win.alert(t("Could not change the system's OpenSC"), &format!("{e:#}"));
+            }
+        }
+        // What the apps see changes: check it again.
+        *hub.host_checked.borrow_mut() = None;
+    });
+    row.add_suffix(&switch);
+    row.set_activatable_widget(Some(&switch));
+    row
+}
+
 pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     add_host_icons();
     let header = adw::HeaderBar::new();
@@ -622,6 +655,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     service.add(&host_row);
     let pcsc_row = plain_row(t("Smart card service (pcscd)"), "", "computer-symbolic");
     service.add(&pcsc_row);
+    service.add(&system_opensc_row(hub));
     page.add(&service);
 
     let win = Rc::new(Win {
