@@ -20,6 +20,6 @@
     <p>This extension installs the program from the vendor's official Linux package, downloaded at install time and checked against a pinned checksum. Only its files are taken: no install script runs. Certisign WebSigner is closed source and not made or endorsed by Tessera's author.</p>
   </description>
   <releases>
-    <release version="2.17.7" date="2026-11-08"/>
+    <release version="2.9.5" date="2026-11-08"/>
   </releases>
 </component>

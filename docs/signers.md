@@ -6,7 +6,7 @@ Some signing sites need a browser plugin with a program of its own behind it: **
 |---|---|---|
 | `io.github.pedrohqb.Tessera.Signer.WebPKI` | Lacuna Web PKI 2.17.0 | `setup-deb-64` (`cf284641…c2f4`) |
 | `io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner` | Softplan WebSigner 2.15.0 | `webpki-chrome-64-deb` (`04fa41e9…8289`) |
-| `io.github.pedrohqb.Tessera.Signer.CertisignWebSigner` | Certisign WebSigner 2.17.7 | `setup-deb-64` (`04981f07…abfb`) |
+| `io.github.pedrohqb.Tessera.Signer.CertisignWebSigner` | Certisign WebSigner, program 2.9.5 (download path 2.17.7) | `setup-deb-64` (`04981f07…abfb`) |
 
 Softplan's and Certisign's sha256 values are the same as in distrobox-adv-br (and Softplan's as in Sigillum). Web PKI's is 2.17.0's, released by Lacuna on November 9, 2026, the day after the extension was first pinned at distrobox-adv-br's 2.16.1.
 
@@ -67,7 +67,7 @@ So Certisign's `libaetpkss.so.3` is `hide-trust.c`, built with the extension: a 
 
 Flatpak downloads each package at install time and checks the pinned sha256. Two notes:
 
-- **The vendors keep only their current package.** Lacuna's server ignores the version in the path and redirects to `blob.lacuna.net/webpki/webpki-setup-64.deb`, its current release; Softplan's does the same. So a new vendor release changes the file at the pinned URL: installing the extension fails (Flatpak's sha256 check) until the pin is updated, while installed copies keep working. The weekly download check opens an issue when that happens, and CI fails on the next push; updating means checking the new package (the program's path, the manifests' extension ids) and changing the URL, sha256 and size in the manifest (`scripts/pin-drivers.py` fills in the size), plus the version in the metainfo. Web PKI went from 2.16.1 to 2.17.0 that way the day after the extension was made.
+- **The vendors keep only their current package.** Lacuna's server ignores the version in the path and redirects to `blob.lacuna.net/webpki/webpki-setup-64.deb`, its current release; Softplan's does the same. So a new vendor release changes the file at the pinned URL: installing the extension fails (Flatpak's sha256 check) until the pin is updated, while installed copies keep working. The weekly download check opens an issue when that happens, and CI fails on the next push; updating means checking the new package (the program's path, the manifests' extension ids) and changing the URL, sha256 and size in the manifest (`scripts/pin-drivers.py` fills in the size), plus the version in the metainfo. Web PKI went from 2.16.1 to 2.17.0 that way the day after the extension was made. On FlatPark, each extension's `resolve-update.sh` reads the newest version from the package itself, from the first 64 KiB of the `.deb` (its control file, fetched with a Range request), so FlatPark's updater re-pins it by itself, twice a day, after running `apply_extra.sh` on the new download.
 - **Softplan:** `websigner.softplan.com.br` sends an incomplete certificate chain (its certificate twice, without the Thawte intermediate), which Flatpak's downloader, like curl, rejects; distrobox-adv-br and Sigillum downloaded it without checking the certificate. The site is a CloudFront distribution, and its own address, `d1qzl0w4epswjx.cloudfront.net`, serves the same file with a valid certificate: that is the pinned URL. The version in the path is ignored by Softplan's server, which always sends its current package; a new version would change the sha256, and the weekly download check would say so.
 
 ## Setting up a browser
