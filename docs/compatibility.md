@@ -47,6 +47,8 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 | CachyOS | SafeSign (GD Burti), through the SafeSign extension (test build) | Master PDF Editor (Flatpak) | Signs, with step 2 done by Tessera's **Set up** (`pkcs11-helper-provider`) |
 | CachyOS | SerproID (cloud), through the SerproID extension (test build) | Master PDF Editor (Flatpak) | Does not sign: Master PDF Editor apparently does not wait for the approval on the phone (to be confirmed) |
 | CachyOS | SafeSign (GD Burti), through the SafeSign extension (test build) | JSignPdf (Flatpak) | Signs, with the keystore type PKCS11 and the PIN as the keystore password. With OpenSC on and no card in it, the token was missing for every app until Tessera listed its drivers without a token last ([History](history.md) item 43) |
+| Bluefin (GNOME) | SafeSign (GD Burti), through Tessera's extensions (test build) | Web PKI, Softplan WebSigner and Certisign WebSigner as extensions, Firefox and Brave (Flatpak) | Work, with each browser's command from the Web signers section. Certisign's after hiding the trust store's slots from it ([Web signers](signers.md)) |
+| Bluefin (GNOME) | SafeSign (GD Burti) | The system's OpenSC switched off by Tessera (`~/.config/pkcs11/modules/opensc.module`) | `p11-kit list-modules` no longer lists it; the switch in the Service section turns it back on |
 | KDE Plasma (CachyOS) | a real token (type not recorded) | Web PKI and WebSigner, vendors' official packages, native browsers | Work with p11-kit's library (`/lib/libp11-kit.so`, the same module as `p11-kit-proxy.so` there) added by hand under the plugin's custom options |
 
 Not yet confirmed by hand:

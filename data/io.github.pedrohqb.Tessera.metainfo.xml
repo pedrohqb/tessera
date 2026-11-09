@@ -50,6 +50,15 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.0" date="2026-11-09">
+      <description>
+        <p>Web signers, and the system's OpenSC out of the way.</p>
+        <ul>
+          <li>Lacuna Web PKI, Softplan WebSigner (e-SAJ) and Certisign WebSigner as extensions, for the Flatpak browsers: the new Web signers section shows each browser's one command, and whether it is done.</li>
+          <li>The system's own OpenSC, which hung the GD Burti token, is switched off for the system's p11-kit from the first start; Tessera's OpenSC serves the same cards. A switch in the Service section turns it back on.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.1" date="2026-11-09">
       <description>
         <p>Smaller and tidier.</p>
