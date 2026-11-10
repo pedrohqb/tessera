@@ -51,6 +51,15 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.1" date="2026-11-10">
+      <description>
+        <p>A fix, and the documentation reorganized.</p>
+        <ul>
+          <li>The notice that a command was copied came up blank for the web signers' commands; it now shows the command.</li>
+          <li>The documentation in a clearer order: installing the web signers is a step of the installation, the questions are grouped by theme, and RemoteID has its own section.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-11-09">
       <description>
         <p>Web signers, and the system's OpenSC out of the way.</p>
