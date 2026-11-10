@@ -12,13 +12,16 @@
 | What the host sees | `p11-kit list-modules` (on the host) |
 | What an app sees | `flatpak run --command=sh <app> -c 'p11-kit list-modules'` |
 | The host server | `systemctl --user status p11-kit-server.socket p11-kit-server.service`; the log in `journalctl --user -u p11-kit-server.service` |
-| "Unit p11-kit-server.socket does not exist" | The Debian family (Ubuntu 26.04, say): its p11-kit has no systemd units | The user service in [README](../README.md#1-prepare-the-system-once) (the window's copy button gives it) |
 | An app's permissions | `flatpak info --show-permissions <app>` and `~/.local/share/flatpak/overrides/<app>` |
 
 ## Common problems
 
+The questions users ask most, with the answers in plain words, are in the [FAQ](../FAQ.md#english) (in Portuguese and English); this table is the short form, with the causes.
+
 | Symptom | Likely cause | What to do |
 |---|---|---|
+| "Unit p11-kit-server.socket does not exist" | The Debian family (Ubuntu 26.04, say): its p11-kit has no systemd units | The user service in the [README](../README.md#1-prepare-the-system-once) (the window's copy button gives it) |
+| Web PKI or WebSigner shows no token (Flatpak browser) | the browser's step 1 or its web signer command missing, the browser not restarted, or the plugin's SafeSign option not ticked | See the [FAQ](../FAQ.md#the-web-pki-or-websigner-plugin-does-not-show-my-token) and [Web signers](signers.md#setting-up-a-browser) |
 | "System connection" red | `p11-kit-server.socket` off | `systemctl --user enable --now p11-kit-server.socket` (on Debian and Ubuntu, the user service in [README](../README.md#1-prepare-the-system-once); the window's copy button gives it); the row recovers on its own within 15 s, without restarting Tessera; `tessera status` shows the same result |
 | The app sees no token at all | step 1 is missing, or the app was opened before step 1 or before the driver was published | Step 1, then close and reopen the app |
 | Tessera sees the token, the app does not | the driver has not responded yet (not published) or the app was started before publication | Check the driver's state in the window; reopen the app |
