@@ -67,6 +67,23 @@ flatpak-builder --user --force-clean --install --default-branch=stable \
 
 The manifest uses the `org.gnome.Platform` 51 runtime, Rust from the `rust-stable` extension, and builds pcsc-lite 2.5.3 (only the client library, `--libdir=lib`), because the runtime does not have it. The pcsc-lite protocol is compatible with the system's `pcscd`.
 
+## The test build
+
+Each push to `main` produces, in continuous integration, the `tessera-x86_64` artifact. It contains `tessera-repo.tar.gz`, a small Flatpak repository with Tessera and every extension (the drivers and the web signers), and the `install-test-repo.sh` script. A standalone `.flatpak` bundle does not work, because it does not carry the extensions' extra-data: the installation fails with "Extra data missing in detached metadata".
+
+```sh
+mkdir -p ~/Downloads/tessera-teste && cd ~/Downloads/tessera-teste
+unzip ~/Downloads/tessera-x86_64.zip
+tar -xzf tessera-repo.tar.gz
+sh install-test-repo.sh SafeSign WebPKI     # Tessera and those extensions; "all" for every one, nothing for Tessera alone
+```
+
+The script adds the folder as the local repository `tessera-test`, in the user installation, and installs or updates Tessera and the extensions named. While an extension installs, Flatpak downloads the vendor's files and checks each sha256. The window's install commands name the `flatpark` remote; with the test build, use `tessera-test` instead. After updating, quit Tessera (menu → **Quit**) and open it again.
+
+Each release (tag `vX.Y.Z`) publishes the same `tessera-repo.tar.gz` on [Releases](https://github.com/pedrohqb/tessera/releases), so a release can be installed the same way without FlatPark (`curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/tessera-repo.tar.gz`), though without updates. The GNOME runtime comes from Flathub, which must be configured in the user installation.
+
+To remove a test build: `flatpak uninstall --user io.github.pedrohqb.Tessera` (its extensions go with it), `flatpak remote-delete --user tessera-test`, and the folder.
+
 ## Development environment variables
 
 | Variable | Default | Use |

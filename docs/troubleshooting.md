@@ -12,14 +12,14 @@
 | What the host sees | `p11-kit list-modules` (on the host) |
 | What an app sees | `flatpak run --command=sh <app> -c 'p11-kit list-modules'` |
 | The host server | `systemctl --user status p11-kit-server.socket p11-kit-server.service`; the log in `journalctl --user -u p11-kit-server.service` |
-| "Unit p11-kit-server.socket does not exist" | The Debian family (Ubuntu 26.04, say): its p11-kit has no systemd units | The user service in [usage](usage.md) (the window's copy button gives it) |
+| "Unit p11-kit-server.socket does not exist" | The Debian family (Ubuntu 26.04, say): its p11-kit has no systemd units | The user service in [README](../README.md#1-prepare-the-system-once) (the window's copy button gives it) |
 | An app's permissions | `flatpak info --show-permissions <app>` and `~/.local/share/flatpak/overrides/<app>` |
 
 ## Common problems
 
 | Symptom | Likely cause | What to do |
 |---|---|---|
-| "System connection" red | `p11-kit-server.socket` off | `systemctl --user enable --now p11-kit-server.socket` (on Debian and Ubuntu, the user service in [usage](usage.md); the window's copy button gives it); the row recovers on its own within 15 s, without restarting Tessera; `tessera status` shows the same result |
+| "System connection" red | `p11-kit-server.socket` off | `systemctl --user enable --now p11-kit-server.socket` (on Debian and Ubuntu, the user service in [README](../README.md#1-prepare-the-system-once); the window's copy button gives it); the row recovers on its own within 15 s, without restarting Tessera; `tessera status` shows the same result |
 | The app sees no token at all | step 1 is missing, or the app was opened before step 1 or before the driver was published | Step 1, then close and reopen the app |
 | Tessera sees the token, the app does not | the driver has not responded yet (not published) or the app was started before publication | Check the driver's state in the window; reopen the app |
 | "System connection" red, or a token missing in the apps, only while a driver has no token (OpenSC with no card, say) | p11-kit stops listing at a module of Tessera's without a token (a bug in its RPC; [History](history.md) item 43) | Fixed in Tessera: the drivers without a token are listed last, updated within a few seconds of a token going in or out. Press refresh (top left) to check at once |

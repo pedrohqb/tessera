@@ -1,88 +1,21 @@
-# Installation and usage
+# Usage
 
-## Preparing the system (once)
+Installing Tessera, preparing the system and installing a driver or a web signer are in the README ([Installation](../README.md#installation)), with the commands for each distribution. This page covers what comes after: the window, the tray, automatic start and the command line. A few notes the README leaves out:
 
-- **`pcscd` with the CCID driver.** Most distributions ship both, and the atomic Fedora and Universal Blue images (Bluefin, Aurora, Bazzite) already come with them. To check: `systemctl status pcscd.socket`.
-- **The system's p11-kit server:**
-  ```sh
-  systemctl --user enable --now p11-kit-server.socket
-  ```
-  On Fedora-based systems, the unit comes in the `p11-kit-server` package, which the atomic images already ship; on openSUSE, in `p11-kit-server` too; on Arch, in `p11-kit` itself.
-
-  **Ubuntu 26.04 and the rest of the Debian family** ship the server (`p11-kit server`, package `p11-kit`) but no systemd units for it, and build it without socket activation (no libsystemd), so the unit above does not exist there (and from p11-kit 0.25.6 on the server could take the socket, but the unit is still not shipped). Only systems with p11-kit 0.25.6 or newer are supported: Debian 12 and 13, LMDE 6 and 7, Ubuntu 24.04 and Linux Mint 22 have older versions, with which signing fails ([History](history.md) item 38). A plain user service takes its place: it starts at login and creates the socket itself, at the same path (`%t/p11-kit/pkcs11`). The README has it as a file; the window's copy button gives the same as one line. Its content:
-  ```ini
-  [Unit]
-  Description=p11-kit server
-  Documentation=man:p11-kit(8)
-
-  [Service]
-  ExecStartPre=/bin/mkdir -p -m 700 %t/p11-kit
-  ExecStart=/usr/bin/p11-kit server -f -n %t/p11-kit/pkcs11 pkcs11:
-  Restart=on-failure
-
-  [Install]
-  WantedBy=default.target
-  ```
-  in `~/.config/systemd/user/p11-kit-server.service`, then `systemctl --user daemon-reload && systemctl --user enable --now p11-kit-server.service`. To try it without systemd, `mkdir -p -m 700 "$XDG_RUNTIME_DIR/p11-kit" && p11-kit server -f -n "$XDG_RUNTIME_DIR/p11-kit/pkcs11" pkcs11:` serves the tokens while the terminal stays open.
-
-Nothing else is installed on the system.
-
-## Installing from FlatPark
-
-The standard install, with updates through `flatpak update`. The GNOME runtime comes from Flathub, and Flatpak only downloads it from a remote in the same installation as Tessera (`--user` here; for a system install, `--system` in all three lines):
-
-```sh
-flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak --user remote-add --if-not-exists flatpark https://dl.flatpark.org/flatpark.flatpakrepo
-flatpak --user install flatpark io.github.pedrohqb.Tessera
-```
-
-Then the driver for the token, if it is not one OpenSC (built in) serves; the window shows which one and the command:
-
-```sh
-flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign   # GD Burti and other SafeSign tokens
-flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeNet    # SafeNet eToken 5100/5110, IDPrime
-flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SerproID   # Serpro's cloud certificate
-```
-
-The FlatPark package (`registry/io.github.pedrohqb.Tessera` in [flatpark/flatpark](https://github.com/flatpark/flatpark)) installs the `tessera-x86_64.tar.gz` of each GitHub release, unmodified. Each driver extension has its own entry there, built from `flatpak/extensions/<Name>`, with the same pins.
-
-## Installing the published release directly
-
-Each release (tag `vX.Y.Z`) publishes on [Releases](https://github.com/pedrohqb/tessera/releases) the `tessera-repo.tar.gz`, a small Flatpak repository with the `install-test-repo.sh` script:
-
-```sh
-mkdir -p ~/Downloads/tessera && cd ~/Downloads/tessera
-curl -fLO https://github.com/pedrohqb/tessera/releases/latest/download/tessera-repo.tar.gz
-tar -xzf tessera-repo.tar.gz
-./install-test-repo.sh SafeSign      # or: SafeNet, SerproID, all, or none for Tessera alone
-```
-
-The GNOME runtime comes from Flathub, which must be configured.
-
-## Installing the test build
-
-Each push to `main` produces, in continuous integration, the `tessera-x86_64` artifact. It contains `tessera-repo.tar.gz`, a small Flatpak repository. A standalone `.flatpak` bundle does not work, because it does not carry the driver extensions' extra-data: the installation fails with "Extra data missing in detached metadata". The repository holds Tessera and the three driver extensions; `install-test-repo.sh` installs Tessera and the drivers named after it (`all` for every one).
-
-```sh
-mkdir -p ~/Downloads/tessera-teste && cd ~/Downloads/tessera-teste
-unzip ~/Downloads/tessera-x86_64.zip
-tar -xzf tessera-repo.tar.gz
-./install-test-repo.sh all
-```
-
-The script adds the folder as the local repository `tessera-test` and installs or updates Tessera and the drivers asked for. While a driver installs, Flatpak downloads the vendor's files and checks each sha256. The window's install commands name the `flatpark` remote; with the test build, use `tessera-test` instead.
-
-After updating, quit Tessera (menu → **Quit**) and open it again.
+- **Where the packages come from.** FlatPark's package (`registry/io.github.pedrohqb.Tessera` in [flatpark/flatpark](https://github.com/flatpark/flatpark)) installs the `tessera-x86_64.tar.gz` of each GitHub release, unmodified. Each extension, driver or web signer, has its own entry there, built from `flatpak/extensions/<Name>` with the same pins. The GNOME runtime comes from Flathub, and Flatpak only downloads it from a remote in the same installation as Tessera (`--user` or `--system`), which is why the README adds both remotes.
+- **Why the Debian family needs a user service.** Ubuntu 26.04 and the rest of the Debian family ship the server (`p11-kit server`, package `p11-kit`) but no systemd units for it, and build it without socket activation (no libsystemd), so `p11-kit-server.socket` does not exist there. The README's user service starts it at login and creates the socket itself, at the same path (`%t/p11-kit/pkcs11`); the window's copy button gives the same as one line. Only p11-kit 0.25.6 or newer is supported: Debian 12 and 13, LMDE 6 and 7, Ubuntu 24.04 and Linux Mint 22 have older versions, with which signing fails ([History](history.md), item 38). On Fedora-based systems and openSUSE the socket unit comes in the `p11-kit-server` package (the atomic images already ship it); on Arch, in `p11-kit` itself.
+- **Without systemd,** `mkdir -p -m 700 "$XDG_RUNTIME_DIR/p11-kit" && p11-kit server -f -n "$XDG_RUNTIME_DIR/p11-kit/pkcs11" pkcs11:` serves the tokens while the terminal stays open (see the [FAQ](../FAQ.md#does-it-work-with-snap-without-systemd)).
+- **Test builds** and installing a release without FlatPark are in [Development](development.md#the-test-build).
 
 ## The window
 
-- **Service:** the state of the driver servers, with **Start** or **Restart**. Right below, **System connection**, which checks end to end whether the apps see Tessera's tokens through the host's p11-kit server, with the activation command to copy (on Debian and Ubuntu, the one that writes the user service, too long to show). Last, **Smart card service (pcscd)**.
+- **Service:** the state of the driver servers, with **Start** or **Restart**. Right below, **System connection**, which checks end to end whether the apps see Tessera's tokens through the host's p11-kit server, with the activation command to copy (on Debian and Ubuntu, the one that writes the user service, too long to show). Then **Smart card service (pcscd)**, and the switch **Switch off the system's OpenSC**, on by default ([Drivers](drivers.md#opensc)).
 - **Readers:** the readers that `pcscd` sees and whether there is a card.
 - **Tokens:** each token with its driver and certificates (holder, issuer, validity). An expired certificate is highlighted.
 - **Drivers:** each driver with its on/off switch and its state: "Published: the apps can use it", "Starting…", "No answer; trying again (1 of 3)", "Stopped: …" or "Switched off". The buttons for the vendor tools (Token Administration, SerproID) are here.
 - **Apps:** two tabs. **Flatpak:** the two steps for each app (see [Apps](apps.md)), with the state "Ready", "Step 1 missing", "Step 2 missing" or "Steps 1 and 2 missing". **Native:** the apps installed from the distribution (Firefox, the Chromium-based browsers, Okular and Papers, PJeOffice Pro), each with its one step, **Set up** (Okular and Papers follow Firefox) (see [Native apps](apps.md#native-apps)). A completed step appears with ✓ and no button, and the states update on their own, without restarting Tessera.
-- The refresh button, in the top left corner, runs a check right away. The menu has **Start automatically at login**, **Show an icon in the tray**, **About Tessera** and **Quit** (Ctrl+Q).
+- **Web signers:** for each Flatpak browser, the web signer extensions installed and whether each is set up in it, with the one command to copy; then the ones not installed, with their FlatPark page and install command (see [Web signers](signers.md)).
+- The refresh button, in the top left corner, runs a check right away. The menu has **Start automatically at login**, **Show an icon in the tray**, **Restart Tessera** (needed after installing an extension, or when an app's folder appeared after Tessera started), **About Tessera** and **Quit** (Ctrl+Q).
 
 Configuration errors appear in a dialog box, with the full text and what to do.
 
