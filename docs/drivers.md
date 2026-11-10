@@ -7,7 +7,7 @@ Tessera's own package carries one driver, [OpenSC](#opensc), free software and b
 | Extension | For | Vendor files (sha256) |
 |---|---|---|
 | `io.github.pedrohqb.Tessera.Driver.SafeSign` | GD Burti (G+D StarSign) and other SafeSign tokens | SafeSign IC 4.5.0.0 `SafeSignICStandardLinux4.5.0.0-AET.000ub2404x86_64.deb` (`7742e21e…1b91`) and, for Token Administration, `…redhat10x86_64.rpm` (`2f5ea462…3378`); GDBM from Ubuntu 24.04, `libgdbm6t64_1.23-5.1build1_amd64.deb` (`18d6d74a…645e`) and `libgdbm-compat4t64_1.23-5.1build1_amd64.deb` (`fb8564af…ee65`) |
-| `io.github.pedrohqb.Tessera.Driver.SafeNet` | SafeNet eToken 5100/5110, IDPrime cards | SafeNet Authentication Client 10.9, `Linux_SAC_10.9_GA.zip` from DigiCert (`46759cfe…013e`) |
+| `io.github.pedrohqb.Tessera.Driver.SafeNet` | SafeNet eToken 5100/5110, IDPrime cards | SafeNet Authentication Client 10.9.6885, `GlobalSign-SAC-Linux-Ubuntu-24.04.4-v10.9.zip` from GlobalSign (`c076c2ec…f428`) |
 | `io.github.pedrohqb.Tessera.Driver.SerproID` | Serpro's cloud certificate | `SerproID-2.1.6-amd64.deb` (`0ffa9ffe…e588`) |
 | `io.github.pedrohqb.Tessera.Driver.RemoteID` | Certisign's RemoteID cloud certificate | RemoteID's own release build, from its GitHub releases; packaged and pinned on FlatPark by RemoteID's developer ([below](#remoteid)) |
 
@@ -73,9 +73,9 @@ The extensions' icons, shown in FlatPark's catalog, come from the vendors where 
 
 ## SafeNet Authentication Client (eToken 5100/5110, IDPrime)
 
-- The zip contains packages for several distributions. As in distrobox-adv-br, only the Ubuntu "withoutUI" package is used (`safenetauthenticationclient-core_*_amd64.deb`).
+- **The download.** GlobalSign, a certificate authority that ships these tokens with its certificates, distributes Thales's Linux release for Ubuntu 24.04 as a 22 MB zip, with the full package and the "withoutUI" core one, each with Thales's PGP signature (key `B37EBA84D2EB0C786F91EEF77F8AA801285DEE57`, checked when the zip was pinned); the AUR's `sac-core` uses the same zip. Until November 2026 the extension took DigiCert's `Linux_SAC_10.9_GA.zip`, 91 MB with packages for several distributions, and version 10.9.4723. As in distrobox-adv-br, only the core package is used (`…safenetauthenticationclient-core_*_amd64.deb`, about 1 MB). The zip's folders are read-only (0555), so `apply_extra.sh` makes them writable before removing them.
 - **Library:** `libeToken.so`.
-- **Observed behavior:** with no token connected, the driver was slow to respond in the first test, and the system's p11-kit, when loading it, made Firefox show "Unable to add module". That is why supervision exists: a driver that does not respond is not published. Each driver can also be turned off in the window. With a real SafeNet token, a user on Arch Linux reported it working in PJeOffice Pro when it was still built into Tessera ([compatibility](compatibility.md)); as an extension (the same package, URL and checksum), it has not been tried with a token yet.
+- **Observed behavior:** with no token connected, the driver was slow to respond in the first test, and the system's p11-kit, when loading it, made Firefox show "Unable to add module". That is why supervision exists: a driver that does not respond is not published. Each driver can also be turned off in the window. With a real SafeNet token, a user on Arch Linux reported it working in PJeOffice Pro when it was still built into Tessera ([compatibility](compatibility.md)); as an extension, it has not been tried with a token yet, in either version (10.9.4723 from DigiCert's zip, or 10.9.6885 from GlobalSign's).
 
 ## OpenSC
 
