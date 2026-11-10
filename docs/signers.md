@@ -109,10 +109,8 @@ Then, in the browser: install the plugin's extension from the browser's store if
 
 ## In native browsers
 
-Native browsers need none of this: use the vendors' official packages and, in the plugin, add your distribution's p11-kit proxy (`p11-kit-proxy.so`) under "Cripto Dispositivos" → "Opções personalizadas" (see the README).
+Native browsers need none of this: use the vendors' official packages and, in the plugin, add your distribution's p11-kit proxy (`p11-kit-proxy.so`) under "Cripto Dispositivos" → "Opções personalizadas". The README has the path for each distribution ([Web PKI and WebSigner](../README.md#web-pki-and-websigner)).
 
 ## Status
 
-- CI builds the three extensions, installs them (so each `apply_extra.sh` runs on the real download) and checks the start script, the program, the library link and, for Certisign, that no dialog path is left at `/opt` and that every `res/` file the binary names exists.
-- Sigillum's approach (the same programs, links and manifests, from a folder in the home) was tested on October 29, 2026 on Bluefin with a GD Burti token and a SerproID certificate: Web PKI and Softplan's WebSigner worked in Firefox, Chromium, Chrome, Edge and Brave.
-- November 9, 2026, Bluefin, Firefox and Brave (Flatpak), Tessera's test build: Web PKI and Softplan's WebSigner worked at once. Certisign's WebSigner started, but crashed on the trust store (above) with its SafeNet option and found no library with its SafeSign option; with the module that hides the trust store's slots, under the SafeSign name, it worked too.
+CI builds the three extensions, installs them (so each `apply_extra.sh` runs on the real download) and checks the start script, the program, the library link and, for Certisign, that no dialog path is left at `/opt` and that every `res/` file the binary names exists. What has been tested by hand, on which system and in which browsers, is in [Compatibility](compatibility.md#tested-by-hand); how Certisign's program came to need its own module is in [History](history.md), item 52.

@@ -9,6 +9,7 @@ Tessera's own package carries one driver, [OpenSC](#opensc), free software and b
 | `io.github.pedrohqb.Tessera.Driver.SafeSign` | GD Burti (G+D StarSign) and other SafeSign tokens | SafeSign IC 4.5.0.0 `SafeSignICStandardLinux4.5.0.0-AET.000ub2404x86_64.deb` (`7742e21e…1b91`) and, for Token Administration, `…redhat10x86_64.rpm` (`2f5ea462…3378`); GDBM from Ubuntu 24.04, `libgdbm6t64_1.23-5.1build1_amd64.deb` (`18d6d74a…645e`) and `libgdbm-compat4t64_1.23-5.1build1_amd64.deb` (`fb8564af…ee65`) |
 | `io.github.pedrohqb.Tessera.Driver.SafeNet` | SafeNet eToken 5100/5110, IDPrime cards | SafeNet Authentication Client 10.9, `Linux_SAC_10.9_GA.zip` from DigiCert (`46759cfe…013e`) |
 | `io.github.pedrohqb.Tessera.Driver.SerproID` | Serpro's cloud certificate | `SerproID-2.1.6-amd64.deb` (`0ffa9ffe…e588`) |
+| `io.github.pedrohqb.Tessera.Driver.RemoteID` | Certisign's RemoteID cloud certificate | RemoteID's own release build, from its GitHub releases; packaged and pinned on FlatPark by RemoteID's developer ([below](#remoteid)) |
 
 ```bash
 flatpak install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
@@ -126,3 +127,14 @@ SerproID is a cloud certificate. The driver (`libserproidp11.so`) does not talk 
 ### What was not the cause (and was ruled out in testing)
 
 The program name, the command line, the environment, signals, standard input and output, initialization with `CKF_OS_LOCKING_OK`, the finalize and re-initialize that p11-kit does before each connection, several instances of the driver at the same time, and the age of the connection. Each one was tested individually. The path is in [History](history.md).
+
+## RemoteID
+
+[RemoteID](https://github.com/LLawli/RemoteID-linux) makes a Certisign RemoteID cloud certificate available on Linux as a token. It is an independent open source project (GPL-3.0), by Leonardo Lucas, not made or endorsed by Certisign. It was the first driver extension on FlatPark, published by its developer through Tessera's extension point ([History](history.md), item 41).
+
+- **Not in this repository.** The extension's manifest, `apply_extra.sh` and `driver.toml` are in FlatPark's registry (`registry/io.github.pedrohqb.Tessera.Driver.RemoteID`), kept by RemoteID's developer, and it installs RemoteID's release build from its GitHub releases, unmodified. This repository's CI does not build it, and problems with it go to [RemoteID's issues](https://github.com/LLawli/RemoteID-linux/issues).
+- **Library and tool:** `extra/lib/libremoteid.so`; the window's **RemoteID** button (`extra/bin/remoteid`) signs in to the account.
+- **How it signs:** the private key stays on Certisign's servers; when the signing session has expired, a window asks for the code from the authenticator app. The driver reaches Certisign's servers through Tessera's network access and has no permissions of its own.
+- **TLS 1.2 only for website login:** TLS 1.3 requires an RSA-PSS signature, which Certisign's service does not provide. Signing documents is not affected.
+- **Bug reports:** `remoteid diagnostico` packs a log with no password, PIN or authenticator code.
+- **Not tested by hand here yet** ([Compatibility](compatibility.md)).
