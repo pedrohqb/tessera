@@ -20,7 +20,7 @@ This documentation records how Tessera works, why it is the way it is, and every
 
 - **For users:** install Tessera, run `systemctl --user enable --now p11-kit-server.socket` once (on Debian and Ubuntu, a user service instead: see [usage](usage.md)), and follow the two steps for each app in the window. PJeOffice Pro from FlatPark needs nothing.
 - **For maintainers of a Flatpak package that uses a token:** give the app `--filesystem=xdg-run/p11-kit/pkcs11` and load the runtime's `p11-kit-client.so`. This is what PJeOffice Pro from FlatPark already does.
-- **For those who need Web PKI or WebSigner (e-SAJ):** in Flatpak browsers, Tessera's web signer extensions, set up per browser with one command the window shows ([Web signers](signers.md)); until they are on FlatPark, [Sigillum](https://github.com/pedrohqb/sigillum). In native browsers, the vendors' official packages, with `p11-kit-proxy.so` added under the plugin's custom options (see the README).
+- **For those who need Web PKI or WebSigner (e-SAJ):** in Flatpak browsers, Tessera's web signer extensions, set up per browser with one command the window shows ([Web signers](signers.md)). In native browsers, the vendors' official packages, with `p11-kit-proxy.so` added under the plugin's custom options (see the README).
 - **For those who package SerproID elsewhere:** read the SerproID section in [Drivers](drivers.md#serproid). There are four quirks that make signing fail in ways that are hard to understand.
 
 ## Status

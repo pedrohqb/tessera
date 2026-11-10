@@ -73,7 +73,7 @@ p11-kit server -f -n "$XDG_RUNTIME_DIR/p11-kit/pkcs11" pkcs11:
 
 ### Preciso do Sigillum?
 
-Não mais, quando as extensões de assinador web do Tessera chegarem ao FlatPark: o **Web PKI**, o **WebSigner** da Softplan e o da Certisign passam a ser extensões do Tessera, e a janela mostra o comando de cada navegador em Flatpak (veja o [README](README.md#web-pki-e-websigner)). Até lá, o Sigillum serve para o Web PKI e o WebSigner da Softplan. Nos navegadores nativos, nenhum dos dois é preciso: use os pacotes oficiais dos fornecedores e acrescente o caminho do p11-kit no plugin. No Arch e derivados, `/lib/libp11-kit.so` também funciona: é a mesma biblioteca que `/usr/lib/p11-kit-proxy.so`.
+Não. O Sigillum foi arquivado: o **Web PKI** e o **WebSigner** (da Softplan e da Certisign) agora são extensões do Tessera, e a janela mostra o comando de cada navegador em Flatpak (veja o [README](README.md#web-pki-e-websigner)). Se você usava o Sigillum, rode `./sigillum.sh remover` antes de configurar as extensões. Nos navegadores nativos, nenhum dos dois é preciso: use os pacotes oficiais dos fornecedores e acrescente o caminho do p11-kit no plugin. No Arch e derivados, `/lib/libp11-kit.so` também funciona: é a mesma biblioteca que `/usr/lib/p11-kit-proxy.so`.
 
 ### O plugin Web PKI ou WebSigner não mostra o meu token.
 
@@ -246,7 +246,7 @@ p11-kit server -f -n "$XDG_RUNTIME_DIR/p11-kit/pkcs11" pkcs11:
 
 ### Do I need Sigillum?
 
-Not anymore, once Tessera's web signer extensions reach FlatPark: **Web PKI**, Softplan's **WebSigner** and Certisign's become extensions of Tessera, and the window shows the command for each Flatpak browser (see the [README](README.md#web-pki-and-websigner)). Until then, Sigillum covers Web PKI and Softplan's WebSigner. In native browsers neither is needed: use the vendors' official packages and add the p11-kit path in the plugin. On Arch and its derivatives, `/lib/libp11-kit.so` also works: it is the same library as `/usr/lib/p11-kit-proxy.so`.
+No. Sigillum has been archived: **Web PKI** and **WebSigner** (Softplan's and Certisign's) are now extensions of Tessera, and the window shows the command for each Flatpak browser (see the [README](README.md#web-pki-and-websigner)). If you used Sigillum, run `./sigillum.sh remover` before setting up the extensions. In native browsers neither is needed: use the vendors' official packages and add the p11-kit path in the plugin. On Arch and its derivatives, `/lib/libp11-kit.so` also works: it is the same library as `/usr/lib/p11-kit-proxy.so`.
 
 ### The Web PKI or WebSigner plugin does not show my token.
 

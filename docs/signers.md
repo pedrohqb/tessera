@@ -1,6 +1,6 @@
 # Web signers
 
-Some signing sites need a browser plugin with a program of its own behind it: **Lacuna Web PKI**, **Softplan WebSigner** (e-SAJ) and **Certisign WebSigner** (Certisign's signing portals). Each is published as a Flatpak extension of Tessera, so the Flatpak browsers can use them with Tessera's tokens, without a container and without packages installed on the system. They replace [Sigillum](https://github.com/pedrohqb/sigillum), which did the same with a script, and the web signers of [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br).
+Some signing sites need a browser plugin with a program of its own behind it: **Lacuna Web PKI**, **Softplan WebSigner** (e-SAJ) and **Certisign WebSigner** (Certisign's signing portals). Each is published as a Flatpak extension of Tessera, so the Flatpak browsers can use them with Tessera's tokens, without a container and without packages installed on the system. They replace [Sigillum](https://github.com/pedrohqb/sigillum), now archived, which did the same with a script (to move from it, run `./sigillum.sh remover` first, then each browser's command), and the web signers of [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br).
 
 | Extension | Plugin | Vendor file (sha256) |
 |---|---|---|
