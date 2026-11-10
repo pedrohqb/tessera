@@ -69,8 +69,12 @@ pub(super) struct Win {
 }
 
 impl Win {
+    /// A toast with the text as is: a toast's title is Pango markup by
+    /// default, and the commands it shows (`&&`, `>`) are not valid markup,
+    /// which left it blank.
     pub(super) fn toast(&self, text: &str) {
-        self.toasts.add_toast(adw::Toast::new(text));
+        self.toasts
+            .add_toast(adw::Toast::builder().title(text).use_markup(false).build());
     }
 
     /// For messages too long for a toast (what went wrong and what to do).
