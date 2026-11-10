@@ -129,7 +129,7 @@ As atualizações chegam com o `flatpak update`.
 
 Instale a extensão do seu token (tabela no início) de um destes jeitos:
 
-- **Pela loja de aplicativos** (GNOME Software, Discover): na página do Tessera, em **Complementos**, ou pela página do driver no [FlatPark](https://flatpark.org/apps/io.github.pedrohqb.Tessera/), no botão de instalar. Os nomes são **SafeSign IC**, **SafeNet Authentication Client** e **SerproID**.
+- **Pela loja de aplicativos** (GNOME Software, Discover): na página do Tessera, em **Complementos**, ou pela página do driver no [FlatPark](https://flatpark.org/apps/io.github.pedrohqb.Tessera/), no botão de instalar. Os nomes são **SafeSign IC**, **SafeNet Authentication Client**, **SerproID** e **RemoteID**.
 - **Pelo terminal,** na mesma instalação do Tessera (`--user` ou `--system`). Por exemplo, para o GD Burti:
 
 ```bash
@@ -137,6 +137,18 @@ flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
 ```
 
 Na dúvida, abra o Tessera com o token conectado: se faltar o driver, a linha do leitor diz qual instalar, com um botão para a página dele no FlatPark e outro que copia o comando. Depois de instalar, saia do Tessera pelo menu e abra de novo.
+
+#### 4. Instalar os assinadores web (se precisar)
+
+O **Lacuna Web PKI**, o **Softplan WebSigner** (exigido pelo e-SAJ) e o **Certisign WebSigner** (portais de assinatura da Certisign) são plugins de navegador com um programa por trás. Nos navegadores em Flatpak, cada um é uma extensão do Tessera. Instale só os que usar, do mesmo jeito que o driver: pela loja (os nomes são **Lacuna Web PKI**, **Softplan WebSigner** e **Certisign WebSigner**) ou pelo terminal, na mesma instalação do Tessera (`--user` ou `--system`):
+
+```bash
+flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.WebPKI
+flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner
+flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.CertisignWebSigner
+```
+
+Depois, reinicie o Tessera pelo menu e configure cada navegador (veja [Web PKI e WebSigner](#web-pki-e-websigner), em Uso). Nos navegadores nativos, as extensões não são necessárias.
 
 ---
 
@@ -173,17 +185,7 @@ No Fedora e derivados, o próprio sistema já faz isso, e os aplicativos nativos
 
 #### Web PKI e WebSigner
 
-O **Lacuna Web PKI**, o **Softplan WebSigner** (exigido pelo e-SAJ) e o **Certisign WebSigner** (portais de assinatura da Certisign) são plugins de navegador com um programa por trás.
-
-- **Nos navegadores em Flatpak** (Firefox, Chromium, Chrome, Edge e Brave), cada um é uma extensão do Tessera:
-
-  ```bash
-  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.WebPKI
-  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner
-  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.CertisignWebSigner
-  ```
-
-  Instale só os que usar, na mesma instalação do Tessera, e reinicie o Tessera pelo menu. A seção **Assinadores web** da janela mostra, para cada navegador, um comando para rodar uma vez no terminal (botão de copiar). Depois, reinicie o navegador, instale a extensão do plugin na loja do navegador, se ainda não tiver, e marque uma vez, nas configurações do plugin, **"Dispositivos SafeSign AET"** (Web PKI e WebSigner da Softplan, aba "Cripto Dispositivos") ou **"SafeSign"** (WebSigner da Certisign). O passo 1 do navegador, na seção Aplicativos, precisa estar feito. Detalhes em [docs/signers.md](docs/signers.md).
+- **Nos navegadores em Flatpak** (Firefox, Chromium, Chrome, Edge e Brave), com as extensões instaladas ([passo 4](#4-instalar-os-assinadores-web-se-precisar)), a seção **Assinadores web** da janela mostra, para cada navegador, um comando para rodar uma vez no terminal (botão de copiar). Depois, reinicie o navegador, instale a extensão do plugin na loja do navegador, se ainda não tiver, e marque uma vez, nas configurações do plugin, **"Dispositivos SafeSign AET"** (Web PKI e WebSigner da Softplan, aba "Cripto Dispositivos") ou **"SafeSign"** (WebSigner da Certisign). O passo 1 do navegador, na seção Aplicativos, precisa estar feito. Detalhes em [docs/signers.md](docs/signers.md).
 - **Nos navegadores nativos**, não é preciso nada disso: use os pacotes oficiais ([Web PKI](https://get.webpkiplugin.com/) e [WebSigner](https://websigner.softplan.com.br/)). No plugin, em "Cripto Dispositivos" → "Opções personalizadas", acrescente o caminho do p11-kit da sua distribuição. As chaves "Tokens SafeNet" e "Dispositivos SafeSign AET" podem ficar desligadas.
 
   | Distribuição | Caminho |
@@ -206,7 +208,7 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 ### Documentação, suporte e licença
 
 - **[Perguntas frequentes](FAQ.md)**, em português e inglês.
-- **Documentação técnica**, em inglês, em [docs/](docs/README.md): arquitetura, drivers, aplicativos, compatibilidade (o que já foi testado, e como relatar o seu teste), solução de problemas, histórico e desenvolvimento.
+- **Documentação técnica**, em inglês, em [docs/](docs/README.md): uso da janela e da linha de comando, aplicativos, assinadores web, drivers, compatibilidade (o que já foi testado, e como relatar o seu teste), solução de problemas, arquitetura, histórico e desenvolvimento.
 - **Suporte:** abra uma [issue](https://github.com/pedrohqb/tessera/issues) ou peça ajuda no grupo oficial no [Telegram](https://t.me/advogados_linux).
 - **Licença:** GPL-3.0-or-later. Os drivers dos fornecedores não fazem parte do Tessera: são extensões à parte, baixadas dos fornecedores na instalação, e seguem as licenças deles. O OpenSC, que vem compilado no Tessera, é LGPL-2.1-or-later.
 
@@ -331,7 +333,7 @@ Updates come with `flatpak update`.
 
 Install your token's extension (table at the top) in one of these ways:
 
-- **From the app store** (GNOME Software, Discover): on Tessera's page, under **Add-ons**, or from the driver's page on [FlatPark](https://flatpark.org/apps/io.github.pedrohqb.Tessera/), with its install button. The names are **SafeSign IC**, **SafeNet Authentication Client** and **SerproID**.
+- **From the app store** (GNOME Software, Discover): on Tessera's page, under **Add-ons**, or from the driver's page on [FlatPark](https://flatpark.org/apps/io.github.pedrohqb.Tessera/), with its install button. The names are **SafeSign IC**, **SafeNet Authentication Client**, **SerproID** and **RemoteID**.
 - **From a terminal,** in the same installation as Tessera (`--user` or `--system`). For a GD Burti, say:
 
 ```bash
@@ -339,6 +341,18 @@ flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
 ```
 
 If unsure, open Tessera with the token plugged in: when its driver is missing, the reader's row says which one to install, with a button to its FlatPark page and another that copies the command. After installing, quit Tessera from its menu and open it again.
+
+#### 4. Install the web signers (if you need them)
+
+**Lacuna Web PKI**, **Softplan WebSigner** (required by e-SAJ) and **Certisign WebSigner** (Certisign's signing portals) are browser plugins with a program behind them. In Flatpak browsers, each is an extension of Tessera. Install only the ones you use, the same way as the driver: from the app store (the names are **Lacuna Web PKI**, **Softplan WebSigner** and **Certisign WebSigner**) or from a terminal, in the same installation as Tessera (`--user` or `--system`):
+
+```bash
+flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.WebPKI
+flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner
+flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.CertisignWebSigner
+```
+
+Then restart Tessera from its menu and set up each browser (see [Web PKI and WebSigner](#web-pki-and-websigner), under Usage). Native browsers do not need the extensions.
 
 ### Usage
 
@@ -373,17 +387,7 @@ On Fedora and its derivatives, the system itself already does this, and native a
 
 #### Web PKI and WebSigner
 
-**Lacuna Web PKI**, **Softplan WebSigner** (required by e-SAJ) and **Certisign WebSigner** (Certisign's signing portals) are browser plugins with a program behind them.
-
-- **In Flatpak browsers** (Firefox, Chromium, Chrome, Edge and Brave), each is an extension of Tessera:
-
-  ```bash
-  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.WebPKI
-  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.SoftplanWebSigner
-  flatpak --system install flatpark io.github.pedrohqb.Tessera.Signer.CertisignWebSigner
-  ```
-
-  Install only the ones you use, in the same installation as Tessera, and restart Tessera from its menu. The window's **Web signers** section shows, for each browser, a command to run once in a terminal (copy button). Then restart the browser, install the plugin's extension from the browser's store if it is not there yet and tick once, in the plugin's settings, **"Dispositivos SafeSign AET"** (Web PKI and Softplan's WebSigner, "Cripto Dispositivos" tab) or **"SafeSign"** (Certisign's WebSigner). The browser's step 1, in the Apps section, must be done. Details in [docs/signers.md](docs/signers.md).
+- **In Flatpak browsers** (Firefox, Chromium, Chrome, Edge and Brave), with the extensions installed ([step 4](#4-install-the-web-signers-if-you-need-them)), the window's **Web signers** section shows, for each browser, a command to run once in a terminal (copy button). Then restart the browser, install the plugin's extension from the browser's store if it is not there yet and tick once, in the plugin's settings, **"Dispositivos SafeSign AET"** (Web PKI and Softplan's WebSigner, "Cripto Dispositivos" tab) or **"SafeSign"** (Certisign's WebSigner). The browser's step 1, in the Apps section, must be done. Details in [docs/signers.md](docs/signers.md).
 - **In native browsers**, none of this is needed: use the official packages ([Web PKI](https://get.webpkiplugin.com/) and [WebSigner](https://websigner.softplan.com.br/)). In the plugin, under "Cripto Dispositivos" → "Opções personalizadas", add your distribution's p11-kit path. The "Tokens SafeNet" and "Dispositivos SafeSign AET" switches can stay off.
 
   | Distribution | Path |
@@ -402,6 +406,6 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 ### Documentation, support and license
 
 - **[FAQ](FAQ.md)**, in Portuguese and English.
-- **Technical documentation** in [docs/](docs/README.md): architecture, drivers, apps, compatibility (what has been tested, and how to report your test), troubleshooting, history and development.
+- **Technical documentation** in [docs/](docs/README.md): using the window and the command line, apps, web signers, drivers, compatibility (what has been tested, and how to report your test), troubleshooting, architecture, history and development.
 - **Support:** open an [issue](https://github.com/pedrohqb/tessera/issues) or ask in the [Telegram](https://t.me/advogados_linux) group (in Portuguese).
 - **License:** GPL-3.0-or-later. The vendor drivers are not part of Tessera: they are separate extensions, downloaded from their vendors at installation, and are covered by the vendors' own licenses. OpenSC, built into Tessera, is LGPL-2.1-or-later.
