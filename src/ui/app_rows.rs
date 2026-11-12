@@ -610,8 +610,9 @@ fn apps_page(caption: &str) -> (gtk::Box, gtk::ListBox) {
 }
 
 /// The Apps section, with a tab for the Flatpak apps and one for the
-/// native ones.
-pub(super) fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
+/// native ones; the stack tells which tab is shown (the Web signers
+/// section is for Flatpak browsers only).
+pub(super) fn apps_group(win: &Rc<Win>) -> (adw::PreferencesGroup, gtk::Stack) {
     let group = adw::PreferencesGroup::builder()
         .title(t("Apps"))
         .description(t("Apps that use the tokens through Tessera."))
@@ -663,7 +664,7 @@ pub(super) fn apps_group(win: &Rc<Win>) -> adw::PreferencesGroup {
         .build();
     group.set_header_suffix(Some(&switcher));
     group.add(&stack);
-    group
+    (group, stack)
 }
 
 #[cfg(test)]

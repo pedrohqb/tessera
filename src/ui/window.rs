@@ -699,8 +699,18 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     page.add(&win.readers.group);
     page.add(&win.tokens.group);
     page.add(&win.drivers.group);
-    page.add(&apps_group(&win));
-    page.add(&signers_group(&win));
+    let (apps, apps_stack) = apps_group(&win);
+    page.add(&apps);
+    // The web signers run in Flatpak browsers only: shown with the Flatpak
+    // tab, hidden with the native one (native browsers use the vendors'
+    // own packages).
+    let signers = signers_group(&win);
+    apps_stack
+        .bind_property("visible-child-name", &signers, "visible")
+        .transform_to(|_, name: Option<String>| Some(name.as_deref() == Some("flatpak")))
+        .sync_create()
+        .build();
+    page.add(&signers);
 
     let view = adw::ToolbarView::new();
     view.add_top_bar(&header);
