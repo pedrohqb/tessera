@@ -91,6 +91,25 @@ impl Hub {
         self.host_misses.set(0);
     }
 
+    /// Switch one driver on or off (the window's switch). Only its server,
+    /// and those whose environment depends on it, start or stop: the apps
+    /// that are open keep the other drivers' tokens (Server::set_enabled).
+    /// What is published follows at the next listing.
+    fn set_driver_enabled(&self, id: &str, on: bool) {
+        let Some(d) = self.drivers.borrow().iter().find(|d| d.id == id).cloned() else {
+            return;
+        };
+        // A listing that is running is about the servers as they were.
+        self.generation.set(self.generation.get() + 1);
+        self.health.borrow_mut().forget(id);
+        if !on {
+            self.published.borrow_mut().retain(|x| x != id);
+        }
+        self.server.borrow_mut().set_enabled(&d, on);
+        *self.host_checked.borrow_mut() = None;
+        self.host_misses.set(0);
+    }
+
     /// Stop serving: servers down and nothing left published on the host
     /// (module files pointing at stopped servers would only make apps wait).
     fn shut_down(&self) {

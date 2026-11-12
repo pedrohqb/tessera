@@ -88,6 +88,14 @@ const PT_BR: &[(&str, &str)] = &[
     ("Could not set up", "Não foi possível configurar"),
     ("driver(s)", "driver(s)"),
     ("Use this driver", "Usar este driver"),
+    (
+        "Driver on. Apps that were already open see it once reopened.",
+        "Driver ligado. Os aplicativos que já estavam abertos passam a vê-lo quando forem reabertos.",
+    ),
+    (
+        "Starts every driver again: the apps that were open lose the tokens until they are reopened",
+        "Reinicia todos os drivers: os aplicativos que estavam abertos perdem os tokens até serem reabertos",
+    ),
     ("System connection (the system's p11-kit server)", "Conexão com o sistema (servidor p11-kit do sistema)"),
     ("Could not write the host module files", "Não foi possível gravar os arquivos de módulo do sistema"),
     ("A driver could not be read", "Não foi possível ler um driver"),

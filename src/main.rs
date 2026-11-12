@@ -227,6 +227,11 @@ impl Health {
         self.strikes.clear();
     }
 
+    /// Forget one driver's strikes (it was switched on or off).
+    pub fn forget(&mut self, id: &str) {
+        self.strikes.remove(id);
+    }
+
     /// Listings in a row without an answer from this driver.
     pub fn strikes(&self, id: &str) -> u32 {
         self.strikes.get(id).copied().unwrap_or(0)

@@ -544,8 +544,16 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
                     }
                     st.save();
                 }
-                hub.start_server();
+                let on = sw.is_active();
+                hub.set_driver_enabled(&id, on);
                 if let Some(win) = w.upgrade() {
+                    if on {
+                        // p11-kit reads the list of drivers when an app
+                        // connects: an app already open does not see it.
+                        win.toast(t(
+                            "Driver on. Apps that were already open see it once reopened.",
+                        ));
+                    }
                     win.last.borrow_mut().clear();
                     refresh(&hub, &win);
                 }
@@ -647,6 +655,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     let service_button = gtk::Button::builder()
         .label(t("Start"))
         .valign(gtk::Align::Center)
+        .tooltip_text(t("Starts every driver again: the apps that were open lose the tokens until they are reopened"))
         .build();
     service_row.add_suffix(&service_button);
     service.add(&service_row);

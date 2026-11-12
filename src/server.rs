@@ -298,6 +298,57 @@ impl Server {
         self.settle();
     }
 
+    /// Switch one driver's server on or off, leaving the others' servers
+    /// alone: an app keeps its connection to each server for as long as it
+    /// runs, and p11-kit does not connect again, so stopping every server
+    /// (start) takes every token away from the apps that are open. The
+    /// drivers whose environment depends on this one (`when_on`) are started
+    /// again by settle, and only those.
+    pub fn set_enabled(&mut self, driver: &Driver, on: bool) {
+        if on {
+            if self
+                .instances
+                .iter()
+                .any(|i| i.id == driver.id && i.child.is_some())
+            {
+                return;
+            }
+            self.instances.retain(|i| i.id != driver.id);
+            if !self.drivers.iter().any(|d| d.id == driver.id) {
+                self.drivers.push(driver.clone());
+            }
+            let env = driver.env_with(&self.running());
+            let (child, failure) = match spawn(driver, &env) {
+                Ok(c) => (Some(c), None),
+                Err(e) => (None, Some(format!("{e:#}"))),
+            };
+            self.instances.push(Instance {
+                id: driver.id.clone(),
+                name: driver.name.clone(),
+                child,
+                failure,
+                env,
+            });
+        } else if let Some(pos) = self.instances.iter().position(|i| i.id == driver.id) {
+            let inst = self.instances.remove(pos);
+            if let Some(child) = inst.child {
+                stop_child(child);
+                let _ = fs::remove_file(paths::driver_socket(&inst.id));
+            }
+        }
+        self.settle();
+    }
+
+    /// The process id of a driver's server, if it runs (for tests).
+    #[cfg(test)]
+    fn pid_of(&self, id: &str) -> Option<u32> {
+        self.instances
+            .iter()
+            .find(|i| i.id == id)
+            .and_then(|i| i.child.as_ref())
+            .map(|c| c.id())
+    }
+
     /// The overall state: Running when every driver's server runs.
     pub fn poll(&mut self) -> State {
         let mut exited = false;
@@ -377,5 +428,81 @@ impl Server {
 impl Drop for Server {
     fn drop(&mut self) {
         self.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A driver served by a real p11-kit server, with a module that needs
+    /// no token (p11-kit's trust module).
+    fn driver(id: &str, when_on: &[&str]) -> Driver {
+        Driver {
+            id: id.into(),
+            name: id.into(),
+            vendor: String::new(),
+            description: String::new(),
+            module: PathBuf::from("/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so"),
+            tools: vec![],
+            create_dirs: vec![],
+            library_path: vec![],
+            env: BTreeMap::new(),
+            when_on: when_on
+                .iter()
+                .map(|o| {
+                    (
+                        o.to_string(),
+                        BTreeMap::from([("TESSERA_TEST_WITH".to_string(), o.to_string())]),
+                    )
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn switching_one_driver_leaves_the_others_running() {
+        let module = Path::new("/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so");
+        if !module.is_file() || !paths::p11kit_server_command().is_file() {
+            eprintln!("skipped: no p11-kit server or trust module here");
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("tessera-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::env::set_var("TESSERA_SOCKET_DIR", dir.join("sockets"));
+        std::env::set_var("XDG_DATA_HOME", dir.join("data"));
+
+        // a and b plain; c depends on b (as OpenSC does on SafeNet).
+        let ds = vec![driver("a", &[]), driver("b", &[]), driver("c", &["b"])];
+        let mut srv = Server::new();
+        srv.start(&ds, &[]).unwrap();
+        let (a, c) = (srv.pid_of("a").unwrap(), srv.pid_of("c").unwrap());
+        assert!(srv.pid_of("b").is_some());
+        // An app's connection to a's server, open across the switch.
+        let app = UnixStream::connect(paths::driver_socket("a")).unwrap();
+
+        srv.set_enabled(&ds[1], false);
+        assert_eq!(srv.pid_of("b"), None);
+        assert!(!paths::driver_socket("b").exists());
+        assert_eq!(srv.pid_of("a"), Some(a), "a's server was restarted");
+        assert!(socket_answers(&paths::driver_socket("a")));
+        let c2 = srv.pid_of("c").unwrap();
+        assert_ne!(c2, c, "c depends on b and must start again");
+        assert_eq!(srv.counts(), (2, 2));
+
+        srv.set_enabled(&ds[1], true);
+        assert!(srv.pid_of("b").is_some());
+        assert!(socket_answers(&paths::driver_socket("b")));
+        assert_eq!(srv.pid_of("a"), Some(a), "a's server was restarted");
+        assert_ne!(srv.pid_of("c").unwrap(), c2, "c must start again with b");
+        assert_eq!(srv.counts(), (3, 3));
+        // Switching on a driver that runs changes nothing.
+        let b = srv.pid_of("b");
+        srv.set_enabled(&ds[1], true);
+        assert_eq!(srv.pid_of("b"), b);
+
+        drop(app);
+        srv.stop();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
