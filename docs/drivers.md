@@ -135,7 +135,7 @@ The program name, the command line, the environment, signals, standard input and
 
 ## RemoteID
 
-[RemoteID](https://github.com/LLawli/RemoteID-linux) makes a Certisign RemoteID cloud certificate available on Linux as a token. It is an independent open source project (GPL-3.0), by Leonardo Lucas, not made or endorsed by Certisign. It was the first driver extension on FlatPark, published by its developer through Tessera's extension point ([History](history.md), item 41).
+[RemoteID](https://github.com/LLawli/RemoteID-linux) makes a Certisign RemoteID cloud certificate available on Linux as a token. It is an independent open source project (GPL-3.0), by Leonardo Lucas, made by **reverse engineering** Certisign's service, which offers no Linux program; Certisign neither made nor endorses it, and a change in its service may stop it working without notice. It was the first driver extension on FlatPark, published by its developer through Tessera's extension point ([History](history.md), item 41).
 
 - **Not in this repository.** The extension's manifest, `apply_extra.sh` and `driver.toml` are in FlatPark's registry (`registry/io.github.pedrohqb.Tessera.Driver.RemoteID`), kept by RemoteID's developer, and it installs RemoteID's release build from its GitHub releases, unmodified. This repository's CI does not build it, and problems with it go to [RemoteID's issues](https://github.com/LLawli/RemoteID-linux/issues).
 - **Library and tool:** `extra/lib/libremoteid.so`; the window's **RemoteID** button (`extra/bin/remoteid`) signs in to the account.

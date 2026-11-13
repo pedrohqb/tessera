@@ -19,7 +19,7 @@ Os drivers dos fabricantes são extensões, que você instala conforme o seu tok
 | GD Burti (StarSign) e outros tokens SafeSign, atualmente os mais usados pela advocacia; traz o **Token Administration**, para trocar e desbloquear o PIN | `io.github.pedrohqb.Tessera.Driver.SafeSign` |
 | SafeNet eToken 5100/5110 e cartões IDPrime | `io.github.pedrohqb.Tessera.Driver.SafeNet` |
 | Certificado em nuvem do Serpro, com o aplicativo SerproID | `io.github.pedrohqb.Tessera.Driver.SerproID` |
-| Certificado em nuvem RemoteID, da Certisign (experimental; mantido pelo autor do RemoteID) | `io.github.pedrohqb.Tessera.Driver.RemoteID` |
+| Certificado em nuvem RemoteID, da Certisign (experimental; driver independente, feito por engenharia reversa, sem vínculo com a Certisign; mantido pelo autor do RemoteID) | `io.github.pedrohqb.Tessera.Driver.RemoteID` |
 | Tokens do OpenSC (ePass2003 formatado pelo OpenSC, PIV, YubiKey e outros) | nenhuma: já vem no Tessera |
 
 Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pela distribuição:
@@ -230,7 +230,7 @@ The vendors' drivers are extensions, installed for the token you have (see [Inst
 | GD Burti (StarSign) and other SafeSign tokens, currently the most used by Brazilian lawyers; comes with **Token Administration**, to change and unlock the PIN | `io.github.pedrohqb.Tessera.Driver.SafeSign` |
 | SafeNet eToken 5100/5110 and IDPrime cards | `io.github.pedrohqb.Tessera.Driver.SafeNet` |
 | Serpro's cloud certificate, with the SerproID app | `io.github.pedrohqb.Tessera.Driver.SerproID` |
-| Certisign's RemoteID cloud certificate (experimental; maintained by RemoteID's developer) | `io.github.pedrohqb.Tessera.Driver.RemoteID` |
+| Certisign's RemoteID cloud certificate (experimental; independent driver, made by reverse engineering, not affiliated with Certisign; maintained by RemoteID's developer) | `io.github.pedrohqb.Tessera.Driver.RemoteID` |
 | OpenSC's tokens (ePass2003 formatted by OpenSC, PIV, YubiKey and others) | none: built into Tessera |
 
 The tokens are available to these apps, as Flatpaks or installed from the distribution:

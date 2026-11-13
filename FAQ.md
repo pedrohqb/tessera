@@ -21,6 +21,7 @@
 - [Meu token GD Burti (ou cartão SafeSign) trava ou some.](#meu-token-gd-burti-ou-cartão-safesign-trava-ou-some)
 - [O token aparece duas vezes, ou o navegador pede o PIN duas vezes.](#o-token-aparece-duas-vezes-ou-o-navegador-pede-o-pin-duas-vezes)
 - [Como troco ou desbloqueio o PIN de um token do OpenSC (ePass2003)?](#como-troco-ou-desbloqueio-o-pin-de-um-token-do-opensc-epass2003)
+- [Meu certificado é em nuvem. O Tessera atende?](#meu-certificado-é-em-nuvem-o-tessera-atende)
 
 **Aplicativos**
 - [A linha "Conexão com o sistema" está vermelha.](#a-linha-conexão-com-o-sistema-está-vermelha)
@@ -130,6 +131,17 @@ flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --unblock-pin
 
 O primeiro pede o PIN atual e o novo; o segundo, o PUK e o novo PIN. `opensc pkcs15-tool --list-certificates` lista os certificados, e `opensc opensc-tool --list-readers`, as leitoras. Erre o PIN com cuidado: depois de algumas tentativas o token bloqueia, e sem o PUK só a autoridade certificadora resolve.
 
+#### Meu certificado é em nuvem. O Tessera atende?
+
+Depende de a certificadora oferecer um programa para Linux que se apresente como token (uma biblioteca PKCS#11). Hoje:
+
+- **SerproID (Serpro):** sim, com a extensão SerproID. O Serpro tem o programa para Linux, e o Tessera o carrega como as outras extensões.
+- **RemoteID (Certisign):** sim, com a extensão RemoteID, marcada como **Experimental**. Atenção: **não é da Certisign.** É um projeto independente, de código aberto, feito por **engenharia reversa** do serviço da Certisign, que não tem programa para Linux. A Certisign não o fez nem o apoia, e uma mudança no serviço dela pode fazê-lo parar sem aviso. Problemas com ele vão para o [projeto do RemoteID](https://github.com/LLawli/RemoteID-linux/issues). Veja [Drivers](docs/drivers.md#remoteid) (em inglês).
+- **VIDaaS (Valid) e SafeID (Safeweb):** não. Os programas deles para computador (VIDaaS Connect e SafeID Desktop) existem só para Windows e Mac. No Linux, esses certificados funcionam pelo celular e nos sites que se integram direto com a certificadora.
+- **BirdID (Soluti):** ainda não verificado.
+
+O certificado gratuito que a OAB SP oferece é um A1, um arquivo (`.pfx`), não precisa de token nem do Tessera: cada aplicativo o importa direto.
+
 ### Aplicativos
 
 #### A linha "Conexão com o sistema" está vermelha.
@@ -211,6 +223,7 @@ Abra uma [issue](https://github.com/pedrohqb/tessera/issues/new/choose) com o mo
 - [My GD Burti token (or SafeSign card) hangs or disappears.](#my-gd-burti-token-or-safesign-card-hangs-or-disappears)
 - [The token shows twice, or the browser asks for the PIN twice.](#the-token-shows-twice-or-the-browser-asks-for-the-pin-twice)
 - [How do I change or unblock the PIN of an OpenSC token (ePass2003)?](#how-do-i-change-or-unblock-the-pin-of-an-opensc-token-epass2003)
+- [My certificate is in the cloud. Does Tessera support it?](#my-certificate-is-in-the-cloud-does-tessera-support-it)
 
 **Apps**
 - [The "System connection" row is red.](#the-system-connection-row-is-red)
@@ -319,6 +332,17 @@ flatpak run io.github.pedrohqb.Tessera opensc pkcs15-tool --unblock-pin
 ```
 
 The first asks for the current PIN and the new one; the second, for the PUK and the new PIN. `opensc pkcs15-tool --list-certificates` lists the certificates, and `opensc opensc-tool --list-readers` the readers. Be careful with wrong PINs: after a few tries the token locks, and without the PUK only the certificate authority can help.
+
+#### My certificate is in the cloud. Does Tessera support it?
+
+It depends on whether the certificate authority offers a Linux program that presents it as a token (a PKCS#11 library). Today:
+
+- **SerproID (Serpro):** yes, with the SerproID extension. Serpro has the Linux program, and Tessera loads it like the other extensions.
+- **RemoteID (Certisign):** yes, with the RemoteID extension, marked **Experimental**. Note: **it is not Certisign's.** It is an independent open source project, made by **reverse engineering** Certisign's service, which has no Linux program. Certisign neither made nor endorses it, and a change in its service may stop it working without notice. Problems with it go to the [RemoteID project](https://github.com/LLawli/RemoteID-linux/issues). See [Drivers](docs/drivers.md#remoteid).
+- **VIDaaS (Valid) and SafeID (Safeweb):** no. Their desktop programs (VIDaaS Connect and SafeID Desktop) exist only for Windows and Mac. On Linux, these certificates work from the phone and on websites that integrate directly with the certificate authority.
+- **BirdID (Soluti):** not checked yet.
+
+The free certificate OAB SP (the São Paulo bar) offers is an A1, a file (`.pfx`); it needs no token and no Tessera: each app imports it directly.
 
 ### Apps
 
