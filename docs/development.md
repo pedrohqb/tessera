@@ -14,6 +14,7 @@ src/
   server.rs     one p11-kit-server per driver (process group, PDEATHSIG, restart)
   remote.rs     `tessera remote`: the process that loads the driver on each connection
   stable.rs     stable copy of the mechanism parameters (the SerproID defect)
+  serial.rs     the token serial a driver reports (TESSERA_TOKEN_SERIAL; SerproID's)
   trace.rs      call recorder (TESSERA_REMOTE_TRACE=1)
   status.rs     readers (pcsc), token listing, probe-module, probe-sign
   apps.rs       the Flatpak apps, the tessera-*.module files, overrides
@@ -97,6 +98,7 @@ To remove a test build: `flatpak uninstall --user io.github.pedrohqb.Tessera` (i
 | `TESSERA_CLIENT_MODULE` | `/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-client.so` | the client module that `list-tokens` and `status` load (registration in the NSS databases always uses the default path) |
 | `TESSERA_REMOTE_TRACE` | — | `1`: record the calls to the driver |
 | `TESSERA_REMOTE_LOAD` | `managed` | `raw`: serve the driver's own table |
+| `TESSERA_TOKEN_SERIAL` | `SERPROID` for SerproID, none for the others | in a driver's environment (`[env]` of its `driver.toml`): the serial number its tokens report |
 | `TESSERA_PIN`, `TESSERA_MECH` | — | `probe-sign`: PIN and mechanism filter |
 
 To test outside Flatpak, use a regular user: as root, p11-kit ignores the user configuration (`~/.config/pkcs11/modules`).
@@ -132,6 +134,8 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 1. Update the version in `Cargo.toml` and add the `<release>` entry in the metainfo.
 2. `git tag v0.1.0 && git push origin v0.1.0`.
 3. Continuous integration publishes the release at https://github.com/pedrohqb/tessera/releases.
+
+Do not create the release by hand (`gh release create`, or GitHub's page) before continuous integration does: its last step then fails with "a release with the same tag name already exists", and the release has no files. If that happens, delete the release (the tag stays) and run the failed job again: `gh release delete vX.Y.Z --yes && gh run rerun RUN --failed`.
 
 ## Adding a driver
 

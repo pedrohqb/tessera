@@ -10,7 +10,7 @@ O Tessera é uma central de tokens para Flatpak. Ele faz o token A3 ou o certifi
 
 *Tessera* era, em latim, a pequena peça que identificava quem a portava.
 
-O Tessera já traz o driver **OpenSC**, software livre, para o token ePass2003 (Feitian) e os muitos outros cartões e tokens que o OpenSC atende (PIV e YubiKey, OpenPGP, CardOS, IDPrime, carteiras de identidade de vários países).
+O Tessera já traz o driver **OpenSC**, software livre, para os muitos cartões e tokens que o OpenSC atende (PIV e YubiKey, OpenPGP, CardOS, IDPrime, carteiras de identidade de vários países) e para o token ePass2003 (Feitian) formatado pelo próprio OpenSC. O ePass2003 entregue pelas certificadoras, formatado pelo programa da Feitian para Windows, usa um formato próprio que o OpenSC não lê.
 
 Os drivers dos fabricantes são extensões, que você instala conforme o seu token (veja [Instalação](#3-instalar-o-driver-do-seu-token)):
 
@@ -20,7 +20,7 @@ Os drivers dos fabricantes são extensões, que você instala conforme o seu tok
 | SafeNet eToken 5100/5110 e cartões IDPrime | `io.github.pedrohqb.Tessera.Driver.SafeNet` |
 | Certificado em nuvem do Serpro, com o aplicativo SerproID | `io.github.pedrohqb.Tessera.Driver.SerproID` |
 | Certificado em nuvem RemoteID, da Certisign (experimental; mantido pelo autor do RemoteID) | `io.github.pedrohqb.Tessera.Driver.RemoteID` |
-| ePass2003 e os demais tokens do OpenSC | nenhuma: já vem no Tessera |
+| Tokens do OpenSC (ePass2003 formatado pelo OpenSC, PIV, YubiKey e outros) | nenhuma: já vem no Tessera |
 
 Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pela distribuição:
 
@@ -136,7 +136,7 @@ Instale a extensão do seu token (tabela no início) de um destes jeitos:
 flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
 ```
 
-Na dúvida, abra o Tessera com o token conectado: se faltar o driver, a linha do leitor diz qual instalar, com um botão para a página dele no FlatPark e outro que copia o comando. Depois de instalar, saia do Tessera pelo menu e abra de novo.
+Na dúvida, abra o Tessera com o token conectado: se faltar o driver, a linha do leitor, na página **Início**, diz qual instalar. A página **Drivers** lista em **Disponíveis para instalar** os que ainda não estão instalados (o RemoteID, marcado como **Experimental**), cada um com um botão para a página dele no FlatPark e outro que copia o comando. Depois de instalar, saia do Tessera pelo menu e abra de novo.
 
 #### 4. Instalar os assinadores web (se precisar)
 
@@ -154,9 +154,9 @@ Depois, reinicie o Tessera pelo menu e configure cada navegador (veja [Web PKI e
 
 ### Uso
 
-Abra o **Tessera** pelo menu de aplicativos. Com o token conectado, ele aparece em **Tokens**, com os seus certificados. O certificado SerproID aparece depois de você entrar pelo aplicativo SerproID, no botão da linha do driver.
+Abra o **Tessera** pelo menu de aplicativos. A janela tem quatro páginas, na barra lateral: **Início**, **Drivers**, **Aplicativos** e **Sistema**. No Início, uma linha diz se está tudo funcionando ou o que precisa de atenção, e o token conectado aparece em **Tokens**, com os seus certificados. O certificado SerproID aparece depois de você entrar pelo aplicativo SerproID, no botão da linha dele na página **Drivers**, onde também se liga e desliga cada driver.
 
-A seção **Aplicativos** tem duas abas, **Flatpak** e **Nativos**. Cada aplicativo mostra o que falta e, quando tudo estiver certo, aparece como **Pronto**. Feche o aplicativo antes de configurá-lo.
+A página **Aplicativos** tem duas abas, **Flatpak** e **Nativos**. Cada aplicativo mostra o que falta e, quando tudo estiver certo, aparece como **Pronto**. Feche o aplicativo antes de configurá-lo.
 
 #### Aplicativos em Flatpak
 
@@ -185,7 +185,7 @@ No Fedora e derivados, o próprio sistema já faz isso, e os aplicativos nativos
 
 #### Web PKI e WebSigner
 
-- **Nos navegadores em Flatpak** (Firefox, Chromium, Chrome, Edge e Brave), com as extensões instaladas ([passo 4](#4-instalar-os-assinadores-web-se-precisar)), a seção **Assinadores web** da janela (página Aplicativos, aba Flatpak) mostra, para cada navegador, um comando para rodar uma vez no terminal (botão de copiar). Depois, reinicie o navegador, instale a extensão do plugin na loja do navegador, se ainda não tiver, e marque uma vez, nas configurações do plugin, **"Dispositivos SafeSign AET"** (Web PKI e WebSigner da Softplan, aba "Cripto Dispositivos") ou **"SafeSign"** (WebSigner da Certisign). O passo 1 do navegador, na seção Aplicativos, precisa estar feito. Detalhes em [docs/signers.md](docs/signers.md).
+- **Nos navegadores em Flatpak** (Firefox, Chromium, Chrome, Edge e Brave), com as extensões instaladas ([passo 4](#4-instalar-os-assinadores-web-se-precisar)), a seção **Assinadores web** da janela (página Aplicativos, aba Flatpak) mostra, para cada navegador, um comando para rodar uma vez no terminal (botão de copiar). Depois, reinicie o navegador, instale a extensão do plugin na loja do navegador, se ainda não tiver, e marque uma vez, nas configurações do plugin, **"Dispositivos SafeSign AET"** (Web PKI e WebSigner da Softplan, aba "Cripto Dispositivos") ou **"SafeSign"** (WebSigner da Certisign). O passo 1 do navegador, na mesma página, precisa estar feito. Detalhes em [docs/signers.md](docs/signers.md).
 - **Nos navegadores nativos**, não é preciso nada disso: use os pacotes oficiais ([Web PKI](https://get.webpkiplugin.com/) e [WebSigner](https://websigner.softplan.com.br/)). No plugin, em "Cripto Dispositivos" → "Opções personalizadas", acrescente o caminho do p11-kit da sua distribuição. As chaves "Tokens SafeNet" e "Dispositivos SafeSign AET" podem ficar desligadas.
 
   | Distribuição | Caminho |
@@ -200,7 +200,8 @@ Fechar a janela não desliga o Tessera: ele fica na bandeja. Para dúvidas e pro
 
 ### A fazer
 
-- **Testar com token real** o driver OpenSC (ePass2003) e os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice e Assinador SERPRO (o JSignPdf e o Master PDF Editor já foram testados).
+- **Testar com token real** o driver OpenSC e os aplicativos acrescentados por último: Thunderbird, Evolution, LibreOffice e Assinador SERPRO (o JSignPdf e o Master PDF Editor já foram testados). O primeiro ePass2003 testado, formatado pelo programa da Feitian para Windows, não foi lido pelo OpenSC; falta testar a biblioteca da própria Feitian para Linux.
+- **Testar o RemoteID** com uma conta de verdade.
 - **Testar a extensão SafeNet** com um token de verdade. O driver já funcionou quando vinha embutido no Tessera; falta confirmar o empacotamento como extensão, agora com a versão 10.9.6885, do pacote da GlobalSign (SafeSign e SerproID já foram testados).
 
 ---
@@ -220,7 +221,7 @@ Tessera is a token hub for Flatpak. It makes A3 tokens and cloud certificates wo
 
 *Tessera* was the Latin word for a small token that identified its bearer.
 
-Tessera comes with the **OpenSC** driver, free software, for Feitian's ePass2003 token and the many other cards and tokens OpenSC supports (PIV and YubiKey, OpenPGP, CardOS, IDPrime, national ID cards).
+Tessera comes with the **OpenSC** driver, free software, for the many cards and tokens OpenSC supports (PIV and YubiKey, OpenPGP, CardOS, IDPrime, national ID cards) and for Feitian's ePass2003 token formatted by OpenSC itself. The ePass2003 handed out by Brazilian certificate authorities, formatted by Feitian's Windows software, uses a format of its own that OpenSC does not read.
 
 The vendors' drivers are extensions, installed for the token you have (see [Installation](#3-install-your-tokens-driver)):
 
@@ -230,7 +231,7 @@ The vendors' drivers are extensions, installed for the token you have (see [Inst
 | SafeNet eToken 5100/5110 and IDPrime cards | `io.github.pedrohqb.Tessera.Driver.SafeNet` |
 | Serpro's cloud certificate, with the SerproID app | `io.github.pedrohqb.Tessera.Driver.SerproID` |
 | Certisign's RemoteID cloud certificate (experimental; maintained by RemoteID's developer) | `io.github.pedrohqb.Tessera.Driver.RemoteID` |
-| ePass2003 and the other OpenSC tokens | none: built into Tessera |
+| OpenSC's tokens (ePass2003 formatted by OpenSC, PIV, YubiKey and others) | none: built into Tessera |
 
 The tokens are available to these apps, as Flatpaks or installed from the distribution:
 
@@ -342,7 +343,7 @@ Install your token's extension (table at the top) in one of these ways:
 flatpak --user install flatpark io.github.pedrohqb.Tessera.Driver.SafeSign
 ```
 
-If unsure, open Tessera with the token plugged in: when its driver is missing, the reader's row says which one to install, with a button to its FlatPark page and another that copies the command. After installing, quit Tessera from its menu and open it again.
+If unsure, open Tessera with the token plugged in: when its driver is missing, the reader's row, on the **Home** page, says which one to install. The **Drivers** page lists under **Available to install** the ones not installed yet (RemoteID marked **Experimental**), each with a button to its FlatPark page and another that copies the command. After installing, quit Tessera from its menu and open it again.
 
 #### 4. Install the web signers (if you need them)
 
@@ -358,9 +359,9 @@ Then restart Tessera from its menu and set up each browser (see [Web PKI and Web
 
 ### Usage
 
-Open **Tessera** from the app menu. With the token plugged in, it appears under **Tokens**, with its certificates. The SerproID certificate appears after you sign in through the SerproID app, with the button on the driver's row.
+Open **Tessera** from the app menu. The window has four pages, in the sidebar: **Home**, **Drivers**, **Apps** and **System**. On Home, one line says whether everything works or what needs attention, and the plugged-in token appears under **Tokens**, with its certificates. The SerproID certificate appears after you sign in through the SerproID app, with the button on its row on the **Drivers** page, where each driver is also switched on and off.
 
-The **Apps** section has two tabs, **Flatpak** and **Native**. Each app shows what is missing and, when everything is right, shows as **Ready**. Close an app before setting it up.
+The **Apps** page has two tabs, **Flatpak** and **Native**. Each app shows what is missing and, when everything is right, shows as **Ready**. Close an app before setting it up.
 
 #### Flatpak apps
 
@@ -389,7 +390,7 @@ On Fedora and its derivatives, the system itself already does this, and native a
 
 #### Web PKI and WebSigner
 
-- **In Flatpak browsers** (Firefox, Chromium, Chrome, Edge and Brave), with the extensions installed ([step 4](#4-install-the-web-signers-if-you-need-them)), the window's **Web signers** section (Apps page, Flatpak tab) shows, for each browser, a command to run once in a terminal (copy button). Then restart the browser, install the plugin's extension from the browser's store if it is not there yet and tick once, in the plugin's settings, **"Dispositivos SafeSign AET"** (Web PKI and Softplan's WebSigner, "Cripto Dispositivos" tab) or **"SafeSign"** (Certisign's WebSigner). The browser's step 1, in the Apps section, must be done. Details in [docs/signers.md](docs/signers.md).
+- **In Flatpak browsers** (Firefox, Chromium, Chrome, Edge and Brave), with the extensions installed ([step 4](#4-install-the-web-signers-if-you-need-them)), the window's **Web signers** section (Apps page, Flatpak tab) shows, for each browser, a command to run once in a terminal (copy button). Then restart the browser, install the plugin's extension from the browser's store if it is not there yet and tick once, in the plugin's settings, **"Dispositivos SafeSign AET"** (Web PKI and Softplan's WebSigner, "Cripto Dispositivos" tab) or **"SafeSign"** (Certisign's WebSigner). The browser's step 1, on the same page, must be done. Details in [docs/signers.md](docs/signers.md).
 - **In native browsers**, none of this is needed: use the official packages ([Web PKI](https://get.webpkiplugin.com/) and [WebSigner](https://websigner.softplan.com.br/)). In the plugin, under "Cripto Dispositivos" → "Opções personalizadas", add your distribution's p11-kit path. The "Tokens SafeNet" and "Dispositivos SafeSign AET" switches can stay off.
 
   | Distribution | Path |
@@ -402,7 +403,8 @@ Closing the window does not stop Tessera: it stays in the tray. For questions an
 
 ### To do
 
-- **Test with a real token** the OpenSC driver (ePass2003) and the apps added last: Thunderbird, Evolution, LibreOffice and Assinador SERPRO (JSignPdf and Master PDF Editor have been tested).
+- **Test with a real token** the OpenSC driver and the apps added last: Thunderbird, Evolution, LibreOffice and Assinador SERPRO (JSignPdf and Master PDF Editor have been tested). The first ePass2003 tried, formatted by Feitian's Windows software, was not read by OpenSC; Feitian's own Linux library is still to be tried.
+- **Test RemoteID** with a real account.
 - **Test the SafeNet extension** with a real token. The driver already worked when it was built into Tessera; what is left is confirming its packaging as an extension, now with version 10.9.6885, from GlobalSign's package (SafeSign and SerproID have been tested).
 
 ### Documentation, support and license

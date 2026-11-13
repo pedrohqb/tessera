@@ -49,6 +49,7 @@ The `xdg-run/p11-kit/pkcs11` permission given to an app replaces, for that app o
 - resets all signals to their default behavior and unblocks the mask (`p11-kit-server` ignores some, and ignored signals carry across `exec`);
 - moves the p11-kit channel off standard input and output, which become `/dev/null` and the log, so that a driver that writes to standard output does not corrupt the protocol;
 - wraps the driver's function table to hand it stable copies of the mechanism parameters (see [SerproID](drivers.md#serproid)). This is the fix that made SerproID work through p11-kit;
+- with `TESSERA_TOKEN_SERIAL` in the driver's environment (SerproID's, by default), reports that serial number for its tokens, so apps that tell tokens apart by serial do not take it for p11-kit's trust store (see [SerproID's serial number](drivers.md#its-serial-number));
 - with `TESSERA_REMOTE_TRACE=1`, records each call in the log (see [Troubleshooting](troubleshooting.md)).
 
 Each driver's environment comes from the `[env]` of its `driver.toml` (for example, SerproID's `LD_PRELOAD`), and `LD_LIBRARY_PATH` comes from `library_path`.

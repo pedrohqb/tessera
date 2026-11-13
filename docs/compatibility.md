@@ -57,5 +57,6 @@ To add a line, open an issue with the **Compatibility report** template (or tell
 Not yet confirmed by hand:
 
 - **The apps added in November 2026** (see [Apps](apps.md)): Thunderbird and Evolution, as Flatpaks and native; LibreOffice, as a Flatpak and native; Assinador SERPRO, as a Flatpak. Their set-up is checked by unit tests on a made-up home folder, but they have not been tried with a real token yet (JSignPdf and Master PDF Editor have, above).
-- **The OpenSC driver** (November 2026; see [Drivers](drivers.md#opensc)): built into Tessera, it serves every card OpenSC knows, the ePass2003 among them. Checked without a token (served, listed and published with no reader); not yet tried with a real one.
+- **The OpenSC driver** (November 2026; see [Drivers](drivers.md#opensc)): built into Tessera, it serves every card OpenSC knows, the ePass2003 formatted by OpenSC among them. Checked without a token (served, listed and published with no reader). The one real token tried, an ePass2003 formatted by Feitian's Windows software, was recognized but not read ("PKCS#15 binding failed: Unsupported card"); a token OpenSC can read is still to be tried.
+- **RemoteID** (see [Drivers](drivers.md#remoteid)): listed as experimental; not yet tried with a real account.
 - **Snap** packages (Ubuntu's Firefox and Chromium): not supported.
