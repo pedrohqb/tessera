@@ -16,7 +16,7 @@
 
 **Tokens e drivers**
 - [O PIN é pedido, mas a assinatura falha. Por quê?](#o-pin-é-pedido-mas-a-assinatura-falha-por-quê)
-- [Aparece um aviso no topo da janela dizendo que a assinatura não funciona.](#aparece-um-aviso-no-topo-da-janela-dizendo-que-a-assinatura-não-funciona)
+- [A página Início diz que a assinatura não funciona neste sistema.](#a-página-início-diz-que-a-assinatura-não-funciona-neste-sistema)
 - [O token não aparece no Tessera.](#o-token-não-aparece-no-tessera)
 - [Meu token GD Burti (ou cartão SafeSign) trava ou some.](#meu-token-gd-burti-ou-cartão-safesign-trava-ou-some)
 - [O token aparece duas vezes, ou o navegador pede o PIN duas vezes.](#o-token-aparece-duas-vezes-ou-o-navegador-pede-o-pin-duas-vezes)
@@ -99,17 +99,19 @@ Quase sempre é a versão do p11-kit do sistema. Com a 0.25.5 ou anterior, o Tes
 
 Isso afeta o Debian 12 e 13, o LMDE 6 e 7, o Ubuntu 24.04 e o Linux Mint 22. Na família Debian, a versão aparece em `dpkg -l libp11-kit0`. Nesses sistemas, use o [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br). No MX Linux, o p11-kit do repositório de teste (MX Package Installer → MX Test Repo) resolve.
 
-#### Aparece um aviso no topo da janela dizendo que a assinatura não funciona.
+#### A página Início diz que a assinatura não funciona neste sistema.
 
 O Tessera identificou um p11-kit antigo demais no sistema. Veja a [pergunta sobre a assinatura que falha](#o-pin-é-pedido-mas-a-assinatura-falha-por-quê).
 
 #### O token não aparece no Tessera.
 
-Veja primeiro se o driver dele está instalado: os drivers dos fabricantes são extensões à parte (tabela no [README](README.md)). Com o token conectado, se faltar o driver, a linha do leitor diz qual instalar, com o comando pronto para copiar; depois de instalar, use **Reiniciar o Tessera** no menu. Se o driver já estiver lá, tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**. Confira também se o serviço de cartões está ligado (`sudo systemctl enable --now pcscd.socket`).
+Veja primeiro se o driver dele está instalado: os drivers dos fabricantes são extensões à parte (tabela no [README](README.md)). Com o token conectado, se faltar o driver, a linha do leitor, na página **Início**, diz qual instalar; a página **Drivers** lista em **Disponíveis para instalar** os que faltam, com o botão da loja e o comando pronto para copiar. Depois de instalar, use **Reiniciar o Tessera** no menu. Se o driver já estiver lá, tire e ponha o token. Se um driver aparecer como "Parado", aperte **Reiniciar**. Confira também se o serviço de cartões está ligado (`sudo systemctl enable --now pcscd.socket`).
+
+**ePass2003 entregue por certificadora:** o formatado pelo programa da Feitian para Windows usa um formato próprio, que o OpenSC não lê. A leitora aparece, mas o token não. O OpenSC lê o ePass2003 formatado por ele mesmo. Veja [Drivers](docs/drivers.md#opensc) (em inglês).
 
 #### Meu token GD Burti (ou cartão SafeSign) trava ou some.
 
-O OpenSC não sabe ler o token GD Burti e, quando tenta, o token trava, também para o SafeSign. O OpenSC do Tessera já deixa de lado os tokens GD Burti (os leitores "StarSign"). Se você usa um **cartão** SafeSign numa leitora comum, ou o problema continuar, desligue o OpenSC na lista de drivers da janela e tire e ponha o token. O OpenSC instalado pela distribuição (o Fedora e o Bluefin o trazem) também trava o token; por isso o Tessera o desliga (a chave **Desligar o OpenSC do sistema**, na página Sistema, deve ficar ligada). Os aplicativos que já estavam abertos só deixam de carregá-lo quando são abertos de novo.
+O OpenSC não sabe ler o token GD Burti e, quando tenta, o token trava, também para o SafeSign. O OpenSC do Tessera já deixa de lado os tokens GD Burti (os leitores "StarSign"). Se você usa um **cartão** SafeSign numa leitora comum, ou o problema continuar, desligue o OpenSC na página **Drivers** e tire e ponha o token. O OpenSC instalado pela distribuição (o Fedora e o Bluefin o trazem) também trava o token; por isso o Tessera o desliga (a chave **Desligar o OpenSC do sistema**, na página Sistema, deve ficar ligada). Os aplicativos que já estavam abertos só deixam de carregá-lo quando são abertos de novo.
 
 #### O token aparece duas vezes, ou o navegador pede o PIN duas vezes.
 
@@ -117,7 +119,7 @@ No **Fedora e derivados**, o próprio sistema já carrega o p11-kit nos aplicati
 
 O token também aparece duas vezes quando **dois drivers atendem o mesmo token**, e o Tessera avisa na janela:
 
-- **Dois drivers do Tessera** (o OpenSC e o do fornecedor): desligue um deles na lista de drivers. Com o SafeNet ligado, o OpenSC já deixa para ele os cartões IDPrime e o eToken 5110.
+- **Dois drivers do Tessera** (o OpenSC e o do fornecedor): desligue um deles na página **Drivers**. Com o SafeNet ligado, o OpenSC já deixa para ele os cartões IDPrime e o eToken 5110.
 - **O sistema também tem o OpenSC** (o Fedora e o Bluefin o trazem instalado): o Tessera já o desliga, e não deve haver token em dobro por isso. Se você religou o OpenSC do sistema (a chave **Desligar o OpenSC do sistema**, na página Sistema), o token do OpenSC chega aos aplicativos pelos dois: desligue o OpenSC no Tessera ou ligue a chave de novo.
 
 #### Como troco ou desbloqueio o PIN de um token do OpenSC (ePass2003)?
@@ -216,7 +218,7 @@ Abra uma [issue](https://github.com/pedrohqb/tessera/issues/new/choose) com o mo
 
 **Tokens and drivers**
 - [The PIN is asked, but signing fails. Why?](#the-pin-is-asked-but-signing-fails-why)
-- [A warning at the top of the window says signing does not work.](#a-warning-at-the-top-of-the-window-says-signing-does-not-work)
+- [The Home page says signing does not work on this system.](#the-home-page-says-signing-does-not-work-on-this-system)
 - [The token does not appear in Tessera.](#the-token-does-not-appear-in-tessera)
 - [My GD Burti token (or SafeSign card) hangs or disappears.](#my-gd-burti-token-or-safesign-card-hangs-or-disappears)
 - [The token shows twice, or the browser asks for the PIN twice.](#the-token-shows-twice-or-the-browser-asks-for-the-pin-twice)
@@ -299,17 +301,19 @@ Almost always, it is the system's p11-kit version. With 0.25.5 or older, Tessera
 
 This affects Debian 12 and 13, LMDE 6 and 7, Ubuntu 24.04 and Linux Mint 22. On the Debian family, `dpkg -l libp11-kit0` shows the version. On those systems, use [distrobox-adv-br](https://github.com/pedrohqb/distrobox-adv-br). On MX Linux, the p11-kit from the test repository (MX Package Installer → MX Test Repo) solves it.
 
-#### A warning at the top of the window says signing does not work.
+#### The Home page says signing does not work on this system.
 
 Tessera found a p11-kit too old on the system. See the [question on failing signatures](#the-pin-is-asked-but-signing-fails-why).
 
 #### The token does not appear in Tessera.
 
-First check that its driver is installed: the vendors' drivers are separate extensions (table in the [README](README.md)). With the token plugged in, if its driver is missing, the reader's row says which one to install, with the command ready to copy; after installing, use **Restart Tessera** in the menu. If the driver is there, unplug the token and plug it in again. If a driver shows as "Stopped", press **Restart**. Also check that the smart card service is on (`sudo systemctl enable --now pcscd.socket`).
+First check that its driver is installed: the vendors' drivers are separate extensions (table in the [README](README.md)). With the token plugged in, if its driver is missing, the reader's row, on the **Home** page, says which one to install; the **Drivers** page lists under **Available to install** the ones missing, with the store button and the command ready to copy. After installing, use **Restart Tessera** in the menu. If the driver is there, unplug the token and plug it in again. If a driver shows as "Stopped", press **Restart**. Also check that the smart card service is on (`sudo systemctl enable --now pcscd.socket`).
+
+**ePass2003 from a certificate authority:** one formatted by Feitian's Windows software uses a format of its own, which OpenSC does not read. The reader shows, but the token does not. OpenSC reads the ePass2003 it formats itself. See [Drivers](docs/drivers.md#opensc).
 
 #### My GD Burti token (or SafeSign card) hangs or disappears.
 
-OpenSC cannot read GD Burti tokens, and when it tries, the token hangs, for SafeSign too. Tessera's OpenSC already leaves GD Burti tokens alone (the "StarSign" readers). If you use a SafeSign **card** in an ordinary reader, or the problem persists, switch OpenSC off in the window's list of drivers and unplug the token and plug it in again. An OpenSC installed by the distribution (Fedora and Bluefin ship it) hangs the token too, which is why Tessera switches it off (keep **Switch off the system's OpenSC**, on the System page, on). Apps that were already open stop loading it only once they are opened again.
+OpenSC cannot read GD Burti tokens, and when it tries, the token hangs, for SafeSign too. Tessera's OpenSC already leaves GD Burti tokens alone (the "StarSign" readers). If you use a SafeSign **card** in an ordinary reader, or the problem persists, switch OpenSC off on the **Drivers** page and unplug the token and plug it in again. An OpenSC installed by the distribution (Fedora and Bluefin ship it) hangs the token too, which is why Tessera switches it off (keep **Switch off the system's OpenSC**, on the System page, on). Apps that were already open stop loading it only once they are opened again.
 
 #### The token shows twice, or the browser asks for the PIN twice.
 
@@ -317,7 +321,7 @@ On **Fedora and its derivatives**, the system itself already loads p11-kit in na
 
 A token also shows twice when **two drivers serve it**, and Tessera says so in its window:
 
-- **Two of Tessera's drivers** (OpenSC and the vendor's): switch one off in the list of drivers. While SafeNet is on, OpenSC already leaves IDPrime cards and the eToken 5110 to it.
+- **Two of Tessera's drivers** (OpenSC and the vendor's): switch one off on the **Drivers** page. While SafeNet is on, OpenSC already leaves IDPrime cards and the eToken 5110 to it.
 - **The system has OpenSC too** (Fedora and Bluefin ship it installed): Tessera already switches it off, so it should not show tokens twice. If you turned the system's OpenSC back on (the **Switch off the system's OpenSC** switch, on the System page), OpenSC's token reaches the apps through both: switch OpenSC off in Tessera, or turn the switch back on.
 
 #### How do I change or unblock the PIN of an OpenSC token (ePass2003)?

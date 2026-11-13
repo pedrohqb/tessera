@@ -11,7 +11,7 @@ First of all, the system server must be turned on, once per user: `systemctl --u
 
 ## PJeOffice Pro (FlatPark)
 
-`br.jus.cnj.PJeOfficePro`. **Nothing to do.** The FlatPark package already has `xdg-run/p11-kit/pkcs11` and loads `p11-kit-client.so`. All it needs is the system server turned on. One note: a PJeOffice opened before Tessera does not see the drivers published afterwards; just reopen it. PJeOffice tells tokens apart by serial number, and SerproID's (`1`) is also the trust store's, which the system's server lists first; Tessera gives SerproID a serial of its own, `SERPROID`, from 0.4.2 on ([Drivers](drivers.md#its-serial-number)).
+`br.jus.cnj.PJeOfficePro`. **Nothing to do.** The FlatPark package already has `xdg-run/p11-kit/pkcs11` and loads `p11-kit-client.so`. All it needs is the system server turned on. One note: a PJeOffice opened before Tessera does not see the drivers published afterwards; just reopen it. PJeOffice tells tokens apart by serial number, and SerproID's (`1`) is also the trust store's, which the system's server lists first; Tessera gives SerproID a serial of its own, `SERPROID`, from 0.4.2 on ([Drivers](drivers.md#its-serial-number)), and FlatPark's package also hides the trust store from PJeOffice (its PKCS#11 bridge leaves out the p11-kit-trust slots, which hold no key).
 
 ## Assinador SERPRO (FlatPark)
 

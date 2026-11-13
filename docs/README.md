@@ -1,6 +1,6 @@
 # Tessera documentation
 
-Tessera is a PKCS#11 token hub for Flatpak. It runs the token drivers (OpenSC, built in, and the vendors' SafeSign/GD Burti, SafeNet, SerproID and RemoteID, as extensions) inside its own sandbox and hands the tokens to the other apps through p11-kit, without installing any vendor package on the system. It was made for immutable systems (Bluefin, Aurora, Bazzite, Fedora Silverblue and Kinoite), where installing a vendor's `.deb` or `.rpm` on the system is hard or impossible.
+Tessera is a PKCS#11 token hub for Flatpak. It runs the token drivers (OpenSC, built in, and, as extensions, the vendors' SafeSign/GD Burti, SafeNet and SerproID, and RemoteID, an experimental independent driver made by reverse engineering Certisign's service) inside its own sandbox and hands the tokens to the other apps through p11-kit, without installing any vendor package on the system. It was made for immutable systems (Bluefin, Aurora, Bazzite, Fedora Silverblue and Kinoite), where installing a vendor's `.deb` or `.rpm` on the system is hard or impossible.
 
 This documentation records how Tessera works, why it is the way it is, and everything that was discovered while making it work with real tokens. Installing it is covered in the [README](../README.md#english); the questions users ask most are in the [FAQ](../FAQ.md#english).
 
