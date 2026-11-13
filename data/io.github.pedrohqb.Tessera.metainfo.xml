@@ -32,7 +32,7 @@
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/pedrohqb/tessera/main/data/screenshots/main.png</image>
-      <caption>Readers, tokens, drivers and apps</caption>
+      <caption>Home: a SafeSign token and a SerproID cloud certificate, with their certificates</caption>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>

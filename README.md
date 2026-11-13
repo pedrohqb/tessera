@@ -32,7 +32,7 @@ Os tokens ficam disponíveis para estes aplicativos, em Flatpak ou instalados pe
 | LibreOffice | assinar documentos e PDFs exportados |
 | Thunderbird e Evolution | e-mail assinado e cifrado (S/MIME) |
 
-![O Tessera com o SafeSign e o SerproID](data/screenshots/main.png)
+![O Tessera com um token GD Burti (SafeSign) e o certificado em nuvem SerproID](data/screenshots/main.png)
 
 ---
 
@@ -241,6 +241,8 @@ The tokens are available to these apps, as Flatpaks or installed from the distri
 | Papers, Okular, JSignPdf and Master PDF Editor | signing PDFs and checking signatures |
 | LibreOffice | signing documents and exported PDFs |
 | Thunderbird and Evolution | signed and encrypted e-mail (S/MIME) |
+
+![Tessera with a GD Burti (SafeSign) token and the SerproID cloud certificate](data/screenshots/main.png)
 
 ### Distributions
 
