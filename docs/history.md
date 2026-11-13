@@ -96,6 +96,9 @@ The certificate showed up in Tessera and in Firefox, but login failed: the reque
 59. **RemoteID in the list of drivers to install,** marked **Experimental**, as it is in the window once installed: Certisign's RemoteID cloud certificate, by an independent developer, on FlatPark since item 41 but not yet tested by hand here.
 
 
-## After 0.4.2
+## 0.4.3 (November 13)
+
+The README and the documentation follow the window's pages, with a new screenshot; the ePass2003 test and SerproID's serial are written down; continuous integration tells FlatPark as soon as a release is out ([Development](development.md)).
+
 
 60. **What to do with a copied command.** The copy buttons' notice said "Command copied" and repeated the command; it now says how to run it: open the Terminal, paste with Ctrl+Shift+V (Ctrl+V does not paste there) and press Enter. The button for the module's path, for the apps set up by hand, says "Path copied" and to paste it in the app's settings: it is not a command. Switches or a button that opens the terminal were weighed and left out: changing other apps' permissions, starting the system's services or typing in a terminal would each take a permission to act outside Tessera's sandbox, and the copied command keeps every change outside it visible and in the user's hands.

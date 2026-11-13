@@ -51,6 +51,16 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.3" date="2026-11-13">
+      <description>
+        <p>Clearer instructions when copying a command.</p>
+        <ul>
+          <li>After copying a command, the notice says how to run it: open the Terminal, paste with Ctrl+Shift+V and press Enter.</li>
+          <li>The button that copies the module's path, for apps set up by hand, says to paste it in the app's settings.</li>
+          <li>New releases reach FlatPark within minutes.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.2" date="2026-11-12">
       <description>
         <p>A clearer window, and tokens that stay where the apps can see them.</p>
