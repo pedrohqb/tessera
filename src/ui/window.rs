@@ -341,7 +341,8 @@ fn update_summary(win: &Win) {
     if wrong.is_empty() {
         win.summary_row.set_title(t("Everything works"));
         win.summary_row.set_subtitle(&tokens);
-        win.summary_icon.set_icon_name(Some("object-select-symbolic"));
+        win.summary_icon
+            .set_icon_name(Some("object-select-symbolic"));
         win.summary_row.remove_css_class("warning");
         win.summary_button.set_visible(false);
     } else {
