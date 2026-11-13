@@ -140,8 +140,6 @@ Depende de a certificadora oferecer um programa para Linux que se apresente como
 - **VIDaaS (Valid) e SafeID (Safeweb):** não. Os programas deles para computador (VIDaaS Connect e SafeID Desktop) existem só para Windows e Mac. No Linux, esses certificados funcionam pelo celular e nos sites que se integram direto com a certificadora.
 - **BirdID (Soluti):** ainda não verificado.
 
-O certificado gratuito que a OAB SP oferece é um A1, um arquivo (`.pfx`), não precisa de token nem do Tessera: cada aplicativo o importa direto.
-
 ### Aplicativos
 
 #### A linha "Conexão com o sistema" está vermelha.
@@ -341,8 +339,6 @@ It depends on whether the certificate authority offers a Linux program that pres
 - **RemoteID (Certisign):** yes, with the RemoteID extension, marked **Experimental**. Note: **it is not Certisign's.** It is an independent open source project, made by **reverse engineering** Certisign's service, which has no Linux program. Certisign neither made nor endorses it, and a change in its service may stop it working without notice. Problems with it go to the [RemoteID project](https://github.com/LLawli/RemoteID-linux/issues). See [Drivers](docs/drivers.md#remoteid).
 - **VIDaaS (Valid) and SafeID (Safeweb):** no. Their desktop programs (VIDaaS Connect and SafeID Desktop) exist only for Windows and Mac. On Linux, these certificates work from the phone and on websites that integrate directly with the certificate authority.
 - **BirdID (Soluti):** not checked yet.
-
-The free certificate OAB SP (the São Paulo bar) offers is an A1, a file (`.pfx`); it needs no token and no Tessera: each app imports it directly.
 
 ### Apps
 
