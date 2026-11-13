@@ -6,7 +6,7 @@ use gtk::{gio, glib};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use super::window::{copy_button, plain_row, Win};
+use super::window::{copy_button, copy_path_button, plain_row, Win};
 use crate::apps::{self, ClientApp, Setup};
 use crate::i18n::t;
 use crate::nss;
@@ -450,7 +450,7 @@ pub(super) fn client_row(win: &Rc<Win>, app: &'static ClientApp) -> AppRows {
         // first, and GTK then reads its "&" as markup.
         manual.set_title(t(how));
         if matches!(app.setup, Setup::ByHand | Setup::MasterPdf) {
-            manual.add_suffix(&copy_button(win, paths::CLIENT_MODULE.to_string()));
+            manual.add_suffix(&copy_path_button(win, paths::CLIENT_MODULE.to_string()));
         }
         row.add_row(&manual);
         manual

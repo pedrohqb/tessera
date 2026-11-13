@@ -186,7 +186,31 @@ pub(super) fn store_button_for(win: &Rc<Win>, url: String, tooltip: &str) -> gtk
     b
 }
 
+/// A button that copies a command to run in the terminal. The toast says how
+/// to paste it there: Ctrl+Shift+V, not Ctrl+V, is what stops most people.
+/// (Tessera does not open the terminal itself: that would take a permission
+/// to run commands outside its sandbox.)
 pub(super) fn copy_button_with(win: &Rc<Win>, text: String, tooltip: &str) -> gtk::Button {
+    copy_text_button(
+        win,
+        text,
+        tooltip,
+        t("Command copied. Open the Terminal, paste it with Ctrl+Shift+V and press Enter."),
+    )
+}
+
+/// A button that copies the path of Tessera's module, for the apps set up
+/// by hand: it is pasted in the app's settings, not in a terminal.
+pub(super) fn copy_path_button(win: &Rc<Win>, path: String) -> gtk::Button {
+    copy_text_button(
+        win,
+        path,
+        t("Copy the module's path"),
+        t("Path copied. Paste it in the app's settings with Ctrl+V."),
+    )
+}
+
+fn copy_text_button(win: &Rc<Win>, text: String, tooltip: &str, done: &'static str) -> gtk::Button {
     let b = gtk::Button::builder()
         .icon_name("edit-copy-symbolic")
         .valign(gtk::Align::Center)
@@ -197,7 +221,7 @@ pub(super) fn copy_button_with(win: &Rc<Win>, text: String, tooltip: &str) -> gt
     b.connect_clicked(move |_| {
         if let Some(win) = w.upgrade() {
             win.window.clipboard().set_text(&text);
-            win.toast(&format!("{} — {}", t("Command copied"), text));
+            win.toast(done);
         }
     });
     b
