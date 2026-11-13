@@ -341,7 +341,7 @@ fn update_summary(win: &Win) {
     if wrong.is_empty() {
         win.summary_row.set_title(t("Everything works"));
         win.summary_row.set_subtitle(&tokens);
-        win.summary_icon.set_icon_name(Some("emblem-ok-symbolic"));
+        win.summary_icon.set_icon_name(Some("object-select-symbolic"));
         win.summary_row.remove_css_class("warning");
         win.summary_button.set_visible(false);
     } else {
@@ -831,7 +831,7 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     }
 
     // Home's first row.
-    let summary_icon = gtk::Image::from_icon_name("emblem-ok-symbolic");
+    let summary_icon = gtk::Image::from_icon_name("object-select-symbolic");
     summary_icon.set_pixel_size(32);
     let summary_row = adw::ActionRow::builder()
         .use_markup(false)
