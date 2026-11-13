@@ -1,0 +1,37 @@
+# Tells FlatPark a release is out, so the update reaches its users in
+# minutes rather than at FlatPark's next twice-daily check (06:17 and
+# 18:17 UTC). See https://flatpark.org/docs/developers/publish-action.
+#
+# ci.yml calls it once the release is published (a release made by a
+# workflow's own token starts no `on: release` workflow). It can also be
+# run by hand for a release already out:
+#   gh workflow run flatpark.yml -R pedrohqb/tessera -f tag=v0.4.2
+name: FlatPark
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag (vX.Y.Z), already published
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  notify:
+    name: Notify FlatPark
+    runs-on: ubuntu-latest
+    # A FlatPark hiccup never fails the release; its twice-daily check
+    # still picks the release up.
+    continue-on-error: true
+    steps:
+      - uses: flatpark/publish-action@v1
+        with:
+          app-id: io.github.pedrohqb.Tessera
+          tag: ${{ inputs.tag }}

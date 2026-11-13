@@ -220,3 +220,11 @@ jobs:
         run: gh release create "$GITHUB_REF_NAME" tessera-repo.tar.gz tessera-x86_64.tar.gz --title "$GITHUB_REF_NAME" --generate-notes
     permissions:
       contents: write
+
+  flatpark:
+    name: FlatPark
+    needs: flatpak
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/flatpark.yml
+    with:
+      tag: ${{ github.ref_name }}

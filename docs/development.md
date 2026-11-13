@@ -133,7 +133,7 @@ To test outside Flatpak, use a regular user: as root, p11-kit ignores the user c
 
 1. Update the version in `Cargo.toml` and add the `<release>` entry in the metainfo.
 2. `git tag v0.1.0 && git push origin v0.1.0`.
-3. Continuous integration publishes the release at https://github.com/pedrohqb/tessera/releases.
+3. Continuous integration publishes the release at https://github.com/pedrohqb/tessera/releases, then tells FlatPark (`.github/workflows/flatpark.yml`, FlatPark's publish-action), which publishes the update within minutes instead of at its next twice-daily check (06:17 and 18:17 UTC). For a release already out, the same workflow runs by hand: `gh workflow run flatpark.yml -R pedrohqb/tessera -f tag=vX.Y.Z`.
 
 Do not create the release by hand (`gh release create`, or GitHub's page) before continuous integration does: its last step then fails with "a release with the same tag name already exists", and the release has no files. If that happens, delete the release (the tag stays) and run the failed job again: `gh release delete vX.Y.Z --yes && gh run rerun RUN --failed`.
 
