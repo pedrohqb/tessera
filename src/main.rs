@@ -25,6 +25,7 @@ mod native;
 mod nss;
 mod paths;
 mod remote;
+mod serial;
 mod server;
 mod settings;
 mod signers;
@@ -66,9 +67,14 @@ fn print_status() -> ExitCode {
     }
     for k in catalog::missing(&ds) {
         println!(
-            "  {} [{}] not installed: {}",
+            "  {} [{}]{} not installed: {}",
             k.name,
             k.id,
+            if k.experimental {
+                " (experimental)"
+            } else {
+                ""
+            },
             catalog::install_command(k)
         );
     }

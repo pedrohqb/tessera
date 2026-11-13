@@ -23,6 +23,8 @@ pub struct Known {
     reader_words: &'static [&'static str],
     /// Byte runs of an ATR that mean this driver's cards.
     atr_bytes: &'static [&'static [u8]],
+    /// Still being tried out: the window marks it "Experimental".
+    pub experimental: bool,
 }
 
 pub const KNOWN: &[Known] = &[
@@ -36,6 +38,7 @@ pub const KNOWN: &[Known] = &[
         // "SCE6"/"SCE7": G&D Sm@rtCafé Expert 6 and 7, the StarSign tokens'
         // chips; "sfte": SafeSign's own applet.
         atr_bytes: &[b"SCE6", b"SCE7", b"sfte"],
+        experimental: false,
     },
     Known {
         id: "safenet",
@@ -50,6 +53,7 @@ pub const KNOWN: &[Known] = &[
             &[0x80, 0x31, 0x80, 0x65, 0xB0],
             &[0x80, 0x73, 0xC8, 0x21, 0x10],
         ],
+        experimental: false,
     },
     Known {
         id: "serproid",
@@ -59,8 +63,27 @@ pub const KNOWN: &[Known] = &[
         extension: "io.github.pedrohqb.Tessera.Driver.SerproID",
         reader_words: &[],
         atr_bytes: &[],
+        experimental: false,
+    },
+    // An independent driver (GPL-3.0, github.com/LLawli/RemoteID-linux),
+    // not Certisign's own, packaged on FlatPark by its developer (see
+    // docs/drivers.md).
+    Known {
+        id: "remoteid",
+        name: "RemoteID",
+        vendor: "Certisign",
+        tokens: "Certisign's cloud certificate, independent driver (no token to connect)",
+        extension: "io.github.pedrohqb.Tessera.Driver.RemoteID",
+        reader_words: &[],
+        atr_bytes: &[],
+        experimental: true,
     },
 ];
+
+/// The known driver with this id, installed or not.
+pub fn known(id: &str) -> Option<&'static Known> {
+    KNOWN.iter().find(|k| k.id == id)
+}
 
 /// The known drivers that are not installed.
 pub fn missing(installed: &[Driver]) -> Vec<&'static Known> {
@@ -184,6 +207,16 @@ mod tests {
             Some(false)
         );
         assert_eq!(installation_of("/opt/flatpak/app/x/files", home), None);
+    }
+
+    #[test]
+    fn remoteid_is_listed_as_experimental() {
+        let k = known("remoteid").unwrap();
+        assert!(k.experimental);
+        assert_eq!(k.extension, "io.github.pedrohqb.Tessera.Driver.RemoteID");
+        assert!(KNOWN.iter().filter(|k| k.experimental).count() == 1);
+        // A cloud certificate: no reader means it.
+        assert_eq!(for_reader("RemoteID", &[]).map(|k| k.id), None);
     }
 
     #[test]

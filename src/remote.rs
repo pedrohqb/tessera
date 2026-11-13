@@ -16,6 +16,9 @@
 //! The driver always gets mechanism parameters that stay valid after the
 //! *Init call that passed them (see stable.rs): SerproID needs that.
 //!
+//! With TESSERA_TOKEN_SERIAL set, the driver's tokens report that serial
+//! number (see serial.rs).
+//!
 //! TESSERA_REMOTE_LOAD=raw serves the driver's own function list (dlopen +
 //! C_GetFunctionList) instead of p11-kit's managed wrapper around it.
 
@@ -117,7 +120,8 @@ pub fn run(args: &[String]) -> i32 {
     //   signature and fills `list`; `driver` keeps the library loaded until
     //   serving ends.
     // - `module` is a CK_FUNCTION_LIST returned by the driver or by p11-kit,
-    //   checked for null; stable::wrap and trace::wrap copy it (see theirs).
+    //   checked for null; stable::wrap, serial::wrap and trace::wrap copy it
+    //   (see theirs), each once.
     // - c_provider, c_tokens and ptrs are alive through the calls that use
     //   their pointers.
     unsafe {
@@ -180,6 +184,14 @@ pub fn run(args: &[String]) -> i32 {
         // Always: the driver gets mechanism parameters that stay valid
         // after the *Init call (see stable.rs).
         let served = crate::stable::wrap(module);
+        // A serial of its own for the driver's tokens (see serial.rs).
+        let served = match std::env::var("TESSERA_TOKEN_SERIAL")
+            .ok()
+            .and_then(|s| crate::serial::field(&s))
+        {
+            Some(serial) => crate::serial::wrap(served, serial),
+            None => served,
+        };
         let served = if std::env::var("TESSERA_REMOTE_TRACE").as_deref() == Ok("1") {
             crate::trace::wrap(served)
         } else {

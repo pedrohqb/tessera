@@ -575,6 +575,9 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
             subtitle.push_str(&d.description);
         }
         let row = plain_row(&d.name, &subtitle, "application-x-addon-symbolic");
+        if catalog::known(&d.id).is_some_and(|k| k.experimental) {
+            row.add_suffix(&experimental_tag());
+        }
         if !d.available() {
             let missing = format!("{}: {}", t("Driver files missing"), d.module.display());
             row.set_subtitle(&if subtitle.is_empty() {
@@ -665,6 +668,9 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
             t("Install it from the app store (an add-on on Tessera's page) or FlatPark's page (button), or with the command (copy button); then restart Tessera (menu)"),
             catalog::install_command(k)
         )));
+        if k.experimental {
+            row.add_suffix(&experimental_tag());
+        }
         row.add_suffix(&store_button(win, k));
         row.add_suffix(&copy_command_button(win, catalog::install_command(k)));
         win.available.add(&row);
@@ -677,6 +683,16 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
         .set_visible(!win.drivers.rows.borrow().is_empty());
     drop(ds);
     update_drivers(hub, win);
+}
+
+/// The mark of a driver still being tried out (catalog::Known::experimental).
+fn experimental_tag() -> gtk::Label {
+    gtk::Label::builder()
+        .label(t("Experimental"))
+        .css_classes(["caption-heading", "warning"])
+        .valign(gtk::Align::Center)
+        .tooltip_text(t("Still being tried out: it may not work with every site or app. Problems go to its developer."))
+        .build()
 }
 
 /// The system's own OpenSC: off by default (see apps::set_host_opensc_off),

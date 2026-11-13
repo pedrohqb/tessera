@@ -124,6 +124,17 @@ fn env_map(dir: &Path, env: BTreeMap<String, String>) -> BTreeMap<String, String
         .collect()
 }
 
+/// What Tessera adds to a driver's `env` when its driver.toml doesn't set
+/// it. SerproID's tokens report serial "1", like the system's trust store,
+/// so apps that tell tokens apart by serial lose them (see serial.rs).
+fn with_defaults(id: &str, mut env: BTreeMap<String, String>) -> BTreeMap<String, String> {
+    if id == "serproid" {
+        env.entry("TESSERA_TOKEN_SERIAL".into())
+            .or_insert_with(|| "SERPROID".into());
+    }
+    env
+}
+
 /// A path in driver.toml: absolute, or relative to the driver's directory
 /// (`..` taken out, so OpenSC's module, built into Tessera, reads as
 /// /app/lib/opensc-pkcs11.so).
@@ -168,6 +179,7 @@ fn load_one(dir: &Path) -> Result<Driver> {
             t
         })
         .collect();
+    let env = with_defaults(&id, env_map(dir, d.env));
     Ok(Driver {
         id,
         name: d.name,
@@ -177,7 +189,7 @@ fn load_one(dir: &Path) -> Result<Driver> {
         tools,
         create_dirs: d.create_dirs,
         library_path: d.library_path.iter().map(|p| resolve(dir, p)).collect(),
-        env: env_map(dir, d.env),
+        env,
         when_on: d
             .when_on
             .into_iter()
@@ -231,6 +243,38 @@ pub fn prepare_dirs(drivers: &[Driver]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn serproid_gets_a_serial_of_its_own() {
+        let tmp = std::env::temp_dir().join(format!("tessera-test-serial-{}", std::process::id()));
+        for (name, extra) in [("SerproID", ""), ("Other", ""), ("SERPROIDx", "")] {
+            let dir = tmp.join(name);
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(
+                dir.join("driver.toml"),
+                format!("name = \"{name}\"\nmodule = \"x.so\"\n{extra}"),
+            )
+            .unwrap();
+        }
+        let serial = |n: &str| {
+            load_one(&tmp.join(n))
+                .unwrap()
+                .env
+                .get("TESSERA_TOKEN_SERIAL")
+                .cloned()
+        };
+        assert_eq!(serial("SerproID").as_deref(), Some("SERPROID"));
+        assert_eq!(serial("Other"), None);
+        assert_eq!(serial("SERPROIDx"), None);
+        // The driver.toml has the last word.
+        fs::write(
+            tmp.join("SerproID/driver.toml"),
+            "name = \"S\"\nmodule = \"x.so\"\n[env]\nTESSERA_TOKEN_SERIAL = \"\"\n",
+        )
+        .unwrap();
+        assert_eq!(serial("SerproID").as_deref(), Some(""));
+        let _ = fs::remove_dir_all(&tmp);
+    }
 
     #[test]
     fn parses_and_resolves_relative_paths() {
