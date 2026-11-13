@@ -3,7 +3,7 @@
 
 use adw::prelude::*;
 use gtk::{gio, glib};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::process::Command;
 use std::rc::Rc;
 
@@ -65,7 +65,25 @@ pub(super) struct Win {
     pub(super) native_rows: RefCell<Vec<NativeRows>>,
     pub(super) signer_rows: RefCell<Vec<BrowserRows>>,
     pub(super) last: RefCell<String>,
-    pub(super) old_p11kit: adw::Banner,
+    pub(super) old_p11kit: adw::ActionRow,
+    /// The drivers not installed (Drivers page).
+    pub(super) available: Section,
+    /// Home's first row: everything works, or what needs attention.
+    pub(super) summary_row: adw::ActionRow,
+    summary_icon: gtk::Image,
+    summary_button: gtk::Button,
+    /// The sidebar: the tokens found (Home) and a warning on System.
+    token_badge: gtk::Label,
+    system_alert: gtk::Image,
+    split: adw::NavigationSplitView,
+    content_page: adw::NavigationPage,
+    sidebar: gtk::ListBox,
+    stack: gtk::Stack,
+    /// What needs attention, from update_service and apply_snapshot.
+    service_bad: Cell<bool>,
+    host_bad: Cell<bool>,
+    pcsc_bad: Cell<bool>,
+    tokens_found: Cell<usize>,
 }
 
 impl Win {
@@ -185,22 +203,30 @@ pub(super) fn copy_button_with(win: &Rc<Win>, text: String, tooltip: &str) -> gt
     b
 }
 
-/// On systems whose p11-kit is too old for signing (native.rs), a banner
-/// that says so, with a button to the README's list of distributions. It is
-/// shown or hidden again in update_service, once the system's server has
-/// told its protocol version.
-fn old_p11kit_banner() -> adw::Banner {
-    let banner = adw::Banner::new(t(
-        "On this system signing does not work (old p11-kit); see the project's documentation",
-    ));
-    banner.set_button_label(Some(t("Documentation")));
-    banner.set_revealed(crate::native::host_has_old_p11kit(None));
-    banner
+/// On systems whose p11-kit is too old for signing (native.rs), a row on
+/// Home that says so, with a button to the README's list of distributions.
+/// It is shown or hidden again in update_service, once the system's server
+/// has told its protocol version. (A banner over the window does not wrap
+/// its text, and made the window as wide as the sentence.)
+fn old_p11kit_banner() -> adw::ActionRow {
+    let row = plain_row(
+        t("On this system signing does not work (old p11-kit); see the project's documentation"),
+        "",
+        "dialog-error-symbolic",
+    );
+    row.add_css_class("error");
+    row.set_visible(crate::native::host_has_old_p11kit(None));
+    row
 }
 
 fn connect_old_p11kit_banner(win: &Rc<Win>) {
+    let b = gtk::Button::builder()
+        .label(t("Documentation"))
+        .valign(gtk::Align::Center)
+        .build();
+    win.old_p11kit.add_suffix(&b);
     let w = Rc::downgrade(win);
-    win.old_p11kit.connect_button_clicked(move |_| {
+    b.connect_clicked(move |_| {
         let parent = w.upgrade().map(|win| win.window.clone());
         gtk::UriLauncher::new(t("https://github.com/pedrohqb/tessera#distributions")).launch(
             parent.as_ref(),
@@ -232,8 +258,9 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
     };
     win.service_row.set_subtitle(&subtitle);
     win.old_p11kit
-        .set_revealed(crate::native::host_has_old_p11kit(hub.host_protocol.get()));
+        .set_visible(crate::native::host_has_old_p11kit(hub.host_protocol.get()));
     win.service_button.set_label(button);
+    win.service_bad.set(!matches!(state, State::Running));
     if warn {
         win.service_row.add_css_class("error");
     } else {
@@ -254,7 +281,7 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
                 "{} · {n} {} · {}: {}",
                 t("On"),
                 t("token(s) of Tessera seen by the apps"),
-                t("these show twice to the apps, because the system has a driver of its own for them too (its OpenSC, for example); switch off Tessera's driver for them below, or remove the system's"),
+                t("these show twice to the apps, because the system has a driver of its own for them too (its OpenSC, for example); switch off Tessera's driver for them on the Drivers page, or remove the system's"),
                 twice
                     .iter()
                     .map(|(label, _)| label.as_str())
@@ -280,10 +307,51 @@ pub(super) fn update_service(hub: &Hub, win: &Win) {
         (Ok(_), None) => (off, true),
     };
     win.host_row.set_subtitle(&text);
+    win.host_bad.set(bad);
     if bad {
         win.host_row.add_css_class("error");
     } else {
         win.host_row.remove_css_class("error");
+    }
+    update_summary(win);
+}
+
+/// Home's first row and the sidebar's marks: everything works, or which
+/// parts of the System page need attention.
+fn update_summary(win: &Win) {
+    let mut wrong = Vec::new();
+    if win.service_bad.get() {
+        wrong.push(t("Token service"));
+    }
+    if win.host_bad.get() {
+        wrong.push(t("System connection"));
+    }
+    if win.pcsc_bad.get() {
+        wrong.push(t("Smart card service (pcscd)"));
+    }
+    let n = win.tokens_found.get();
+    win.token_badge.set_label(&n.to_string());
+    win.token_badge.set_visible(n > 0);
+    win.system_alert.set_visible(!wrong.is_empty());
+    let tokens = match n {
+        0 => t("No token connected").to_string(),
+        1 => format!("1 {}", t("token found")),
+        n => format!("{n} {}", t("tokens found")),
+    };
+    if wrong.is_empty() {
+        win.summary_row.set_title(t("Everything works"));
+        win.summary_row.set_subtitle(&tokens);
+        win.summary_icon.set_icon_name(Some("emblem-ok-symbolic"));
+        win.summary_row.remove_css_class("warning");
+        win.summary_button.set_visible(false);
+    } else {
+        win.summary_row.set_title(t("Needs attention"));
+        win.summary_row
+            .set_subtitle(&format!("{} · {tokens}", wrong.join(" · ")));
+        win.summary_icon
+            .set_icon_name(Some("dialog-warning-symbolic"));
+        win.summary_row.add_css_class("warning");
+        win.summary_button.set_visible(true);
     }
 }
 
@@ -302,6 +370,7 @@ pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]
                 t("Not reachable: is pcscd installed and running on the system?")
             ));
             win.pcsc_row.add_css_class("error");
+            win.pcsc_bad.set(true);
             win.readers.add(&status_page_row(
                 t("No reader found"),
                 t("Not reachable: is pcscd installed and running on the system?"),
@@ -310,6 +379,7 @@ pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]
         Readers::Ok(list) => {
             win.pcsc_row.set_subtitle(t("Reachable"));
             win.pcsc_row.remove_css_class("error");
+            win.pcsc_bad.set(false);
             if list.is_empty() {
                 win.readers.add(&status_page_row(
                     t("No reader found"),
@@ -355,7 +425,7 @@ pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]
             t("The same token comes from two drivers"),
             &format!(
                 "{token}: {a} · {b}. {}",
-                t("The apps would list it twice: switch one of the two drivers off below")
+                t("The apps would list it twice: switch one of the two drivers off on the Drivers page")
             ),
         );
         row.add_css_class("warning");
@@ -367,10 +437,12 @@ pub(super) fn apply_snapshot(win: &Rc<Win>, snap: Snapshot, installed: &[String]
         win.tokens.add(&row);
     }
     super::app_rows::set_token_choices(win, &snap.tokens);
+    win.tokens_found.set(snap.tokens.len());
+    update_summary(win);
     match snap.tokens {
         tokens if tokens.is_empty() => win.tokens.add(&status_page_row(
             t("No token found"),
-            t("Insert a token, or install the driver for it below."),
+            t("Insert a token, or install the driver for it on the Drivers page."),
         )),
         tokens => {
             for tok in tokens {
@@ -477,6 +549,7 @@ pub(super) fn update_drivers(hub: &Hub, win: &Win) {
 
 pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     win.drivers.clear();
+    win.available.clear();
     win.driver_rows.borrow_mut().clear();
     let ds = hub.drivers.borrow();
     for d in ds.iter() {
@@ -572,21 +645,24 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
     for k in catalog::missing(&ds) {
         let row = plain_row(
             k.name,
-            &format!(
-                "{} · {} · {}\n{}",
-                t("Not installed"),
-                k.vendor,
-                t(k.tokens),
-                t("Install it from the app store (an add-on on Tessera's page) or FlatPark's page (button), or with the command (copy button); then restart Tessera (menu)")
-            ),
+            &format!("{} · {}", k.vendor, t(k.tokens)),
             "application-x-addon-symbolic",
         );
-        row.add_css_class("dim-label");
-        row.set_tooltip_text(Some(&catalog::install_command(k)));
+        row.set_tooltip_text(Some(&format!(
+            "{}\n{}",
+            t("Install it from the app store (an add-on on Tessera's page) or FlatPark's page (button), or with the command (copy button); then restart Tessera (menu)"),
+            catalog::install_command(k)
+        )));
         row.add_suffix(&store_button(win, k));
         row.add_suffix(&copy_command_button(win, catalog::install_command(k)));
-        win.drivers.add(&row);
+        win.available.add(&row);
     }
+    win.available
+        .group
+        .set_visible(!win.available.rows.borrow().is_empty());
+    win.drivers
+        .group
+        .set_visible(!win.drivers.rows.borrow().is_empty());
     drop(ds);
     update_drivers(hub, win);
 }
@@ -596,9 +672,10 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
 fn system_opensc_row(hub: &Rc<Hub>) -> adw::ActionRow {
     let row = plain_row(
         t("Switch off the system's OpenSC"),
-        t("Recommended. If the system has OpenSC of its own, it hangs some tokens (GD Burti) and shows the others twice; Tessera's OpenSC serves the same cards. Stays off with Tessera closed. Restart the apps that were open."),
+        t("Recommended: it hangs some tokens (GD Burti) and shows others twice"),
         "action-unavailable-symbolic",
     );
+    row.set_tooltip_text(Some(t("Recommended. If the system has OpenSC of its own, it hangs some tokens (GD Burti) and shows the others twice; Tessera's OpenSC serves the same cards. Stays off with Tessera closed. Restart the apps that were open.")));
     let switch = gtk::Switch::builder()
         .active(!hub.settings.borrow().system_opensc_on)
         .valign(gtk::Align::Center)
@@ -624,32 +701,93 @@ fn system_opensc_row(hub: &Rc<Hub>) -> adw::ActionRow {
     row
 }
 
+/// A page of the window: its groups in a column that grows to 900 px (an
+/// AdwPreferencesPage stops at 600, which left most of a maximized window
+/// empty).
+fn page_column() -> (gtk::ScrolledWindow, gtk::Box) {
+    let column = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(24)
+        .margin_top(24)
+        .margin_bottom(24)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+    let clamp = adw::Clamp::builder()
+        .maximum_size(960)
+        .tightening_threshold(700)
+        .child(&column)
+        .build();
+    let scroll = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .child(&clamp)
+        .build();
+    (scroll, column)
+}
+
+/// One entry of the sidebar: an icon, the page's name and, at the end,
+/// a mark (the tokens found, a warning).
+fn sidebar_row(name: &str, icon: &str, mark: Option<&gtk::Widget>) -> gtk::ListBoxRow {
+    let line = gtk::Box::builder()
+        .spacing(12)
+        .margin_top(6)
+        .margin_bottom(6)
+        .margin_start(6)
+        .margin_end(6)
+        .build();
+    line.append(&gtk::Image::from_icon_name(icon));
+    line.append(
+        &gtk::Label::builder()
+            .label(name)
+            .xalign(0.0)
+            .hexpand(true)
+            .build(),
+    );
+    if let Some(m) = mark {
+        line.append(m);
+    }
+    let row = gtk::ListBoxRow::builder().child(&line).build();
+    row.set_widget_name(name);
+    row
+}
+
+/// The pages, in the sidebar's order: (stack name, title, icon).
+const PAGES: [(&str, &str, &str); 4] = [
+    ("home", "Home", "go-home-symbolic"),
+    ("drivers", "Drivers", "application-x-addon-symbolic"),
+    ("apps", "Apps", "view-app-grid-symbolic"),
+    ("system", "System", "emblem-system-symbolic"),
+];
+
+/// Show a page: the stack, the content's title and the sidebar's choice.
+pub(super) fn show_page(win: &Win, name: &str) {
+    let Some(i) = PAGES.iter().position(|(n, _, _)| *n == name) else {
+        return;
+    };
+    win.stack.set_visible_child_name(name);
+    win.content_page.set_title(t(PAGES[i].1));
+    if let Some(row) = win.sidebar.row_at_index(i as i32) {
+        if win.sidebar.selected_row().as_ref() != Some(&row) {
+            win.sidebar.select_row(Some(&row));
+        }
+    }
+    win.split.set_show_content(true);
+}
+
 pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     add_host_icons();
-    let header = adw::HeaderBar::new();
     let menu = gio::Menu::new();
-    menu.append(
-        Some(t("Start automatically at login")),
-        Some("app.autostart"),
-    );
-    menu.append(Some(t("Show an icon in the tray")), Some("app.tray"));
     menu.append(Some(t("Restart Tessera")), Some("app.restart"));
     menu.append(Some(t("About Tessera")), Some("app.about"));
     menu.append(Some(t("Quit")), Some("app.quit"));
-    header.pack_end(
-        &gtk::MenuButton::builder()
-            .icon_name("open-menu-symbolic")
-            .menu_model(&menu)
-            .build(),
-    );
     let refresh_button = gtk::Button::builder()
         .icon_name("view-refresh-symbolic")
         .tooltip_text(t("Refresh"))
         .build();
-    header.pack_start(&refresh_button);
 
-    let page = adw::PreferencesPage::new();
-
+    // System: the service, what connects Tessera to the apps, and how it
+    // starts.
     let service = adw::PreferencesGroup::builder().title(t("Service")).build();
     let service_row = plain_row(t("Token service"), "", "emblem-system-symbolic");
     let service_button = gtk::Button::builder()
@@ -669,15 +807,91 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
     let pcsc_row = plain_row(t("Smart card service (pcscd)"), "", "computer-symbolic");
     service.add(&pcsc_row);
     service.add(&system_opensc_row(hub));
-    page.add(&service);
+    let startup = adw::PreferencesGroup::builder().title(t("Startup")).build();
+    for (title, action, icon) in [
+        (
+            t("Start automatically at login"),
+            "app.autostart",
+            "system-run-symbolic",
+        ),
+        (
+            t("Show an icon in the tray"),
+            "app.tray",
+            "view-reveal-symbolic",
+        ),
+    ] {
+        let row = plain_row(title, "", icon);
+        let switch = gtk::Switch::builder()
+            .valign(gtk::Align::Center)
+            .action_name(action)
+            .build();
+        row.add_suffix(&switch);
+        row.set_activatable_widget(Some(&switch));
+        startup.add(&row);
+    }
+
+    // Home's first row.
+    let summary_icon = gtk::Image::from_icon_name("emblem-ok-symbolic");
+    summary_icon.set_pixel_size(32);
+    let summary_row = adw::ActionRow::builder()
+        .use_markup(false)
+        .title(t("Checking…"))
+        .build();
+    summary_row.add_prefix(&summary_icon);
+    let summary_button = gtk::Button::builder()
+        .label(t("See"))
+        .valign(gtk::Align::Center)
+        .tooltip_text(t("Open the System page"))
+        .visible(false)
+        .build();
+    summary_row.add_suffix(&summary_button);
+
+    // The sidebar.
+    let token_badge = gtk::Label::builder()
+        .css_classes(["dim-label", "numeric"])
+        .visible(false)
+        .build();
+    let system_alert = gtk::Image::builder()
+        .icon_name("dialog-warning-symbolic")
+        .css_classes(["warning"])
+        .visible(false)
+        .build();
+    let sidebar = gtk::ListBox::builder()
+        .css_classes(["navigation-sidebar"])
+        .build();
+    for (name, title, icon) in PAGES {
+        let mark: Option<gtk::Widget> = match name {
+            "home" => Some(token_badge.clone().upcast()),
+            "system" => Some(system_alert.clone().upcast()),
+            _ => None,
+        };
+        sidebar.append(&sidebar_row(t(title), icon, mark.as_ref()));
+    }
+    let stack = gtk::Stack::builder()
+        .transition_type(gtk::StackTransitionType::Crossfade)
+        .hhomogeneous(false)
+        .vhomogeneous(false)
+        .build();
+
+    let window = adw::ApplicationWindow::builder()
+        .application(app)
+        .title(t("Tessera"))
+        .default_width(980)
+        .default_height(760)
+        .width_request(360)
+        .height_request(400)
+        .build();
+    let content_page = adw::NavigationPage::builder()
+        .title(t("Home"))
+        .tag("content")
+        .build();
+    let split = adw::NavigationSplitView::builder()
+        .min_sidebar_width(200.0)
+        .max_sidebar_width(260.0)
+        .build();
 
     let win = Rc::new(Win {
-        window: adw::ApplicationWindow::builder()
-            .application(app)
-            .title(t("Tessera"))
-            .default_width(620)
-            .default_height(780)
-            .build(),
+        window,
         toasts: adw::ToastOverlay::new(),
         service_row,
         service_button,
@@ -685,22 +899,56 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         pcsc_row,
         readers: Section::new(t("Readers"), None),
         tokens: Section::new(t("Tokens"), None),
-        drivers: Section::new(t("Drivers"), None),
+        drivers: Section::new(t("Installed"), None),
         driver_rows: RefCell::new(vec![]),
         app_rows: RefCell::new(vec![]),
         native_rows: RefCell::new(vec![]),
         signer_rows: RefCell::new(vec![]),
         last: RefCell::new(String::new()),
         old_p11kit: old_p11kit_banner(),
+        available: Section::new(
+            t("Available to install"),
+            Some(t(
+                "Vendors' drivers, as add-ons of Tessera: install the one for your token.",
+            )),
+        ),
+        summary_row,
+        summary_icon,
+        summary_button,
+        token_badge,
+        system_alert,
+        split,
+        content_page,
+        sidebar,
+        stack,
+        service_bad: Cell::new(false),
+        host_bad: Cell::new(false),
+        pcsc_bad: Cell::new(false),
+        tokens_found: Cell::new(0),
     });
     connect_old_p11kit_banner(&win);
     win.host_row
         .add_suffix(&copy_button(&win, apps::host_server_command().to_string()));
-    page.add(&win.readers.group);
-    page.add(&win.tokens.group);
-    page.add(&win.drivers.group);
-    let (apps, apps_stack) = apps_group(&win);
-    page.add(&apps);
+
+    // The pages.
+    let (home, column) = page_column();
+    let summary = adw::PreferencesGroup::new();
+    summary.add(&win.summary_row);
+    summary.add(&win.old_p11kit);
+    column.append(&summary);
+    column.append(&win.tokens.group);
+    column.append(&win.readers.group);
+    win.stack.add_named(&home, Some("home"));
+
+    let (drivers_page, column) = page_column();
+    column.append(&win.drivers.group);
+    column.append(&win.available.group);
+    win.stack.add_named(&drivers_page, Some("drivers"));
+
+    let (apps_page, column) = page_column();
+    let (apps, apps_stack, switcher) = apps_group(&win);
+    column.append(&switcher);
+    column.append(&apps);
     // The web signers run in Flatpak browsers only: shown with the Flatpak
     // tab, hidden with the native one (native browsers use the vendors'
     // own packages).
@@ -710,14 +958,91 @@ pub(super) fn build_window(app: &adw::Application, hub: &Rc<Hub>) -> Rc<Win> {
         .transform_to(|_, name: Option<String>| Some(name.as_deref() == Some("flatpak")))
         .sync_create()
         .build();
-    page.add(&signers);
+    column.append(&signers);
+    win.stack.add_named(&apps_page, Some("apps"));
 
+    let (system_page, column) = page_column();
+    column.append(&service);
+    column.append(&startup);
+    win.stack.add_named(&system_page, Some("system"));
+
+    // The sidebar's page, with the app's menu.
+    let sidebar_header = adw::HeaderBar::new();
+    sidebar_header.pack_end(
+        &gtk::MenuButton::builder()
+            .icon_name("open-menu-symbolic")
+            .menu_model(&menu)
+            .primary(true)
+            .tooltip_text(t("Menu"))
+            .build(),
+    );
+    let sidebar_view = adw::ToolbarView::new();
+    sidebar_view.add_top_bar(&sidebar_header);
+    sidebar_view.set_content(Some(
+        &gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .child(&win.sidebar)
+            .build(),
+    ));
+    win.split.set_sidebar(Some(
+        &adw::NavigationPage::builder()
+            .title(t("Tessera"))
+            .child(&sidebar_view)
+            .build(),
+    ));
+    // The content's page.
+    let header = adw::HeaderBar::new();
+    header.pack_start(&refresh_button);
     let view = adw::ToolbarView::new();
     view.add_top_bar(&header);
-    view.add_top_bar(&win.old_p11kit);
-    view.set_content(Some(&page));
-    win.toasts.set_child(Some(&view));
+    view.set_content(Some(&win.stack));
+    win.content_page.set_child(Some(&view));
+    win.split.set_content(Some(&win.content_page));
+    win.toasts.set_child(Some(&win.split));
     win.window.set_content(Some(&win.toasts));
+    // Narrow (a phone, a window half the screen): the sidebar is the first
+    // screen, and each page opens over it.
+    let narrow = adw::Breakpoint::new(adw::BreakpointCondition::new_length(
+        adw::BreakpointConditionLengthType::MaxWidth,
+        620.0,
+        adw::LengthUnit::Sp,
+    ));
+    narrow.add_setter(&win.split, "collapsed", Some(&true.to_value()));
+    win.window.add_breakpoint(narrow);
+
+    // A page opens when its row is chosen (selected, as the keyboard and
+    // screen readers do) or clicked again (on a narrow window, to open the
+    // page already chosen).
+    {
+        let w = Rc::downgrade(&win);
+        win.sidebar.connect_row_activated(move |_, row| {
+            if let Some(win) = w.upgrade() {
+                if let Some((name, _, _)) = PAGES.get(row.index() as usize) {
+                    show_page(&win, name);
+                }
+            }
+        });
+        let w = Rc::downgrade(&win);
+        win.sidebar.connect_row_selected(move |_, row| {
+            if let (Some(win), Some(row)) = (w.upgrade(), row) {
+                if let Some((name, _, _)) = PAGES.get(row.index() as usize) {
+                    if win.stack.visible_child_name().as_deref() != Some(name) {
+                        show_page(&win, name);
+                    }
+                }
+            }
+        });
+    }
+    {
+        let w = Rc::downgrade(&win);
+        win.summary_button.connect_clicked(move |_| {
+            if let Some(win) = w.upgrade() {
+                show_page(&win, "system");
+            }
+        });
+    }
+    show_page(&win, "home");
+    win.split.set_show_content(false);
 
     {
         let (hub, w) = (hub.clone(), Rc::downgrade(&win));

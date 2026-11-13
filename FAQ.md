@@ -108,7 +108,7 @@ Veja primeiro se o driver dele está instalado: os drivers dos fabricantes são 
 
 #### Meu token GD Burti (ou cartão SafeSign) trava ou some.
 
-O OpenSC não sabe ler o token GD Burti e, quando tenta, o token trava, também para o SafeSign. O OpenSC do Tessera já deixa de lado os tokens GD Burti (os leitores "StarSign"). Se você usa um **cartão** SafeSign numa leitora comum, ou o problema continuar, desligue o OpenSC na lista de drivers da janela e tire e ponha o token. O OpenSC instalado pela distribuição (o Fedora e o Bluefin o trazem) também trava o token; por isso o Tessera o desliga (a chave **Desligar o OpenSC do sistema**, na seção Serviço, deve ficar ligada). Os aplicativos que já estavam abertos só deixam de carregá-lo quando são abertos de novo.
+O OpenSC não sabe ler o token GD Burti e, quando tenta, o token trava, também para o SafeSign. O OpenSC do Tessera já deixa de lado os tokens GD Burti (os leitores "StarSign"). Se você usa um **cartão** SafeSign numa leitora comum, ou o problema continuar, desligue o OpenSC na lista de drivers da janela e tire e ponha o token. O OpenSC instalado pela distribuição (o Fedora e o Bluefin o trazem) também trava o token; por isso o Tessera o desliga (a chave **Desligar o OpenSC do sistema**, na página Sistema, deve ficar ligada). Os aplicativos que já estavam abertos só deixam de carregá-lo quando são abertos de novo.
 
 #### O token aparece duas vezes, ou o navegador pede o PIN duas vezes.
 
@@ -117,7 +117,7 @@ No **Fedora e derivados**, o próprio sistema já carrega o p11-kit nos aplicati
 O token também aparece duas vezes quando **dois drivers atendem o mesmo token**, e o Tessera avisa na janela:
 
 - **Dois drivers do Tessera** (o OpenSC e o do fornecedor): desligue um deles na lista de drivers. Com o SafeNet ligado, o OpenSC já deixa para ele os cartões IDPrime e o eToken 5110.
-- **O sistema também tem o OpenSC** (o Fedora e o Bluefin o trazem instalado): o Tessera já o desliga, e não deve haver token em dobro por isso. Se você religou o OpenSC do sistema (a chave **Desligar o OpenSC do sistema**, na seção Serviço), o token do OpenSC chega aos aplicativos pelos dois: desligue o OpenSC no Tessera ou ligue a chave de novo.
+- **O sistema também tem o OpenSC** (o Fedora e o Bluefin o trazem instalado): o Tessera já o desliga, e não deve haver token em dobro por isso. Se você religou o OpenSC do sistema (a chave **Desligar o OpenSC do sistema**, na página Sistema), o token do OpenSC chega aos aplicativos pelos dois: desligue o OpenSC no Tessera ou ligue a chave de novo.
 
 #### Como troco ou desbloqueio o PIN de um token do OpenSC (ePass2003)?
 
@@ -152,7 +152,7 @@ O JSignPdf abre um único slot do servidor p11-kit, e o Tessera grava a posiçã
 
 #### O plugin Web PKI ou WebSigner não mostra o meu token.
 
-Nos navegadores em Flatpak, confira, nesta ordem: o passo 1 do navegador (seção Aplicativos) está feito; a linha do navegador em **Assinadores web** mostra o plugin como feito; o navegador foi reiniciado depois do comando; e, nas configurações do plugin, **"Dispositivos SafeSign AET"** (aba "Cripto Dispositivos") está marcado; no WebSigner da Certisign, a opção é **"SafeSign"**. Essa opção vale para qualquer token do Tessera, não só para o SafeSign: é o nome que o plugin usa para carregar o p11-kit. Não marque também "Tokens SafeNet", senão cada token aparece duas vezes.
+Nos navegadores em Flatpak, confira, nesta ordem: o passo 1 do navegador (página Aplicativos) está feito; a linha do navegador em **Assinadores web** mostra o plugin como feito; o navegador foi reiniciado depois do comando; e, nas configurações do plugin, **"Dispositivos SafeSign AET"** (aba "Cripto Dispositivos") está marcado; no WebSigner da Certisign, a opção é **"SafeSign"**. Essa opção vale para qualquer token do Tessera, não só para o SafeSign: é o nome que o plugin usa para carregar o p11-kit. Não marque também "Tokens SafeNet", senão cada token aparece duas vezes.
 
 #### Preciso do Sigillum?
 
@@ -178,7 +178,7 @@ flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 
 Numa instalação de sistema, troque `--user` por `--system`. As extensões (drivers e assinadores web) saem junto com o Tessera. O Flatpak lista cada uma duas vezes e, na segunda, avisa que ela não está instalada (um **[✗]** na lista): é um defeito do próprio Flatpak, inofensivo, porque a primeira linha já a removeu. Se `flatpak list | grep -E 'Tessera\.(Driver|Signer)'` ainda mostrar alguma, remova com `flatpak uninstall --user io.github.pedrohqb.Tessera.Driver.SerproID` (o nome que aparecer). A permissão do passo 1 de cada aplicativo é desfeita com `flatpak override --user --reset <aplicativo>`, que também apaga outras permissões que você tenha dado ao aplicativo.
 
-O Tessera desliga o OpenSC do sistema com dois arquivos que continuam lá depois de desinstalar. Para religá-lo, desligue antes a chave **Desligar o OpenSC do sistema**, na seção Serviço, ou apague os arquivos depois:
+O Tessera desliga o OpenSC do sistema com dois arquivos que continuam lá depois de desinstalar. Para religá-lo, desligue antes a chave **Desligar o OpenSC do sistema**, na página Sistema, ou apague os arquivos depois:
 
 ```bash
 rm -f ~/.config/pkcs11/modules/opensc.module ~/.config/pkcs11/modules/opensc-pkcs11.module
@@ -298,7 +298,7 @@ First check that its driver is installed: the vendors' drivers are separate exte
 
 #### My GD Burti token (or SafeSign card) hangs or disappears.
 
-OpenSC cannot read GD Burti tokens, and when it tries, the token hangs, for SafeSign too. Tessera's OpenSC already leaves GD Burti tokens alone (the "StarSign" readers). If you use a SafeSign **card** in an ordinary reader, or the problem persists, switch OpenSC off in the window's list of drivers and unplug the token and plug it in again. An OpenSC installed by the distribution (Fedora and Bluefin ship it) hangs the token too, which is why Tessera switches it off (keep **Switch off the system's OpenSC**, in the Service section, on). Apps that were already open stop loading it only once they are opened again.
+OpenSC cannot read GD Burti tokens, and when it tries, the token hangs, for SafeSign too. Tessera's OpenSC already leaves GD Burti tokens alone (the "StarSign" readers). If you use a SafeSign **card** in an ordinary reader, or the problem persists, switch OpenSC off in the window's list of drivers and unplug the token and plug it in again. An OpenSC installed by the distribution (Fedora and Bluefin ship it) hangs the token too, which is why Tessera switches it off (keep **Switch off the system's OpenSC**, on the System page, on). Apps that were already open stop loading it only once they are opened again.
 
 #### The token shows twice, or the browser asks for the PIN twice.
 
@@ -307,7 +307,7 @@ On **Fedora and its derivatives**, the system itself already loads p11-kit in na
 A token also shows twice when **two drivers serve it**, and Tessera says so in its window:
 
 - **Two of Tessera's drivers** (OpenSC and the vendor's): switch one off in the list of drivers. While SafeNet is on, OpenSC already leaves IDPrime cards and the eToken 5110 to it.
-- **The system has OpenSC too** (Fedora and Bluefin ship it installed): Tessera already switches it off, so it should not show tokens twice. If you turned the system's OpenSC back on (the **Switch off the system's OpenSC** switch, in the Service section), OpenSC's token reaches the apps through both: switch OpenSC off in Tessera, or turn the switch back on.
+- **The system has OpenSC too** (Fedora and Bluefin ship it installed): Tessera already switches it off, so it should not show tokens twice. If you turned the system's OpenSC back on (the **Switch off the system's OpenSC** switch, on the System page), OpenSC's token reaches the apps through both: switch OpenSC off in Tessera, or turn the switch back on.
 
 #### How do I change or unblock the PIN of an OpenSC token (ePass2003)?
 
@@ -342,7 +342,7 @@ JSignPdf opens a single slot of the p11-kit server, and Tessera writes the posit
 
 #### The Web PKI or WebSigner plugin does not show my token.
 
-In Flatpak browsers, check, in this order: the browser's step 1 (Apps section) is done; the browser's row under **Web signers** shows the plugin as done; the browser was restarted after the command; and, in the plugin's settings, **"Dispositivos SafeSign AET"** ("Cripto Dispositivos" tab) is ticked; in Certisign's WebSigner the option is **"SafeSign"**. That option works for any of Tessera's tokens, not only SafeSign: it is the name the plugin uses to load p11-kit. Do not tick "Tokens SafeNet" as well, or each token shows twice.
+In Flatpak browsers, check, in this order: the browser's step 1 (Apps page) is done; the browser's row under **Web signers** shows the plugin as done; the browser was restarted after the command; and, in the plugin's settings, **"Dispositivos SafeSign AET"** ("Cripto Dispositivos" tab) is ticked; in Certisign's WebSigner the option is **"SafeSign"**. That option works for any of Tessera's tokens, not only SafeSign: it is the name the plugin uses to load p11-kit. Do not tick "Tokens SafeNet" as well, or each token shows twice.
 
 #### Do I need Sigillum?
 
@@ -368,7 +368,7 @@ flatpak uninstall --user --delete-data io.github.pedrohqb.Tessera
 
 For a system-wide install, use `--system` instead of `--user`. The extensions (drivers and web signers) go with it. Flatpak lists each one twice and, the second time, warns that it is not installed (a **[✗]** in the list): a harmless defect of Flatpak itself, since the first line already removed it. If `flatpak list | grep -E 'Tessera\.(Driver|Signer)'` still shows one, remove it with `flatpak uninstall --user io.github.pedrohqb.Tessera.Driver.SerproID` (the name shown). Each app's step 1 permission is undone with `flatpak override --user --reset <app>`, which also removes any other permission you gave the app.
 
-Tessera switches the system's OpenSC off with two files that stay after uninstalling. To turn it back on, first switch off **Switch off the system's OpenSC**, in the Service section, or delete the files afterwards:
+Tessera switches the system's OpenSC off with two files that stay after uninstalling. To turn it back on, first switch off **Switch off the system's OpenSC**, on the System page, or delete the files afterwards:
 
 ```bash
 rm -f ~/.config/pkcs11/modules/opensc.module ~/.config/pkcs11/modules/opensc-pkcs11.module

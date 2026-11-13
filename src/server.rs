@@ -464,6 +464,10 @@ mod tests {
     fn switching_one_driver_leaves_the_others_running() {
         let module = Path::new("/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so");
         if !module.is_file() || !paths::p11kit_server_command().is_file() {
+            // In CI the tools are there, and a skip would hide a failure.
+            if std::env::var("TESSERA_TEST_REQUIRE").as_deref() == Ok("1") {
+                panic!("no p11-kit server or trust module (TESSERA_TEST_REQUIRE=1)");
+            }
             eprintln!("skipped: no p11-kit server or trust module here");
             return;
         }

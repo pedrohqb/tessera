@@ -592,35 +592,24 @@ fn native_row(win: &Rc<Win>, app: &'static native::NativeApp) -> NativeRows {
 }
 
 /// A page of the Apps section: a line about it, then the rows.
-fn apps_page(caption: &str) -> (gtk::Box, gtk::ListBox) {
-    let page = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    let label = gtk::Label::builder()
-        .label(caption)
-        .wrap(true)
-        .xalign(0.0)
-        .css_classes(["dim-label"])
-        .build();
-    let list = gtk::ListBox::builder()
+fn apps_page() -> gtk::ListBox {
+    gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::None)
         .css_classes(["boxed-list"])
-        .build();
-    page.append(&label);
-    page.append(&list);
-    (page, list)
+        .build()
 }
 
 /// The Apps section, with a tab for the Flatpak apps and one for the
 /// native ones; the stack tells which tab is shown (the Web signers
 /// section is for Flatpak browsers only).
-pub(super) fn apps_group(win: &Rc<Win>) -> (adw::PreferencesGroup, gtk::Stack) {
-    let group = adw::PreferencesGroup::builder()
-        .title(t("Apps"))
-        .description(t("Apps that use the tokens through Tessera."))
-        .build();
+pub(super) fn apps_group(win: &Rc<Win>) -> (adw::PreferencesGroup, gtk::Stack, gtk::StackSwitcher) {
+    let group = adw::PreferencesGroup::builder().title(t("Apps")).build();
 
-    let (flatpak_page, flatpak_list) = apps_page(t(
-        "Each needs one or two steps, once: access to the system connection, then (for some) a certificate database.",
-    ));
+    // Each tab's explanation is the group's description (a label of
+    // their own, in the stack, did not wrap and widened the window).
+    const FLATPAK: &str = "Each needs one or two steps, once: access to the system connection, then (for some) a certificate database.";
+    const NATIVE: &str = "Apps installed from the distribution reach Tessera through p11-kit-proxy.so, without the system connection: each needs it in its certificate database, once.";
+    let flatpak_list = apps_page();
     for app in apps::APPS.into_iter().filter(|a| apps::shown(a)) {
         let rows = client_row(win, app);
         flatpak_list.append(&rows.row);
@@ -643,9 +632,7 @@ pub(super) fn apps_group(win: &Rc<Win>) -> (adw::PreferencesGroup, gtk::Stack) {
         flatpak_list.append(&row);
     }
 
-    let (native_page, native_list) = apps_page(t(
-        "Apps installed from the distribution reach Tessera through p11-kit-proxy.so, without the system connection: each needs it in its certificate database, once.",
-    ));
+    let native_list = apps_page();
     for app in native::APPS {
         let rows = native_row(win, app);
         native_list.append(&rows.row);
@@ -656,15 +643,29 @@ pub(super) fn apps_group(win: &Rc<Win>) -> (adw::PreferencesGroup, gtk::Stack) {
         .transition_type(gtk::StackTransitionType::Crossfade)
         .vhomogeneous(false)
         .build();
-    stack.add_titled(&flatpak_page, Some("flatpak"), t("Flatpak"));
-    stack.add_titled(&native_page, Some("native"), t("Native"));
+    stack.add_titled(&flatpak_list, Some("flatpak"), t("Flatpak"));
+    stack.add_titled(&native_list, Some("native"), t("Native"));
+    stack
+        .bind_property("visible-child-name", &group, "description")
+        .transform_to(|_, name: Option<String>| {
+            Some(t(if name.as_deref() == Some("native") {
+                NATIVE
+            } else {
+                FLATPAK
+            }))
+        })
+        .sync_create()
+        .build();
+    // At the top of the Apps page, where it is seen: it also decides
+    // whether the web signers show (they are for Flatpak browsers).
     let switcher = gtk::StackSwitcher::builder()
         .stack(&stack)
-        .valign(gtk::Align::Center)
+        .halign(gtk::Align::Center)
+        .height_request(36)
         .build();
-    group.set_header_suffix(Some(&switcher));
+    switcher.set_size_request(320, 36);
     group.add(&stack);
-    (group, stack)
+    (group, stack, switcher)
 }
 
 #[cfg(test)]

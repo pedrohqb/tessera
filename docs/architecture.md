@@ -65,7 +65,7 @@ Supervision runs in the service, with or without the window (`supervise` in `src
 ## Window, tray and background
 
 - The service is an `adw::Application` with a "hold": it keeps running when the window closes.
-- While the service runs, with the window open or closed, there is a tray icon (it can be removed from the menu, under **Show an icon in the tray**) (StatusNotifierItem, through the `ksni` library) with the summary ("Serving · 2/2 driver(s) · 2 published · 2 token(s)"), **Open Tessera** and **Quit (stop serving the tokens)**. GNOME shows this icon with the AppIndicator extension, which Bluefin, Aurora and Ubuntu already ship; KDE shows it without an extension. The same summary goes to the Background portal, which GNOME shows in the list of background apps.
+- While the service runs, with the window open or closed, there is a tray icon (it can be removed on the System page, with **Show an icon in the tray**) (StatusNotifierItem, through the `ksni` library) with the summary ("Serving · 2/2 driver(s) · 2 published · 2 token(s)"), **Open Tessera** and **Quit (stop serving the tokens)**. GNOME shows this icon with the AppIndicator extension, which Bluefin, Aurora and Ubuntu already ship; KDE shows it without an extension. The same summary goes to the Background portal, which GNOME shows in the list of background apps.
 - `tessera --background` starts only the service. It is the command the Background portal uses when automatic start is on.
 
 ## Flatpak permissions

@@ -7,8 +7,8 @@ src/
   main.rs       command line; check_drivers (publish, restart, stop) and Health
   ui/
     mod.rs      the app: Hub (the state that outlives the window), actions, Background portal
-    window.rs   the window: service, readers, tokens, drivers
-    app_rows.rs the window's Apps section: each app and its steps
+    window.rs   the window: sidebar and pages (Home, Drivers, Apps, System)
+    app_rows.rs the Apps page: each app and its steps
     signer_rows.rs  the window's Web signers section: each Flatpak browser and its commands
     supervise.rs  supervision with or without the window, the tray and the background status
   server.rs     one p11-kit-server per driver (process group, PDEATHSIG, restart)

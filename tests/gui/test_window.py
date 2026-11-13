@@ -8,10 +8,13 @@ TESSERA defaults to target/debug/tessera. Needs at-spi2-core, python3-pyatspi,
 libnss3-tools (certutil) and p11-kit-modules. Exits 1 on the first failure.
 
 What it checks:
+- The sidebar opens the Apps page.
 - Native tab: Firefox's Set up writes p11-kit-proxy.so into the profile and
   the row turns Ready; Okular and Papers have no button, wait for Firefox
   ("Set up Firefox first") and turn Ready with it; PJeOffice Pro's Set up writes p11-kit's
   path for this distribution into list.a3.
+- The Web signers section shows with the Flatpak tab and not with the
+  Native one.
 - Flatpak tab: the Firefox Flatpak's step 2 registers p11-kit-client.so in
   its profile.
 """
@@ -140,7 +143,24 @@ def focused(node):
         return False
 
 
-def activate_by_keyboard(node, presses=80):
+def open_page(app, name):
+    """Open one of the window's pages from the sidebar (its row's label)."""
+    label = wait(f"the sidebar's {name!r}", lambda: find(app, role="label", name=name))
+    row = label.parent
+    while row is not None and row.getRoleName() != "list item":
+        row = row.parent
+    if row is None:
+        fail(f"no sidebar row for {name!r}")
+    # Rows offer no action; choosing one through the list's selection is
+    # what the keyboard does.
+    row.parent.querySelection().selectChild(row.getIndexInParent())
+
+
+def signers_showing(app):
+    return find(app, role="label", name="Web signers") is not None
+
+
+def activate_by_keyboard(node, presses=150):
     """Tab through the window until `node` has the focus, then press Space:
     for widgets AT-SPI offers no action for (an expander row's header).
     Needs xdotool."""
@@ -149,12 +169,17 @@ def activate_by_keyboard(node, presses=80):
         check=False,
         stderr=subprocess.DEVNULL,
     )
+    # Backwards: forwards, the focus would go through the sidebar's rows,
+    # and moving through them chooses them, which changes the page.
     for _ in range(presses):
         if focused(node):
             subprocess.run(["xdotool", "key", "space"], check=True)
             return
-        subprocess.run(["xdotool", "key", "Tab"], check=True)
+        subprocess.run(["xdotool", "key", "shift+Tab"], check=True)
         time.sleep(0.15)
+        if os.environ.get("TESSERA_GUI_DEBUG"):
+            f = next((n for n in nodes(APP) if focused(n)), None)
+            print("focus:", f and (f.getRoleName(), f.name, labels(f)[:2]), flush=True)
     fail(f"could not reach {node.name!r} with the keyboard")
 
 
@@ -259,8 +284,13 @@ def main():
                 fail("old p11-kit banner shown on a host that does not need it")
             ok("no old p11-kit banner on this host")
 
-        # --- Native tab ----------------------------------------------------
+        # --- Apps page, Native tab ----------------------------------------
+        open_page(app, "Apps")
+        wait("the Web signers section with the Flatpak tab", lambda: signers_showing(app))
+        ok("Apps page open; Web signers shown with the Flatpak tab")
         press(wait("the Native tab", lambda: find(app, role="page tab", name="Native")))
+        wait("the Web signers section to hide", lambda: not signers_showing(app))
+        ok("Web signers hidden with the Native tab")
         ff_row = wait(
             "the native Firefox row",
             lambda: find(app, role="list item", name="Firefox", sub="Native app"),
@@ -309,6 +339,7 @@ def main():
 
         # --- Flatpak tab ---------------------------------------------------
         press(wait("the Flatpak tab", lambda: find(app, role="page tab", name="Flatpak")))
+        wait("the Web signers section back with the Flatpak tab", lambda: signers_showing(app))
         flat = wait(
             "the Firefox Flatpak row",
             lambda: find(app, role="list item", name="Firefox", sub="org.mozilla.firefox"),
