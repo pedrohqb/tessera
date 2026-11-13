@@ -69,6 +69,48 @@ struct Instance {
     failure: Option<String>,
     /// The environment its server was started with (driver.env_with).
     env: BTreeMap<String, String>,
+    /// Switched off, but still serving the apps that had it open: it is no
+    /// longer published, and stops once no app is connected (retire).
+    retiring: bool,
+    /// The environment it should run with (when_on), applied once no app is
+    /// connected (settle).
+    pending_env: Option<BTreeMap<String, String>>,
+}
+
+/// Whether an app is connected to a server: p11-kit server runs one
+/// `p11-kit remote` per connection, in the server's process group (spawn).
+///
+/// An app keeps its connection to each server for as long as it runs, and
+/// p11-kit does not connect again. Worse, through p11-kit's proxy (native
+/// apps, and the system's p11-kit server that the Flatpak apps reach) one
+/// module that stops answering makes the whole slot list fail: every token
+/// disappears from that app, not only that driver's. So a server an app is
+/// connected to is never stopped by a switch or a change of environment.
+fn has_connections(child: &Child) -> bool {
+    let pgid = child.id() as i32;
+    let Ok(dir) = fs::read_dir("/proc") else {
+        return false;
+    };
+    dir.flatten().any(|e| {
+        let Ok(pid) = e.file_name().to_string_lossy().parse::<i32>() else {
+            return false;
+        };
+        if pid == pgid {
+            return false;
+        }
+        // /proc/<pid>/stat: "pid (comm) state ppid pgrp …"; comm may hold
+        // spaces or parentheses, so count from the last ')'.
+        let Ok(stat) = fs::read_to_string(e.path().join("stat")) else {
+            return false;
+        };
+        let Some(rest) = stat.rsplit_once(')').map(|(_, r)| r) else {
+            return false;
+        };
+        rest.split_whitespace()
+            .nth(2)
+            .and_then(|g| g.parse::<i32>().ok())
+            == Some(pgid)
+    })
 }
 
 #[derive(Default)]
@@ -196,6 +238,8 @@ impl Server {
                 child,
                 failure,
                 env,
+                retiring: false,
+                pending_env: None,
             });
         }
         if conflict {
@@ -211,7 +255,7 @@ impl Server {
     fn settle(&mut self) {
         let running = self.running();
         for i in 0..self.instances.len() {
-            if self.instances[i].child.is_none() {
+            if self.instances[i].child.is_none() || self.instances[i].retiring {
                 continue;
             }
             let Some(d) = self
@@ -224,9 +268,17 @@ impl Server {
             };
             let env = d.env_with(&running);
             if env == self.instances[i].env {
+                self.instances[i].pending_env = None;
                 continue;
             }
             let inst = &mut self.instances[i];
+            // An app is connected: the new environment waits for it to
+            // close (see has_connections).
+            if inst.child.as_ref().is_some_and(has_connections) {
+                inst.pending_env = Some(env);
+                continue;
+            }
+            inst.pending_env = None;
             if let Some(child) = inst.child.take() {
                 stop_child(child);
                 let _ = fs::remove_file(paths::driver_socket(&inst.id));
@@ -244,10 +296,8 @@ impl Server {
 
     /// Number of drivers whose server runs, and of those switched on.
     pub fn counts(&self) -> (usize, usize) {
-        (
-            self.instances.iter().filter(|i| i.child.is_some()).count(),
-            self.instances.len(),
-        )
+        let on = || self.instances.iter().filter(|i| !i.retiring);
+        (on().filter(|i| i.child.is_some()).count(), on().count())
     }
 
     pub fn stop(&mut self) {
@@ -306,11 +356,14 @@ impl Server {
     /// again by settle, and only those.
     pub fn set_enabled(&mut self, driver: &Driver, on: bool) {
         if on {
-            if self
+            // Still serving the apps that had it open: in use again.
+            if let Some(inst) = self
                 .instances
-                .iter()
-                .any(|i| i.id == driver.id && i.child.is_some())
+                .iter_mut()
+                .find(|i| i.id == driver.id && i.child.is_some())
             {
+                inst.retiring = false;
+                self.settle();
                 return;
             }
             self.instances.retain(|i| i.id != driver.id);
@@ -328,13 +381,14 @@ impl Server {
                 child,
                 failure,
                 env,
+                retiring: false,
+                pending_env: None,
             });
-        } else if let Some(pos) = self.instances.iter().position(|i| i.id == driver.id) {
-            let inst = self.instances.remove(pos);
-            if let Some(child) = inst.child {
-                stop_child(child);
-                let _ = fs::remove_file(paths::driver_socket(&inst.id));
-            }
+        } else if let Some(inst) = self.instances.iter_mut().find(|i| i.id == driver.id) {
+            // No longer published; stopped once no app uses it (retire).
+            inst.retiring = true;
+            inst.failure = None;
+            self.retire();
         }
         self.settle();
     }
@@ -351,11 +405,14 @@ impl Server {
 
     /// The overall state: Running when every driver's server runs.
     pub fn poll(&mut self) -> State {
+        self.retire();
         let mut exited = false;
         for inst in self.instances.iter_mut() {
             if let Some(child) = inst.child.as_mut() {
                 match child.try_wait() {
                     Ok(None) => {}
+                    // Switched off: its end is no failure (retire drops it).
+                    Ok(Some(_)) if inst.retiring => inst.child = None,
                     Ok(Some(status)) => {
                         exited = true;
                         inst.child = None;
@@ -391,7 +448,11 @@ impl Server {
         }
         // One driver down is shown on its own row; the service runs as long
         // as one driver does.
-        if self.instances.iter().any(|i| i.child.is_some()) {
+        if self
+            .instances
+            .iter()
+            .any(|i| i.child.is_some() && !i.retiring)
+        {
             return State::Running;
         }
         if !failures.is_empty() {
@@ -412,9 +473,43 @@ impl Server {
     pub fn running(&self) -> Vec<String> {
         self.instances
             .iter()
-            .filter(|i| i.child.is_some())
+            .filter(|i| i.child.is_some() && !i.retiring)
             .map(|i| i.id.clone())
             .collect()
+    }
+
+    /// Ids of the drivers switched off whose server still serves the apps
+    /// that had it open.
+    pub fn retiring(&self) -> Vec<String> {
+        self.instances
+            .iter()
+            .filter(|i| i.retiring && i.child.is_some())
+            .map(|i| i.id.clone())
+            .collect()
+    }
+
+    /// Stop the servers switched off that no app uses any more, and give
+    /// the new environment to those waiting for their apps to close.
+    fn retire(&mut self) {
+        let mut i = 0;
+        while i < self.instances.len() {
+            let inst = &mut self.instances[i];
+            if inst.retiring {
+                let idle = !inst.child.as_ref().is_some_and(has_connections);
+                if idle {
+                    let inst = self.instances.remove(i);
+                    if let Some(child) = inst.child {
+                        stop_child(child);
+                        let _ = fs::remove_file(paths::driver_socket(&inst.id));
+                    }
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        if self.instances.iter().any(|i| i.pending_env.is_some()) {
+            self.settle();
+        }
     }
 
     /// Record a start error so `poll` reports it.
@@ -460,8 +555,20 @@ mod tests {
         }
     }
 
+    /// Connect as an app would, and wait for the server to serve it.
+    fn connect(id: &str, srv: &Server) -> UnixStream {
+        let app = UnixStream::connect(paths::driver_socket(id)).unwrap();
+        let inst = srv.instances.iter().find(|i| i.id == id).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !has_connections(inst.child.as_ref().unwrap()) {
+            assert!(Instant::now() < deadline, "{id}: no connection seen");
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        app
+    }
+
     #[test]
-    fn switching_one_driver_leaves_the_others_running() {
+    fn switching_one_driver_leaves_the_others_and_the_open_apps_alone() {
         let module = Path::new("/usr/lib/x86_64-linux-gnu/pkcs11/p11-kit-trust.so");
         if !module.is_file() || !paths::p11kit_server_command().is_file() {
             // In CI the tools are there, and a skip would hide a failure.
@@ -475,37 +582,77 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::env::set_var("TESSERA_SOCKET_DIR", dir.join("sockets"));
         std::env::set_var("XDG_DATA_HOME", dir.join("data"));
+        // Each connection served by p11-kit's own remote: `tessera remote`
+        // would be this test harness.
+        let remote = paths::p11kit_server_command().with_file_name("p11-kit-remote");
+        std::env::set_var("TESSERA_REMOTE_COMMAND", &remote);
+        let alive = |pid: u32| Path::new(&format!("/proc/{pid}")).exists();
 
         // a and b plain; c depends on b (as OpenSC does on SafeNet).
         let ds = vec![driver("a", &[]), driver("b", &[]), driver("c", &["b"])];
         let mut srv = Server::new();
         srv.start(&ds, &[]).unwrap();
-        let (a, c) = (srv.pid_of("a").unwrap(), srv.pid_of("c").unwrap());
-        assert!(srv.pid_of("b").is_some());
-        // An app's connection to a's server, open across the switch.
-        let app = UnixStream::connect(paths::driver_socket("a")).unwrap();
+        let (a, b, c) = (
+            srv.pid_of("a").unwrap(),
+            srv.pid_of("b").unwrap(),
+            srv.pid_of("c").unwrap(),
+        );
 
+        // With no app connected: b stops at once, c starts again (its
+        // environment changed), a is untouched.
         srv.set_enabled(&ds[1], false);
         assert_eq!(srv.pid_of("b"), None);
+        assert!(!alive(b));
         assert!(!paths::driver_socket("b").exists());
         assert_eq!(srv.pid_of("a"), Some(a), "a's server was restarted");
-        assert!(socket_answers(&paths::driver_socket("a")));
         let c2 = srv.pid_of("c").unwrap();
         assert_ne!(c2, c, "c depends on b and must start again");
         assert_eq!(srv.counts(), (2, 2));
-
         srv.set_enabled(&ds[1], true);
-        assert!(srv.pid_of("b").is_some());
-        assert!(socket_answers(&paths::driver_socket("b")));
-        assert_eq!(srv.pid_of("a"), Some(a), "a's server was restarted");
-        assert_ne!(srv.pid_of("c").unwrap(), c2, "c must start again with b");
+        let b2 = srv.pid_of("b").unwrap();
+        let c3 = srv.pid_of("c").unwrap();
+        assert_ne!(c3, c2, "c must start again with b");
+        assert_eq!(srv.pid_of("a"), Some(a));
         assert_eq!(srv.counts(), (3, 3));
-        // Switching on a driver that runs changes nothing.
-        let b = srv.pid_of("b");
-        srv.set_enabled(&ds[1], true);
-        assert_eq!(srv.pid_of("b"), b);
 
-        drop(app);
+        // An app with every driver open (p11-kit's proxy loads them all).
+        let app_a = connect("a", &srv);
+        let app_b = connect("b", &srv);
+        let app_c = connect("c", &srv);
+        srv.set_enabled(&ds[1], false);
+        assert_eq!(srv.pid_of("b"), Some(b2), "b stopped under an open app");
+        assert!(socket_answers(&paths::driver_socket("b")));
+        assert_eq!(srv.running(), vec!["a".to_string(), "c".to_string()]);
+        assert_eq!(srv.retiring(), vec!["b".to_string()]);
+        assert_eq!(srv.counts(), (2, 2));
+        assert_eq!(srv.pid_of("c"), Some(c3), "c restarted under an open app");
+        assert_eq!(srv.poll(), State::Running);
+        assert_eq!(srv.pid_of("b"), Some(b2));
+
+        // Switched on again while still serving: the same server.
+        srv.set_enabled(&ds[1], true);
+        assert_eq!(srv.pid_of("b"), Some(b2));
+        assert!(srv.retiring().is_empty());
+        srv.set_enabled(&ds[1], false);
+
+        // The app closes: b stops, then c gets its new environment.
+        drop(app_b);
+        drop(app_c);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while srv.pid_of("b").is_some() || srv.pid_of("c") == Some(c3) {
+            assert!(
+                Instant::now() < deadline,
+                "b or c not settled after the app closed"
+            );
+            srv.poll();
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(!alive(b2));
+        assert!(srv.retiring().is_empty());
+        assert_eq!(srv.pid_of("a"), Some(a), "a's server was restarted");
+        assert_eq!(srv.counts(), (2, 2));
+
+        drop(app_a);
         srv.stop();
         let _ = std::fs::remove_dir_all(&dir);
     }

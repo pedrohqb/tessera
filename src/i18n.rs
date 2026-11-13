@@ -89,8 +89,16 @@ const PT_BR: &[(&str, &str)] = &[
     ("driver(s)", "driver(s)"),
     ("Use this driver", "Usar este driver"),
     (
+        "still serving the apps that had it open, until they close",
+        "ainda atende os aplicativos que já o usavam, até serem fechados",
+    ),
+    (
         "Driver on. Apps that were already open see it once reopened.",
         "Driver ligado. Os aplicativos que já estavam abertos passam a vê-lo quando forem reabertos.",
+    ),
+    (
+        "Driver off. Apps that were already open keep it until they close.",
+        "Driver desligado. Os aplicativos que já estavam abertos continuam com ele até serem fechados.",
     ),
     (
         "Starts every driver again: the apps that were open lose the tokens until they are reopened",

@@ -21,7 +21,7 @@
 
 use libloading::{Library, Symbol};
 use std::ffi::{c_char, c_int, c_void, CString};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fs, os::unix::fs::PermissionsExt};
 
 use crate::paths;
@@ -204,9 +204,16 @@ pub fn run(args: &[String]) -> i32 {
 pub fn private_dir() -> std::io::Result<PathBuf> {
     let dir = paths::log_dir().with_file_name("libexec");
     fs::create_dir_all(&dir)?;
-    let exe = std::env::current_exe()?;
     let script = dir.join("p11-kit-remote");
-    let body = format!("#!/bin/sh\nexec '{}' remote \"$@\"\n", exe.display());
+    // TESSERA_REMOTE_COMMAND: what serves each connection instead (tests,
+    // whose executable is the test harness, use p11-kit's own).
+    let body = match std::env::var_os("TESSERA_REMOTE_COMMAND") {
+        Some(cmd) => format!("#!/bin/sh\nexec '{}' \"$@\"\n", Path::new(&cmd).display()),
+        None => format!(
+            "#!/bin/sh\nexec '{}' remote \"$@\"\n",
+            std::env::current_exe()?.display()
+        ),
+    };
     if fs::read_to_string(&script).ok().as_deref() != Some(body.as_str()) {
         fs::write(&script, body)?;
     }

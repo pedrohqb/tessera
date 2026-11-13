@@ -514,7 +514,17 @@ pub(super) fn update_drivers(hub: &Hub, win: &Win) {
     let running = hub.server.borrow().running();
     for (id, row, base) in win.driver_rows.borrow().iter() {
         let strikes = hub.health.borrow().strikes(id);
-        let (state, bad) = if disabled.contains(id) {
+        let retiring = hub.server.borrow().retiring();
+        let (state, bad) = if disabled.contains(id) && retiring.contains(id) {
+            (
+                format!(
+                    "{} · {}",
+                    t("Switched off"),
+                    t("still serving the apps that had it open, until they close")
+                ),
+                false,
+            )
+        } else if disabled.contains(id) {
             (t("Switched off").to_string(), false)
         } else if let Some(why) = hub.server.borrow().failure_of(id) {
             (format!("{}: {why}", t("Stopped")), true)
@@ -621,13 +631,14 @@ pub(super) fn fill_drivers(hub: &Rc<Hub>, win: &Rc<Win>) {
                 let on = sw.is_active();
                 hub.set_driver_enabled(&id, on);
                 if let Some(win) = w.upgrade() {
-                    if on {
-                        // p11-kit reads the list of drivers when an app
-                        // connects: an app already open does not see it.
-                        win.toast(t(
-                            "Driver on. Apps that were already open see it once reopened.",
-                        ));
-                    }
+                    // p11-kit reads the list of drivers when an app
+                    // connects; and a driver an app is using keeps serving
+                    // it (Server::set_enabled).
+                    win.toast(if on {
+                        t("Driver on. Apps that were already open see it once reopened.")
+                    } else {
+                        t("Driver off. Apps that were already open keep it until they close.")
+                    });
                     win.last.borrow_mut().clear();
                     refresh(&hub, &win);
                 }
