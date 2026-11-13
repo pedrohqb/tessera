@@ -51,6 +51,18 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.2" date="2026-11-12">
+      <description>
+        <p>A clearer window, and tokens that stay where the apps can see them.</p>
+        <ul>
+          <li>The window in pages (Home, Drivers, Apps, System), using the whole width of a large window. Home says in one line whether everything works.</li>
+          <li>Switching a driver on or off no longer takes the other tokens away from apps that are open, such as PJeOffice Pro. A driver switched off keeps serving the apps that had it open until they close.</li>
+          <li>SerproID now shows up in PJeOffice Pro's Flatpak: its token reports a serial number of its own, no longer the same as the system's trust store.</li>
+          <li>RemoteID, Certisign's cloud certificate by an independent developer, is in the list of drivers to install, marked Experimental.</li>
+          <li>The web signers are shown only with the Flatpak apps, which are the ones that need them.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.1" date="2026-11-10">
       <description>
         <p>A fix, and the documentation reorganized.</p>
